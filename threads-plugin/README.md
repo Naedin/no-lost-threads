@@ -1,4 +1,4 @@
-# threads — process tooling for Claude Code
+# threads: process tooling for Claude Code
 
 A Claude Code plugin for keeping the threads of your work from getting lost. Its first
 command is **`/threads:retro`**.
@@ -27,10 +27,10 @@ premature lock-in, mode confusion, and stale workflow habits.
 - **Self-pass:** a fast reflection on the in-scope work while context is hot. Runs as
   part of every pass — and is the *only* pass under `/threads:retro quick`.
 
-**Findings are candidates, never auto-applied.** They're surfaced in-thread for you to
-accept, reject, or refine — no working-tree changes by default — and the command biases
+**Findings are candidate process changes for you to review.** They're surfaced in-thread for you to
+accept, reject, or refine. The command biases
 toward amending an existing rule over adding a new one (anti-bloat). The point: an agent
-reviewing its own work shouldn't silently rewrite your process docs; *you* decide what
+reviewing its own work shouldn't silently rewrite your process docs. *You* decide what
 gets promoted.
 
 ### Usage
@@ -45,10 +45,9 @@ gets promoted.
 ### Cost
 
 The default spawns a sub-agent that reads your whole session transcript, so it can use
-a meaningful number of tokens — more than a typical command. Two levers keep that in
+a meaningful number of tokens. There are two ways to keep that in
 your control: **`/threads:retro quick`** skips the sub-agent entirely, and the
-sub-agent's model follows your session (the spawning agent right-sizes it; nothing is
-hardcoded to an expensive tier).
+sub-agent's model follows your session (the spawning agent right-sizes it).
 
 ## Install
 
