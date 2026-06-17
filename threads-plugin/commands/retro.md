@@ -4,7 +4,7 @@ argument-hint: "[quick] [optional scope note]"
 allowed-tools: Bash, Read, Grep, Glob, Agent
 ---
 
-# /retro — retrospective pass
+# /threads:retro — retrospective pass
 
 Review the work in **this conversation** as process telemetry: *how* it happened, not
 whether the code is correct.
@@ -12,8 +12,9 @@ whether the code is correct.
 **Args (`$ARGUMENTS`):**
 - no args → run **both** the self-pass (§1) and the fresh-context audit (§2).
 - leading `quick` → **self-pass only**; skip §2.
-- remaining text → optional **scope note** narrowing focus (e.g. `/retro the dedup
-  decision`, `/retro quick this planning thread`). Default scope is the full session.
+- remaining text → optional **scope note** narrowing focus (e.g. `/threads:retro the
+  dedup decision`, `/threads:retro quick this planning thread`). Default scope is the
+  full session.
 
 ## 1. Self-pass (always)
 
