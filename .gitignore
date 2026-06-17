@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Obsidian vault config
+.obsidian/
+.Obsidian/
+
+# Python
+__pycache__/
+*.py[cod]

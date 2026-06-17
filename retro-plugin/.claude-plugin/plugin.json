@@ -1,0 +1,11 @@
+{
+  "name": "retro",
+  "version": "0.1.0",
+  "description": "A /retro slash command that reviews work as process telemetry — how it happened, not whether the code is correct. By default it runs a fresh-context sub-agent that audits the observable session record cold, catching drift, scope leak, ignored user signals, unverified claims, and premature lock-in the original session can't see; `quick` runs a self-pass only. Explicit invocation only — never auto-fires.",
+  "author": {
+    "name": "Jeff Thoene"
+  },
+  "homepage": "https://github.com/Naedin/no-lost-threads",
+  "license": "MIT",
+  "keywords": ["retro", "retrospective", "process", "review", "workflow", "closeout"]
+}

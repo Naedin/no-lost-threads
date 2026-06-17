@@ -1,0 +1,18 @@
+{
+  "name": "no-lost-threads",
+  "owner": {
+    "name": "Jeff Thoene"
+  },
+  "metadata": {
+    "description": "Workflow primitives that keep AI-assisted coding from losing the threads that matter — including the /retro retrospective command.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "retro",
+      "source": "./retro-plugin",
+      "description": "A /retro slash command that reviews work as process telemetry — how it happened, not whether the code is correct. Runs a fresh-context sub-agent audit of the session record by default; `quick` runs a self-pass only. Explicit invocation only; never auto-fires.",
+      "version": "0.1.0"
+    }
+  ]
+}
