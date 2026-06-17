@@ -31,10 +31,6 @@ Reflect on the in-scope work against these prompts:
 Hand the observable session record to a fresh sub-agent that did not do the work, so
 it judges cold without the original context's anchoring.
 
-**If it can't run, fall back — don't fail.** If the record can't be resolved (no
-session id, transcript not found) or no sub-agent is available, run the self-pass
-alone, say so plainly, and continue to Output. Never fabricate a record.
-
 **Step 2a — extract the record.** Run the bundled extractor; it resolves this
 session's transcript, distills it to a compact `asked → did → said` timeline, and
 prints the path:
@@ -43,7 +39,20 @@ prints the path:
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract-record.py"
 ```
 
-If it errors or finds no transcript, take the fallback above.
+**If it fails, surface why — then fall back to the self-pass; never hard-fail or
+fabricate a record.** Don't degrade silently: tell the user (a) what failed, (b) the
+fix, (c) that you're running the self-pass only. Read the command's stderr and match:
+- **`python3: command not found`** (or similar) → Python 3 isn't installed / on
+  `PATH`, and the audit needs it. Suggest installing Python 3 (on Windows the
+  interpreter may be `python` or `py`), or using `/threads:retro quick` to skip the
+  audit deliberately.
+- **`CLAUDE_CODE_SESSION_ID is not set`** → this client didn't expose the session id,
+  so the transcript can't be auto-located. Note they can pass a transcript path to the
+  script directly if they know it.
+- **`no transcript found … set CLAUDE_CONFIG_DIR`** → their Claude data dir is
+  non-default; suggest setting `CLAUDE_CONFIG_DIR`.
+
+Likewise, if the `Agent` tool isn't available (Step 2b), fall back the same way.
 
 **Step 2b — spawn the sub-agent** via the `Agent` tool (general-purpose). Give it the
 printed record path and this brief verbatim. If the session was clean it should

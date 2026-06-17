@@ -61,9 +61,11 @@ Once installed, `/threads:retro` is available in any repo.
 
 ## Requirements
 
-The fresh-context audit shells out to `python3` to distill the session transcript. If
-`python3` isn't on `PATH`, the command degrades to the self-pass instead of failing.
-The self-pass needs nothing beyond Claude Code itself.
+The fresh-context audit shells out to **`python3`** (3.6+) to distill the session
+transcript, which it reads from `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR`). If
+`python3` is missing or the transcript can't be located, `/threads:retro` reports the
+reason and the fix, then runs the self-pass instead of failing — it never silently
+drops the audit. The self-pass needs nothing beyond Claude Code itself.
 
 ## Layout
 

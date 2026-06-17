@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
 extract-record.py — distill a Claude Code session transcript into a compact
-`asked -> did -> said` timeline for the /retro command's fresh-context audit (its default pass).
+`asked -> did -> said` timeline for the /threads:retro command's fresh-context audit.
 
-HARNESS-SPECIFIC (Claude Code). This turns a raw session record into a small,
-reviewable timeline so a fresh-context sub-agent can judge the work cheaply. The
-/retro command invokes it via "${CLAUDE_PLUGIN_ROOT}/scripts/extract-record.py".
+HARNESS-SPECIFIC (Claude Code). Requires Python 3.6+. Reads the session transcript
+from $CLAUDE_CONFIG_DIR (default ~/.claude) and writes a small, reviewable timeline
+to a temp file so a fresh-context sub-agent can judge the work cheaply. The command
+invokes it via "${CLAUDE_PLUGIN_ROOT}/scripts/extract-record.py".
 
 Usage:
     python3 extract-record.py [TRANSCRIPT.jsonl]
 
 If TRANSCRIPT is omitted, resolves this session by id ($CLAUDE_CODE_SESSION_ID)
-under ~/.claude/projects (worktree-safe — never assumes the project dir).
+under <config>/projects (worktree-safe — never assumes the project dir). On any
+failure it exits non-zero with an actionable message on stderr; the command surfaces
+that to the user and falls back to the self-pass.
 
 Writes the timeline to a temp file and prints its path + stats. Drops sub-agent
 sidechains, tool-result payloads, and system-reminder turns; caps long turns so a
@@ -20,16 +23,33 @@ multi-hundred-KB transcript compresses to a few KB.
 import sys, os, json, glob, tempfile
 
 
+def fail(msg):
+    """Exit non-zero with a prefixed, actionable message on stderr."""
+    sys.stderr.write("extract-record: " + msg + "\n")
+    raise SystemExit(1)
+
+
+def config_dir():
+    # Honor a relocated Claude config dir; default to ~/.claude.
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+
+
 def resolve_transcript():
     if len(sys.argv) > 1:
-        return sys.argv[1]
+        path = sys.argv[1]
+        if not os.path.isfile(path):
+            fail("transcript path not found: " + path)
+        return path
     sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
     if not sid:
-        sys.exit("no transcript path given and CLAUDE_CODE_SESSION_ID is unset")
-    hits = glob.glob(os.path.expanduser(f"~/.claude/projects/**/{sid}.jsonl"),
-                     recursive=True)
+        fail("CLAUDE_CODE_SESSION_ID is not set and no transcript path was given — "
+             "this client did not expose the session id. Pass a transcript path as an "
+             "argument, or run the self-pass only.")
+    base = os.path.join(config_dir(), "projects")
+    hits = glob.glob(os.path.join(base, "**", sid + ".jsonl"), recursive=True)
     if not hits:
-        sys.exit(f"no transcript found for session {sid}")
+        fail("no transcript found for session " + sid + " under " + base +
+             " — if your Claude data lives elsewhere, set CLAUDE_CONFIG_DIR.")
     return hits[0]
 
 
@@ -41,7 +61,7 @@ def short(s, n):
 def main():
     src = resolve_transcript()
     rows = []
-    with open(src) as f:
+    with open(src, encoding="utf-8", errors="replace") as f:
         for line in f:
             try:
                 o = json.loads(line)
@@ -73,7 +93,7 @@ def main():
                         rows.append(("  DID ", f"{b.get('name')}({short(key, 100)})"))
 
     out = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", prefix="retro-record-", delete=False)
+        mode="w", encoding="utf-8", suffix=".md", prefix="retro-record-", delete=False)
     with out:
         for tag, body in rows:
             out.write(f"{tag}: {body}\n")
