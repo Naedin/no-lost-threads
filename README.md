@@ -13,25 +13,21 @@ signals, unverified claims, premature lock-in, mode confusion, and stale workflo
 habits.
 
 - **Default (`/threads:retro`):** runs a quick self-pass **and** a fresh-context
-  audit — a sub-agent is handed the observable session record (`what was asked → what
+  audit. A sub-agent is handed the observable session record (`what was asked → what
   was done → what was said`) and judges the work cold, catching the anchoring-driven
-  issues a self-reflection structurally can't see. The cold audit is the headline:
-  most retros only self-reflect.
-- **Quick (`/threads:retro quick`):** the self-pass alone — a fast reflection while
-  context is hot, skipping the sub-agent.
+  issues a self-reflection structurally can't see.
+- **Quick (`/threads:retro quick`):** the self-pass alone. It's a fast reflection that skips the sub-agent.
 
-It's a **command, not a skill** — it runs only when you type `/threads:retro`, and
+Currently, this is only a command. It runs when you type `/threads:retro`, and
 never auto-fires on trigger words.
 
-**Findings are candidates, not changes.** A retro is one agent reviewing work, so its
-findings are surfaced in-thread for you to accept, reject, or refine — no working-tree
-changes by default. That's deliberate: an agent shouldn't silently rewrite your
-process docs on the strength of its own self-review. You decide what gets promoted.
+**The command includes instructions to not auto-adopt changes.** A retro is one agent reviewing work, so its
+findings are surfaced in-thread for you to accept, reject, or refine. That's deliberate: an agent shouldn't silently rewrite your
+process docs on the strength of its own self-review. You decide what's actualy important to your own process.
 
 > **Cost note:** the default spawns a sub-agent that reads your whole session
 > transcript, so it uses more tokens than a typical command. Use `/threads:retro
-> quick` to skip the sub-agent; the audit's model follows your session — nothing is
-> hardcoded.
+> quick` to skip the sub-agent.
 
 ## Install
 
@@ -49,9 +45,6 @@ Then:
 /threads:retro quick               # self-pass only (skip the sub-agent)
 /threads:retro the auth refactor   # narrow the scope
 ```
-
-(More commands may join the `threads` family over time — they'll all live under the
-same `/threads:` prefix, findable by `threads` or by the command name.)
 
 See [`threads-plugin/README.md`](threads-plugin/README.md) for the full command spec.
 
