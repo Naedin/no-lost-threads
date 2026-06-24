@@ -1,0 +1,59 @@
+# Contributing
+
+## Local development
+
+This repo is a plugin marketplace; the plugin lives in `threads-plugin/`. When the
+plugin is installed via `/plugin install`, Claude Code keeps a **cached copy** under
+`~/.claude/plugins/cache/no-lost-threads/threads/<version>/` and runs *that* — **editing
+files in `threads-plugin/` does not change what the installed copy executes.**
+
+To test working-tree changes, load the plugin straight from disk:
+
+```bash
+cd /path/to/no-lost-threads
+claude --plugin-dir ./threads-plugin
+```
+
+`--plugin-dir` (confirmed in Claude Code 2.1.x via `claude --help`) loads the plugin
+from the filesystem for that session, so your edits are what runs — no commit, push, or
+reinstall needed.
+
+To pick up edits made *during* a running session, relaunch with the flag (the guaranteed
+path); `/reload-plugins` may reload commands and agents without a full restart. New files
+(e.g. a new `agents/*.md`) are discovered the same way.
+
+**Don't hand-edit the cache.** Editing files under `~/.claude/plugins/cache/...` is
+unsupported: it's overwritten on update and never syncs back to git. Use `--plugin-dir`.
+
+## How the plugin is wired
+
+- **Commands** — auto-discovered from `threads-plugin/commands/*.md`; no manifest entry
+  needed.
+- **Agents** — auto-discovered from `threads-plugin/agents/*.md`. The agent's `name:`
+  frontmatter field is its handle.
+- **`subagent_type`** — reference a plugin agent as `<plugin>:<agent-name>`. This plugin
+  is named `threads` (see `threads-plugin/.claude-plugin/plugin.json`), so
+  `agents/retro-auditor.md` (`name: retro-auditor`) is spawned as
+  `threads:retro-auditor`.
+
+## Before you call a plugin change "done"
+
+Editing the source is not the same as running it. A change to a command, agent, or
+script isn't done until:
+
+1. **It loads** — `claude --plugin-dir ./threads-plugin` starts with no plugin load
+   errors.
+2. **The changed path has actually been exercised** — for a command that spawns an
+   agent, run it and confirm the agent is reachable under its `threads:<name>` handle,
+   not merely that the file parses.
+
+The trap this guards against: the installed cache can keep running the *old* behavior
+while your working tree looks correct, so a change can appear complete and tested when
+neither is true.
+
+## Releasing
+
+The marketplace install (`/plugin install threads@no-lost-threads`) pulls from git, not
+your working tree. To ship a change to installed users: commit and push, bump `version`
+in **both** `threads-plugin/.claude-plugin/plugin.json` and the plugin entry in
+`.claude-plugin/marketplace.json`, then users update via `/plugin update` (or reinstall).

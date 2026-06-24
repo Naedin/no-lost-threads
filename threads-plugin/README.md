@@ -72,7 +72,8 @@ drops the audit. The self-pass needs nothing beyond Claude Code itself.
 ```
 threads-plugin/
   .claude-plugin/plugin.json    Plugin manifest
-  commands/retro.md             The /threads:retro command (the whole spec lives here)
+  commands/retro.md             The /threads:retro command — flow, args, and output
+  agents/retro-auditor.md       Read-only sub-agent for the fresh-context audit (its brief)
   scripts/extract-record.py     Transcript → compact timeline (used by the fresh-context audit)
 ```
 

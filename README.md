@@ -48,6 +48,12 @@ Then:
 
 See [`threads-plugin/README.md`](threads-plugin/README.md) for the full command spec.
 
+## Development
+
+Working on the plugin itself? See [DEVELOPMENT.md](DEVELOPMENT.md) for the
+local-development loop (`claude --plugin-dir ./threads-plugin`) and the working-tree
+vs. installed-cache gotcha.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
