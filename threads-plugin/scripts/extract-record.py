@@ -18,7 +18,8 @@ that to the user and falls back to the self-pass.
 
 Writes the timeline to a temp file and prints its path + stats. Drops sub-agent
 sidechains, tool-result payloads, and system-reminder turns; caps long turns so a
-multi-hundred-KB transcript compresses to a few KB.
+multi-hundred-KB transcript compresses to a few KB. Agent turns are capped generously
+and keep their head *and* tail, so end-of-turn commitments/deferrals reach the audit.
 """
 import sys, os, json, glob, tempfile
 
@@ -53,9 +54,17 @@ def resolve_transcript():
     return hits[0]
 
 
-def short(s, n):
+def short(s, n, tail=0):
+    """Collapse whitespace and cap at n chars. With tail>0, keep the head *and* the
+    last `tail` chars around an elision, so end-of-turn content (commitments,
+    deferrals, lock-in language) survives — head-only truncation drops exactly where
+    those tend to land."""
     s = " ".join(str(s).split())
-    return s[:n] + ("…" if len(s) > n else "")
+    if len(s) <= n:
+        return s
+    if tail and tail < n:
+        return s[: n - tail].rstrip() + " […] " + s[-tail:].lstrip()
+    return s[:n] + "…"
 
 
 def main():
@@ -84,7 +93,9 @@ def main():
                     if not isinstance(b, dict):
                         continue
                     if b.get("type") == "text" and b.get("text", "").strip():
-                        rows.append(("  SAID", short(b["text"], 700)))
+                        # Agent turns carry the reasoning/claims/commitments the audit
+                        # hunts for; keep head+tail so the cold reviewer sees the end.
+                        rows.append(("  SAID", short(b["text"], 2500, tail=800)))
                     elif b.get("type") == "tool_use":
                         inp = b.get("input") or {}
                         key = (inp.get("file_path") or inp.get("command")

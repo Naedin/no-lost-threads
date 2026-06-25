@@ -59,7 +59,8 @@ your working tree. To ship a change to installed users:
 1. Commit and push to `main`.
 2. Bump `version` in **both** `threads-plugin/.claude-plugin/plugin.json` and the plugin
    entry in `.claude-plugin/marketplace.json` (the `claude plugin tag` step below enforces
-   that these agree).
+   that these agree), and roll [`CHANGELOG.md`](CHANGELOG.md): move the `[Unreleased]`
+   entries under a new `[<version>] — <date>` heading. Same commit as the version bump.
 3. Tag the release: `claude plugin tag --push ./threads-plugin`. This creates and pushes a
    `threads--v<version>` git tag and validates the two manifests are in sync. (The tag is
    release hygiene — Claude Code resolves versions from `marketplace.json` on the default
