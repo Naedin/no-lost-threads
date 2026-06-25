@@ -54,6 +54,28 @@ neither is true.
 ## Releasing
 
 The marketplace install (`/plugin install threads@no-lost-threads`) pulls from git, not
-your working tree. To ship a change to installed users: commit and push, bump `version`
-in **both** `threads-plugin/.claude-plugin/plugin.json` and the plugin entry in
-`.claude-plugin/marketplace.json`, then users update via `/plugin update` (or reinstall).
+your working tree. To ship a change to installed users:
+
+1. Commit and push to `main`.
+2. Bump `version` in **both** `threads-plugin/.claude-plugin/plugin.json` and the plugin
+   entry in `.claude-plugin/marketplace.json` (the `claude plugin tag` step below enforces
+   that these agree).
+3. Tag the release: `claude plugin tag --push ./threads-plugin`. This creates and pushes a
+   `threads--v<version>` git tag and validates the two manifests are in sync. (The tag is
+   release hygiene — Claude Code resolves versions from `marketplace.json` on the default
+   branch, not from tags — but it gives each release a clean ref and a sanity check.)
+
+### How users actually receive the update
+
+Marketplace clones are **pull-based and manual** — Claude Code does *not* auto-refresh
+them, so a stale clone keeps advertising the old version and no "update available" appears.
+There is no author-side way to push an update or a notification. An installed user picks up
+a new version in **two** steps, in order:
+
+```bash
+claude plugin marketplace update no-lost-threads   # refresh the marketplace clone first
+claude plugin update threads@no-lost-threads        # then update the plugin (restart to apply)
+```
+
+Skipping the first step is the common trap: `/plugin update` alone finds nothing new
+because the local marketplace clone still points at the old commit.
