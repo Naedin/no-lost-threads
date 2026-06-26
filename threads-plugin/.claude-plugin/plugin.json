@@ -1,6 +1,6 @@
 {
   "name": "threads",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Process tooling for Claude Code. Its first command, /threads:retro, reviews work as process telemetry — how it happened, not whether the code is correct. By default it runs a fresh-context sub-agent that audits the observable session record cold, catching drift, scope leak, ignored user signals, unverified claims, and premature lock-in the original session can't see; `quick` runs a self-pass only. Explicit invocation only — never auto-fires.",
   "author": {
     "name": "Jeff Thoene"

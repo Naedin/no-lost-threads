@@ -8,7 +8,7 @@ Notable changes to the **threads** plugin, newest first. Versions track the plug
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.2.1] — 2026-06-25
 
 ### Changed
 
