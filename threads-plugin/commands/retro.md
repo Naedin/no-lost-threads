@@ -175,9 +175,12 @@ context that work requires.
 
 Read `retroLogPath` from `.claude/threads.json` (default `.claude/threads-retro-log.md`).
 
-- **Config present** → append every surviving finding, then **say what you appended and
-  where**, in one line. Don't ask first — the user ran a retro, and capture is what it
-  produces — and don't write silently either.
+- **Config present** → append every surviving finding **under the log's `## Entries`
+  heading, ahead of any trailing section** — never a bare end-of-file append; a log that
+  has grown a trailing section puts one outside the section that holds entries, where it
+  still greps and no longer reads. Then **say what you appended and where**, in one line.
+  Don't ask first — the user ran a retro, and capture is what it produces — and don't
+  write silently either.
 - **No config** → the cross-session loop isn't bootstrapped here, so there is nowhere to
   capture. Present the punch list and, in one line, mention `/threads:process-review` can
   set it up. **Don't create the config or the log yourself** — bootstrap belongs to that

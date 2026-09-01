@@ -9,6 +9,45 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.7.2] — 2026-09-01
+
+### Fixed
+
+- **`/threads:process-review` could not see that its own capability-evidence
+  input was short.** `capabilityEvidencePath` had readers and no writer: the
+  field appeared three times in the command, all read-side, and nothing pointed
+  `finding-placer` at the store either — it is not in `processDocs`. A retro-log
+  `Placement:` naming that store was therefore a proposal nothing in the system
+  would act on. The failure is invisible from where the review stands: step 0c
+  counts the store's own keys, and those counts read identically whether the
+  placements addressed to it arrived or not, so a review reports a healthy log
+  and a short one the same way — then ranks capability candidates, the funnel's
+  only non-doc-shaped output, against the short set. Measured in the reference
+  repo before the fix: nine actionable placements named the store and none had
+  landed. Step 0c now reconciles the store against 0b's placements and carries
+  the fraction, and that fraction is a required field of the
+  capability-candidates output, so a run cannot finish its report without having
+  looked. Landing the unresolved ones is a completion step; a decline goes in the
+  ledger. Stated as a rule rather than a required output it would have been
+  another prose route, which is the class of failure it fixes.
+- **Retro's log append named a file but not a position in it.** `/threads:retro`
+  said to append every finding to the retro log while the log's own contract says
+  entries live under `## Entries`. Once a log grows a trailing section, a literal
+  end-of-file append lands outside the section that holds entries — where it
+  still greps and no longer reads, so the failure is silent to the mechanism that
+  ranks recurrence. Retro now appends under `## Entries`, ahead of any trailing
+  section, and the bootstrap seeds the same clause into a new repo's log header.
+
+## slices [0.1.1] — 2026-09-01
+
+### Fixed
+
+- **`/slices:capture` failed on a fully-drained inbox.** The command wrote a stub
+  into `inboxDir` without ensuring the directory existed. Git tracks no empty
+  directories, so draining the last stub deletes the directory and the next
+  capture fails with ENOENT — an inbox that has been used is indistinguishable
+  from a repo that never had one. Capture now creates `inboxDir` when absent.
+
 ## threads [0.7.1] — 2026-09-01
 
 ### Fixed

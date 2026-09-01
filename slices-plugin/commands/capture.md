@@ -36,7 +36,10 @@ sibling. If the argument bundles two concerns, split them: one stub each.
 
 ## 2. Write the stub
 
-A small markdown file in `inboxDir`, kebab-case filename from the concern. Shape:
+A small markdown file in `inboxDir`, kebab-case filename from the concern. **Create
+`inboxDir` if it is absent** — git tracks no empty directories, so an inbox drained to
+its last stub is indistinguishable from a repo that never had one, and the write fails.
+Shape:
 
 ```markdown
 > **Low-trust capture.** Unverified claims recorded in passing — re-verify before

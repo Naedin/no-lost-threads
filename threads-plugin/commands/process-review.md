@@ -68,7 +68,8 @@ convention in the moment. Fields:
 - `capabilityEvidencePath` — optional: a log of findings about *capabilities* — contracts
   and rungs rather than doc sections. Only relevant where the repo builds tooling it also
   uses. It is the one input that can yield a non-doc proposal; without it the funnel is
-  doc-churn-shaped end to end. Absent → narrate and skip.
+  doc-churn-shaped end to end. Written by this command alone — no other step in the system
+  appends here. Absent → narrate and skip.
 - `markTag` — default `process-review-mark`.
 
 **The two files are separate on purpose.** The ledger holds decisions *not* to act and is
@@ -114,7 +115,8 @@ then negotiate with the answers in hand; do not interview blind.
 5. **Seed** (only after confirmation): write `.claude/threads.json`, then re-run the
    step-3 proof reading the pattern back out of the real file; create the retro log at
    `retroLogPath` with a header stating its entry contract (one greppable, domain-free key
-   line per entry, detail indented beneath, a same-key entry meaning a recurrence and
+   line per entry, detail indented beneath, entries appended under an `## Entries`
+   heading rather than at end-of-file, a same-key entry meaning a recurrence and
    nothing else — see step 0 of the review); tag
    `git tag <markTag> HEAD`. Then run one normal pass so the first run delivers value.
    **Migration case:** a repo already keeping a hand-built recurrence log should have it
@@ -157,6 +159,15 @@ commits of process-doc churn — here's what this tool does with that."*
    they are the only input that can produce a non-doc proposal. Without it, every input in
    this funnel is doc-churn-shaped and the output can only ever be doc edits. Count keys
    the same way. Absent → narrate and skip.
+
+   **Then reconcile it against 0b, and carry the number.** A retro-log `Placement:` may
+   name this store, and nothing but this command writes here — so a placement that names
+   it has landed only if an entry for it exists. Grep 0b's placements for this path and
+   check each against the keys you just counted. **The count of unresolved ones is a
+   required field of the capability-candidates output**, including when it is zero. Report
+   it as a fraction (landed / named). This is what makes the store's shortfall visible:
+   0c's key counts look complete whether or not the placements arrived, so a review that
+   reads only 0c reports a healthy log and a short one identically.
 
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
 expensive path and they are *conditional*, not automatic:
@@ -267,6 +278,9 @@ as its yield thins. The gate is what keeps the review affordable at scale.
   implication is a contract change, a rung promotion, or a new capability, not a doc edit.
   Rank by rung implication and occurrence. These are the proposals the doc-churn inputs
   structurally cannot reach, so report them even when the doc-side funnel found more.
+  **Lead with 0c's reconciliation fraction** (placements landed / placements naming the
+  store). Below 100%, the funnel's only non-doc input is short by that many findings and
+  every ranking here was made without them.
 - **The reads that sized the run** — name the `invariantDocs` you actually read and what
   in them bore on this run, plus the depth-gate decision and what triggered it. A run that
   stopped at the gate says so plainly: that is a complete review, not a truncated one.
@@ -292,6 +306,12 @@ never folded into unrelated work.
   `git push -f origin refs/tags/<markTag>`. If it isn't on the remote it's local-only —
   leave it that way; don't publish it as a side effect of a review. (`origin` here means
   whatever the repo's remote is actually called; no remote → nothing to do.)
+- **Land the placements 0c counted as unresolved.** A retro-log `Placement:` naming
+  `capabilityEvidencePath` is a proposal nothing else in the system will act on. Append
+  each in that store's own entry format, or record a decline in the ledger with the
+  reason; then the entries you just landed become collapse candidates below. Under
+  `read-only`, propose the appends rather than making them. Zero unresolved → nothing to
+  do, and 0c already said so.
 - **Maintain the retro log (`retroLogPath`) — you are its only mutator.** Retro appends
   and never edits, so everything below is yours, and nothing else in the system will do
   it. Under `read-only`, propose these rather than applying them.
@@ -341,6 +361,9 @@ never folded into unrelated work.
   session that set it; use it, and record the re-rank.
 - **Counting keys before re-keying them** — the count is then invalidated by your own
   later re-key, after it has already set the ranking.
+- **Judging `capabilityEvidencePath` from its own contents alone.** A store nothing else
+  writes reads as healthy whether or not the placements addressed to it arrived; the
+  reconciliation against 0b is the only thing that can tell those apart.
 - **Running the full funnel against a corpus with no recurrence** — the gate exists
   because measurement cost rises with repo size while a fixed funnel's yield does not.
 - **Silent fallback** — always narrate the tier and its upgrade path.
