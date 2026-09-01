@@ -186,10 +186,12 @@ Read `retroLogPath` from `.claude/threads.json` (default `.claude/threads-retro-
 **Append only. Never edit or remove an existing entry, ever** — not to mark one landed,
 not to tidy, not to collapse a duplicate. Parallel slices mean concurrent retros against
 one repo, and two sessions rewriting the log at once silently drop each other's work.
-Recurrence is recorded by appending a *new* entry that reuses the *same key*, so a repeat
-never requires touching what's already there. Compaction, retirement, and re-keying all
-belong to `/threads:process-review`, which is single-session by requirement and holds the
-write tools for it.
+Recurrence — and *only* recurrence — is recorded by appending a *new* entry that reuses
+the *same key*, so a repeat never requires touching what's already there. That key line is
+the occurrence count `/threads:process-review` reads as evidence, so a same-key append
+made for any other reason reports a recurrence that never happened. Compaction,
+retirement, and re-keying all belong to `/threads:process-review`, which is single-session
+by requirement and holds the write tools for it.
 
 Each entry: the key line, greppable and on its own, with the detail indented beneath it.
 Follow the shape of entries already in the log; if it's empty, its header states the
@@ -211,8 +213,12 @@ don't quietly substitute a different edit. Then check `.claude/threads.json`:
   `<marker>` commit? That's what feeds `/threads:process-review`") and record either
   answer in the config.
 
-The entry still goes in the log — appended with its landing noted, never removed. The
-append-only rule has no exceptions, and the review needs to see that it landed.
+The log entry stays exactly as §4a appended it. The landing is recorded by the `<marker>`
+commit, and `/threads:process-review` is what later collapses a landed entry to a pointer
+at it — never a second entry under the same key, which that review counts as a recurrence,
+and never an edit to the one already there. Under `retroTelemetry: false` the user
+declined the marker commit, so the landing is untracked by their own choice; don't
+improvise a substitute in the log.
 
 ## 5. Ripeness nudge — one line, at the end
 
@@ -251,8 +257,9 @@ backlog earns a sentence on each run.
   the lesson.** Amend first; let the human promote.
 - **Concatenating the two finding sets** and leaving the user to reconcile them.
 - **Placing findings in this context** when the placer was available.
-- **Editing or removing an existing log entry.** Append-only has no exceptions; a
-  concurrent retro is why.
+- **Editing or removing an existing log entry**, or reusing a key for anything but a
+  recurrence. Append-only has no exceptions; a concurrent retro is why, and the key line
+  is a counter.
 - **Capturing silently.** Say what was appended and where — a write nobody was told about
   is the same failure as a nudge nobody heard.
 - **Applying edits because the findings look good.** Capture is the default; landing now

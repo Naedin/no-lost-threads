@@ -54,7 +54,7 @@ appending a further line if fixes land — never rewrite existing lines:
 
 When every defect is addressed and no question remains open, flip the plan's
 status line from draft to **`Status: checked — implement-ready.`** Open questions
-keep it a draft; say what's blocking.
+keep it a draft; name each open question and who has to answer it.
 
 ## Anti-patterns
 

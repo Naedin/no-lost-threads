@@ -114,7 +114,8 @@ then negotiate with the answers in hand; do not interview blind.
 5. **Seed** (only after confirmation): write `.claude/threads.json`, then re-run the
    step-3 proof reading the pattern back out of the real file; create the retro log at
    `retroLogPath` with a header stating its entry contract (one greppable, domain-free key
-   line per entry, detail indented beneath — see step 0 of the review); tag
+   line per entry, detail indented beneath, a same-key entry meaning a recurrence and
+   nothing else — see step 0 of the review); tag
    `git tag <markTag> HEAD`. Then run one normal pass so the first run delivers value.
    **Migration case:** a repo already keeping a hand-built recurrence log should have it
    adopted as `retroLogPath` if its entries can carry keys, not have a second one started

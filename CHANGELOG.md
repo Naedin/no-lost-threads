@@ -9,6 +9,37 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.7.1] — 2026-09-01
+
+### Fixed
+
+- **`/threads:retro`'s escape hatch could silently inflate the retro log's
+  recurrence count.** When a user accepted findings and asked for them to be
+  applied on the spot, the escape hatch closed with "the entry still goes in the
+  log — appended with its landing noted." By that point capture has already
+  happened: the capture step appends unconditionally and is told not to ask
+  first. So noting the landing required either editing an existing entry —
+  forbidden by name, "not to mark one landed" — or appending a second entry
+  under the same key. That same-key append is exactly what the command
+  authorizes as the *recurrence* mechanism, so an agent holding "note the
+  landing" and "never edit" resolves to the move the document had already
+  blessed. Nothing errors and the log stays well-formed; the key's occurrence
+  count simply gains a recurrence that never happened, and
+  `/threads:process-review` reads that count as the evidence that promotes a
+  finding to *adopt now*. The failure is worse than a miscount: it ratchets one
+  way, since nothing demotes a promotion, and it is self-confirming, since retro
+  reads the log *before* it appends — the session that corrupts the count cannot
+  detect what it just did, and the next one inherits it as measured fact. The
+  root is that an entry carries two things, occurrence (what the key counts) and
+  lifecycle (which has no field), so the escape hatch borrowed the counter.
+  Lifecycle now routes to the stream that already owns it: the log entry stays
+  exactly as it was appended, the landing is recorded by the marker commit, and
+  the review collapses the entry to a pointer at that commit. A same-key append
+  is authorized for recurrence and nothing else — stated in the capture rule, in
+  the anti-patterns, and in the log header that bootstrap seeds, so the contract
+  an appending session reads in-file matches the one in the command. Found by a
+  downstream adopter that hit the ambiguity live.
+
 ## threads [0.7.0] — 2026-08-31
 
 ### Added
