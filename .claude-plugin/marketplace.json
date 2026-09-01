@@ -1,0 +1,24 @@
+{
+  "name": "no-lost-threads",
+  "owner": {
+    "name": "Jeff Thoene"
+  },
+  "metadata": {
+    "description": "Workflow primitives that keep AI-assisted coding from losing the threads that matter \u2014 /threads:retro reviews a session, /threads:process-review reads what accumulates across sessions.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "threads",
+      "source": "./threads-plugin",
+      "description": "Process tooling for Claude Code \u2014 two commands, one loop. /threads:retro reviews a session as process telemetry (how it happened, not whether the code is correct), by default via a fresh-context sub-agent that audits the observable record cold; a second fresh sub-agent places findings in the repo's process docs, biased to amend before add, and keys them against a retro log so \"adopt if it recurs\" is measured rather than hoped for. Retro captures findings to that log instead of applying them at the session's most expensive moment. /threads:process-review adjudicates what's pending, reads what accumulated across sessions \u2014 process-shaped commits, or process-doc churn as a fallback \u2014 surfaces reconciliation and structural candidates, and sweeps stable process/workflow docs for negative-space drift the churn signal can't see. No hooks; retro closes with a ripeness nudge instead. First runs bootstrap by inspection and negotiate conventions; nothing is applied without recorded consent.",
+      "version": "0.7.0"
+    },
+    {
+      "name": "slices",
+      "source": "./slices-plugin",
+      "description": "Day-one slice pipeline \u2014 /slices:capture files one-concern, low-trust stubs the moment work is discovered; /slices:draft promotes a stub into a plan that re-verifies the capture's claims and ends in a review digest (shape + at most five tension points); /slices:check hands the plan to a fresh-context adversary told only its path, and no plan is implement-ready until it survives. Rung-one by design: the artifacts are the contract, and later hardening only appends to them.",
+      "version": "0.1.0"
+    }
+  ]
+}
