@@ -1,6 +1,6 @@
 {
   "name": "slices",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Day-one slice pipeline for AI-assisted coding — /slices:capture files one-concern, low-trust stubs the moment work is discovered; /slices:draft promotes a stub into a slice plan that re-verifies the capture's claims and ends in a review digest (shape + tension points); /slices:check hands the plan to a fresh-context adversary told only its path, and no plan is implement-ready until it survives. Contract-first and rung-one by design: the artifacts stay stable as a repo hardens, so adopting the kit early never means migrating later.",
   "author": {
     "name": "Jeff Thoene"

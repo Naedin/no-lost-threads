@@ -18,7 +18,7 @@
       "name": "slices",
       "source": "./slices-plugin",
       "description": "Day-one slice pipeline \u2014 /slices:capture files one-concern, low-trust stubs the moment work is discovered; /slices:draft promotes a stub into a plan that re-verifies the capture's claims and ends in a review digest (shape + at most five tension points); /slices:check hands the plan to a fresh-context adversary told only its path, and no plan is implement-ready until it survives. Rung-one by design: the artifacts are the contract, and later hardening only appends to them.",
-      "version": "0.1.1"
+      "version": "0.1.2"
     },
     {
       "name": "checks",

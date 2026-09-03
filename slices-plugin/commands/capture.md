@@ -10,7 +10,7 @@ allowed-tools: Bash, Read, Grep, Glob, Write, Edit
 immediately as **one pickable concern**, self-disclosing as low-trust, without
 derailing the task at hand. Lifecycle is expressed by directory, never by mutable
 status metadata. A dropped claim gets re-discovered; a wrong gate rots invisibly —
-so a blocker is a **named, checkable condition** or it is omitted entirely.
+so a blocker is a **named, checkable condition** or it is omitted entirely; the field spellings are the reference adopter's, verbatim.
 
 Speed is a correctness property here. This runs mid-anything: one grep, one write,
 one confirmation line, back to work.
@@ -47,21 +47,21 @@ Shape:
 
 # <one-line concern>
 
-- blocked-on: <tokens> — <rationale — omit this line entirely if nothing blocks>
-- source: <origin> <YYYY-MM-DD> — <detail — omit when the observation is this repo's own session>
+- Blocked on: <tokens> — <rationale — omit this line entirely if nothing blocks>
+- Source: <origin> <YYYY-MM-DD> — <detail — omit when the observation is this repo's own session>
 
 <what was noticed, where, and why it might matter — a few lines. The slice's own
 nouns belong here: files, symbols, the moment it surfaced.>
 ```
 
 The banner is mandatory — every future reader, human or agent, is told up front
-that these are captures, not decisions. `blocked-on` is a closed grammar, not
+that these are captures, not decisions. `Blocked on` is a closed grammar, not
 prose: tokens `slice:<plan-basename>`, `signal`, `decision`, comma-separated before
 the ` — `, with the rationale after it (`none` means the same as omitting the line).
 **"Not now" is not a blocker** — if the gate condition can't be named checkably, drop
 the line.
 
-`source` is provenance, not trust. An observation carried in from outside this
+`Source` is provenance, not trust. An observation carried in from outside this
 repo's own sessions is still a low-trust capture, and the banner already says so;
 the line exists so a later reader can tell an observation made here from one
 brought in, and so the origins can be counted. Origin is one of `user`,
@@ -80,5 +80,5 @@ later, deliberately.
 - **Two concerns in one stub**, or a vague stub no one could pick up cold.
 - **A status field, a priority ladder, readiness metadata.** Directory is
   lifecycle; everything else drifts.
-- **A `blocked-on` that means "not now."** Name the checkable gate or drop it.
+- **A `Blocked on` that means "not now."** Name the checkable gate or drop it.
 - **Minting a duplicate** because grepping the inbox felt slower than writing.

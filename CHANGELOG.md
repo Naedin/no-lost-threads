@@ -25,14 +25,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   so prevented errors reach the retro log as observed corrections instead of leaving no
   trace.
 
-## slices [Unreleased]
+## slices [0.1.2] — 2026-09-03
 
-### Changed
+### Contract
 
-- **Stub fields carry a closed grammar.** `blocked-by` is now `blocked-on: <tokens> —
-  <rationale>` with tokens `slice:<plan-basename>`, `signal`, `decision`; `source:` is
-  `<origin> <date> — <detail>` with origin `user`, `repo:<name>`, or
-  `carved:<plan-basename>`. Both lines stay optional and mean the same when absent.
+- **Stub fields carry a closed grammar, spelled as the reference adopter spells them.**
+  `blocked-by` is now `Blocked on: <tokens> — <rationale>` with tokens
+  `slice:<plan-basename>`, `signal`, `decision`; `source:` is now `Source: <origin>
+  <date> — <detail>` with origin `user`, `repo:<name>`, or `carved:<plan-basename>`.
+  Both lines stay optional and mean the same when absent. Benefit of a new spelling:
+  none — the side with fewer carriers moved. Adopter-side edit: none for a repo already
+  on `Blocked on:`; a repo on `blocked-by` renames the line.
 
 ### Added
 
