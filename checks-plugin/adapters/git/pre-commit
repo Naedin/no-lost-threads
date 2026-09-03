@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# checks — git pre-commit adapter. Judges the index, not the working tree: the
+# index is exported to a temporary tree and the runner runs there, so a check that
+# reads across files sees exactly what the commit will contain.
+#
+# Install, from a checkout that carries the plugin:
+#   git config core.hooksPath checks-plugin/adapters/git
+# Inert when the index carries no .claude/checks.json: exit 0, no output.
+# Otherwise the runner's exit is the hook's exit — 1 refuses on a block finding,
+# 2 refuses because the gate could not run.
+
+plugin="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)" || exit 2
+
+if ! git ls-files --cached --error-unmatch -- .claude/checks.json >/dev/null 2>&1; then
+  exit 0
+fi
+
+tmp="$(mktemp -d)" || exit 2
+trap 'rm -rf "$tmp"' EXIT
+
+git checkout-index -a --prefix="$tmp/" || { echo "checks: could not export the index" >&2; exit 2; }
+
+python3 "$plugin/run.py" --root "$tmp"
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "checks: commit refused (exit $status)" >&2
+fi
+exit "$status"

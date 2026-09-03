@@ -31,7 +31,9 @@ Work in this order:
    stated problem; acceptance criteria that test a proxy instead of the real gate;
    criteria with no named verify command; a replacement whose fallout on existing
    behavior is unexamined; tests that assert the implementation rather than the
-   requirement; a bundled second concern hiding inside the slice.
+   requirement; a bundled second concern hiding inside the slice; a ruling or
+   tension in the plan that changes a recorded decision without naming that
+   decision's own amendment in scope.
 
 Report in two kinds, and keep them separate:
 

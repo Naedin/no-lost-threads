@@ -40,4 +40,6 @@ instance after the fact but can't change the read-time response that let it thro
 
 Cite the specific USER/SAID/DID events as evidence. If the session is clean, say so
 plainly — do not pad, and do not invent findings because you were asked to look. Record
-what worked, too, not only faults. Your reply IS the report (raw findings, no preamble).
+what worked, too, not only faults: a claim the record shows revised after a doc read is
+a `positive/` finding naming the doc — it turns a prevented error into an observed
+correction. Your reply IS the report (raw findings, no preamble).

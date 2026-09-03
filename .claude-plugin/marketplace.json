@@ -12,13 +12,19 @@
       "name": "threads",
       "source": "./threads-plugin",
       "description": "Process tooling for Claude Code \u2014 two commands, one loop. /threads:retro reviews a session as process telemetry (how it happened, not whether the code is correct), by default via a fresh-context sub-agent that audits the observable record cold; a second fresh sub-agent places findings in the repo's process docs, biased to amend before add, and keys them against a retro log so \"adopt if it recurs\" is measured rather than hoped for. Retro captures findings to that log instead of applying them at the session's most expensive moment. /threads:process-review adjudicates what's pending, reads what accumulated across sessions \u2014 process-shaped commits, or process-doc churn as a fallback \u2014 surfaces reconciliation and structural candidates, and sweeps stable process/workflow docs for negative-space drift the churn signal can't see. No hooks; retro closes with a ripeness nudge instead. First runs bootstrap by inspection and negotiate conventions; nothing is applied without recorded consent.",
-      "version": "0.7.2"
+      "version": "0.7.3"
     },
     {
       "name": "slices",
       "source": "./slices-plugin",
       "description": "Day-one slice pipeline \u2014 /slices:capture files one-concern, low-trust stubs the moment work is discovered; /slices:draft promotes a stub into a plan that re-verifies the capture's claims and ends in a review digest (shape + at most five tension points); /slices:check hands the plan to a fresh-context adversary told only its path, and no plan is implement-ready until it survives. Rung-one by design: the artifacts are the contract, and later hardening only appends to them.",
       "version": "0.1.1"
+    },
+    {
+      "name": "checks",
+      "source": "./checks-plugin",
+      "description": "Repo guardrails as scripts behind a gate \u2014 one script per check with a stable id and exit codes 0 / 1 / 2 meaning pass, findings, refused; .claude/checks.json names the enabled checks and each one's rung, warn or block; a git pre-commit adapter judges the index and is inert in a repo with no config. Two checks ship: anchors (every in-repo section link resolves to an explicit <a id> and every relative link target exists) and war-stories (narrative provenance in process docs). Rung as config is the enforcement ladder made add-only.",
+      "version": "0.1.0"
     }
   ]
 }

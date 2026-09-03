@@ -47,16 +47,26 @@ Shape:
 
 # <one-line concern>
 
-- blocked-by: <named, checkable condition — omit this line entirely if none>
+- blocked-on: <tokens> — <rationale — omit this line entirely if nothing blocks>
+- source: <origin> <YYYY-MM-DD> — <detail — omit when the observation is this repo's own session>
 
 <what was noticed, where, and why it might matter — a few lines. The slice's own
 nouns belong here: files, symbols, the moment it surfaced.>
 ```
 
 The banner is mandatory — every future reader, human or agent, is told up front
-that these are captures, not decisions. `blocked-by` is a closed grammar, not
-prose: a named slice, an external signal, or a maintainer decision. **"Not now" is
-not a blocker** — if the gate condition can't be named checkably, drop the line.
+that these are captures, not decisions. `blocked-on` is a closed grammar, not
+prose: tokens `slice:<plan-basename>`, `signal`, `decision`, comma-separated before
+the ` — `, with the rationale after it (`none` means the same as omitting the line).
+**"Not now" is not a blocker** — if the gate condition can't be named checkably, drop
+the line.
+
+`source` is provenance, not trust. An observation carried in from outside this
+repo's own sessions is still a low-trust capture, and the banner already says so;
+the line exists so a later reader can tell an observation made here from one
+brought in, and so the origins can be counted. Origin is one of `user`,
+`repo:<name>`, or `carved:<plan-basename>`, then the date, then ` — ` and the
+detail (the command, the window, the doc). How it arrived is not part of the line.
 
 ## 3. Confirm and return
 
@@ -70,5 +80,5 @@ later, deliberately.
 - **Two concerns in one stub**, or a vague stub no one could pick up cold.
 - **A status field, a priority ladder, readiness metadata.** Directory is
   lifecycle; everything else drifts.
-- **A `blocked-by` that means "not now."** Name the checkable gate or drop it.
+- **A `blocked-on` that means "not now."** Name the checkable gate or drop it.
 - **Minting a duplicate** because grepping the inbox felt slower than writing.

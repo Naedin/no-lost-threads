@@ -14,7 +14,8 @@ verifiable, completable in a single fresh session.
   moment work is discovered, without derailing the current task. Stubs carry a
   mandatory low-trust banner: they are captures, not decisions. Lifecycle is
   expressed by directory, never by status metadata; a blocker is a named,
-  checkable condition or nothing.
+  checkable condition or nothing; a `source:` line names where an observation
+  came from when that is not this repo's own session.
 - **`/slices:draft <stub>`** — promote a stub into a slice plan. The capture's
   claims are re-verified against current code before anything is built on them;
   bundled concerns are carved into separate stubs; the stub is deleted in the

@@ -3,11 +3,12 @@
 
 Workflow tooling for AI-assisted coding. This repository is a Claude Code
 **plugin marketplace** carrying growable workflow capabilities — adopt what your
-repo's scale warrants; each hardens in place without migrations. Two plugins so
+repo's scale warrants; each hardens in place without migrations. Three plugins so
 far: **`threads`** (process learning — `/threads:retro` reviews a single session
 as process telemetry, `/threads:process-review` reads what accumulates across
-sessions) and **`slices`** (the day-one slice pipeline — capture, draft,
-gap-check).
+sessions), **`slices`** (the day-one slice pipeline — capture, draft,
+gap-check), and **`checks`** (repo guardrails — plain scripts with stable ids
+behind a pre-commit gate, each check's rung set by config).
 
 ## `/threads:retro` — a process-retrospective slash command
 
@@ -76,6 +77,18 @@ adversary told only its path — no plan is implement-ready until it survives. T
 artifacts are the contract, so later hardening (lint, ledgers, gates) only
 appends to them. Full spec: [`slices-plugin/README.md`](slices-plugin/README.md).
 
+## `checks` — repo guardrails behind a gate
+
+One script per check, with a stable id, fixtures, and exit codes meaning pass,
+findings, refused. `.claude/checks.json` names the checks a repo has turned on and
+each one's rung, `warn` or `block`, so enforcement climbs by config and never by
+migration. A git pre-commit adapter judges the index and is inert in a repo with
+no config. Two checks ship: `anchors` (every in-repo section link resolves to an
+explicit anchor; every relative link target exists) and `war-stories` (narrative
+provenance in process docs). Installed from the marketplace, this version is
+inert; the gate installs from a checkout that carries the plugin. Full contract:
+[`checks-plugin/README.md`](checks-plugin/README.md).
+
 ## Install
 
 This repository is a plugin marketplace. In Claude Code:
@@ -84,6 +97,7 @@ This repository is a plugin marketplace. In Claude Code:
 /plugin marketplace add Naedin/no-lost-threads
 /plugin install threads@no-lost-threads
 /plugin install slices@no-lost-threads
+/plugin install checks@no-lost-threads
 ```
 
 Then:

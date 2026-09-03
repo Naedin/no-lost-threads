@@ -1,0 +1,11 @@
+{
+  "name": "checks",
+  "version": "0.1.0",
+  "description": "Repo guardrails as scripts behind a gate — one script per check with a stable id and exit codes 0 / 1 / 2 meaning pass, findings, refused; .claude/checks.json names the enabled checks and each one's rung, warn or block; a git pre-commit adapter judges the index and is inert in a repo with no config. Two checks ship: anchors (every in-repo section link resolves to an explicit <a id> and every relative link target exists) and war-stories (narrative provenance in process docs). Rung as config is the enforcement ladder made add-only.",
+  "author": {
+    "name": "Jeff Thoene"
+  },
+  "homepage": "https://github.com/Naedin/no-lost-threads",
+  "license": "MIT",
+  "keywords": ["checks", "guardrails", "lint", "pre-commit", "gate", "anchors", "process", "workflow"]
+}

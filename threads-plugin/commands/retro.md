@@ -231,16 +231,27 @@ tag, or nothing accrued.
 
 Measure — cheap, all local git plus one file read:
 
-- **Pending** — entries in the retro log, and roughly how old the oldest is.
+- **Pending** — key lines appended to the retro log since the mark. The mark is the
+  adjudication boundary `/threads:process-review` advances, so it is the one thing both
+  commands share, and pending is derived from it and nothing else:
+  `git diff <markTag> -- <retroLogPath> | grep -c '^+<key-line shape>'`, where the shape
+  is the one the log's own header states, against the working tree so this run's own
+  appends count. Oldest: the date on the first such line. **Never count
+  the whole file.** The log is append-only and the review collapses an adjudicated entry
+  in place, so no entry ever leaves it — a whole-file count is the lifetime total, and
+  reporting it as pending calls a clean review a backlog.
 - **Volume** — marker commits since the mark: `git log <markTag>..HEAD --format='%s%x09%h'
   | grep '<markerPattern>'`, subject-first so the anchored pattern tests the subject.
 - **Concentration** — any file touched by `trigger.concentration` or more of those
   commits.
 
-Say something only when pending entries exist, or a `trigger` bar is met. Then **one
-sentence, teasing the finding rather than the count** — *"nine findings are pending, the
-oldest about six weeks, and one doc has churned across four process commits since the last
-review."*
+Say something only when pending is non-zero, or a `trigger` bar is met; when neither
+holds, say nothing — the review is current, and a nudge with nothing behind it is the
+same failure as one nobody heard. Then **one sentence, teasing the finding rather than
+the count**, and telling this session's appends apart from older unreviewed ones — *"six
+findings are pending, all from this session"* is a different report from *"nine findings
+are pending, the oldest about six weeks, and one doc has churned across four process
+commits since the last review,"* and only the second is a backlog.
 
 **Point at a fresh thread, and never offer to run it here.** `/threads:process-review`
 requires a context that did not do the work under review, and this one just did. Say they

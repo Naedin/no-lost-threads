@@ -1,13 +1,73 @@
 <!-- audience: human -->
 # Changelog
 
-Notable changes to this marketplace's plugins (**threads**, **slices**), newest
+Notable changes to this marketplace's plugins (**threads**, **slices**, **checks**), newest
 first per plugin. Versions track each plugin's `version` in its
 `.claude-plugin/plugin.json` and in
 [`marketplace.json`](.claude-plugin/marketplace.json); each release is tagged
 `<plugin>--v<version>`.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## threads [0.7.3] — 2026-09-03
+
+### Fixed
+
+- **The ripeness nudge counted the whole retro log as pending.** `/threads:retro` §5 now
+  derives pending from the review mark, the same boundary `/threads:process-review`
+  adjudicates against, so a clean review is no longer reported as a backlog the next
+  day, and a run with nothing pending and no trigger bar met says nothing.
+
+### Changed
+
+- **The retro auditor records what a read prevented.** A claim the session record
+  shows revised after a doc read is reported as a `positive/` finding naming the doc,
+  so prevented errors reach the retro log as observed corrections instead of leaving no
+  trace.
+
+## slices [Unreleased]
+
+### Changed
+
+- **Stub fields carry a closed grammar.** `blocked-by` is now `blocked-on: <tokens> —
+  <rationale>` with tokens `slice:<plan-basename>`, `signal`, `decision`; `source:` is
+  `<origin> <date> — <detail>` with origin `user`, `repo:<name>`, or
+  `carved:<plan-basename>`. Both lines stay optional and mean the same when absent.
+
+### Added
+
+- **`/slices:check` tests an escalated ruling before recording it.** Step 2 checks the
+  ruling against the docs `invariantDocs` names in `.claude/threads.json` (falling back
+  to `docs/principles.md` and `docs/direction.md`) and surfaces a conflict instead of
+  recording the ruling.
+- **A new gap-check failure class.** A ruling or tension that changes a recorded
+  decision without naming that decision's own amendment in scope.
+- **A stub can say where its observation came from.** The capture contract gains an
+  optional `source:` line, next to `blocked-by`, for an observation carried in from
+  outside the repo's own sessions: another repo's review or retro, a person's
+  report, an issue. Provenance, not trust; the banner still applies. A later reader
+  can tell an observation made in the repo from one brought in, which the banner
+  alone cannot say. The channel by which an outside observation arrives is not part
+  of the line.
+
+## checks [0.1.0] — 2026-09-02
+
+### Added
+
+- **Initial release of `checks`, repo guardrails as scripts behind a gate** — the
+  third capability module. One script per check with a stable id, pass and fail
+  fixture trees proven by `test.sh`, and exit codes 0 / 1 / 2 meaning pass, findings,
+  refused; severity is the rung's, set per check in `.claude/checks.json` as `warn` or
+  `block`, so enforcement climbs by config and never by migration. `run.py` maps
+  findings through rungs and exits 2 itself when a check cannot run, so a broken gate
+  is never a passed one. A git pre-commit adapter exports the index to a temporary
+  tree and runs the runner there, judging the commit's content; it is inert when the
+  index carries no config. Two checks ship: `anchors` (every in-repo section link
+  resolves to an explicit `<a id>` and every relative link target exists;
+  heading-derived slugs fail by design) and `war-stories` (narrative provenance in
+  process docs); for both, fenced code and code spans are not prose. Installed from
+  the marketplace this version is inert — no hook file, no command; the install line
+  assumes the plugin lives in the repo's tree.
 
 ## threads [0.7.2] — 2026-09-01
 
