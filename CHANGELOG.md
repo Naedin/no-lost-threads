@@ -25,6 +25,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   so prevented errors reach the retro log as observed corrections instead of leaving no
   trace.
 
+## slices [0.1.3] — 2026-09-03
+
+### Contract
+
+- **`/slices:capture` is template-aware through an optional `stubTemplate` config
+  field.** `.claude/slices.json` gains an optional `stubTemplate` path. Absent — every
+  current config, this repo's included — capture writes the built-in day-one stub
+  byte-for-byte as before. Set, the command starts from the adopter's template and
+  *overlays* the invariants it guarantees in every repo: a low-trust banner (present; the
+  wording is the template's), the one-concern rule, and the closed `Blocked on:` /
+  `Source:` grammars — auto-emitting any the template omits and narrating that it did,
+  never refusing. The title form, the banner text, and every other field are the
+  adopter's, carried through untouched, so a repo adapts the stub shape through a template
+  instead of editing command text and a `/plugin update` never forks it. Benefit: an
+  adopter carries local stub fields through config, not a command fork. Adopter-side edit:
+  none — the field is additive and opt-in and its absence preserves prior behavior, so no
+  adopter holds it and none needed reconciling.
+
+### Added
+
+- **The stub-template format is documented** in `/slices:capture` and the plugin README:
+  a template is an ordinary stub skeleton read by structure — heading, banner blockquote,
+  the grammar lines, local fields, body. Relationship fields — a `Depends on:`, a
+  `Related:` cross-reference to a set of sibling concerns — are local fields the overlay
+  carries through; point them at durable slugs (plans, epics), not at sibling stubs, which
+  `/slices:draft` deletes on promotion.
+
 ## slices [0.1.2] — 2026-09-03
 
 ### Contract

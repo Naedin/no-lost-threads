@@ -48,6 +48,48 @@ re-converted:
 { "inboxDir": "Plans/inbox", "plansDir": "Plans" }
 ```
 
+### Carrying extra stub fields — an optional template
+
+A repo whose stubs need fields beyond the invariant shape — an epic, a priority, a
+dependency, or its own title form or banner wording — points an optional
+`stubTemplate` at a markdown template instead of editing the command, so a later
+`/plugin update` never forks it:
+
+```json
+{ "inboxDir": "Plans/inbox", "plansDir": "Plans", "stubTemplate": "Plans/templates/stub.md" }
+```
+
+`/slices:capture` starts from that template and **overlays** the invariants it
+guarantees in every repo — a low-trust banner (present; the wording is yours), the
+one-concern rule, and the closed `Blocked on:` / `Source:` grammars — auto-emitting
+any your template omits and saying it did, never refusing. Everything else in the
+template is carried through untouched. With no `stubTemplate`, capture writes the
+built-in day-one stub, so the template is pure opt-in.
+
+A template is an ordinary stub skeleton, read by structure: the `#` heading is the
+title (put `<concern>` where the concern goes), a leading `>` blockquote is your
+banner, `- Blocked on:` / `- Source:` follow the kit's grammar, and any other
+`- Field:` line and the trailing prose are yours. Relationship fields — a
+`Depends on:`, a `Related:` cross-reference to a set of sibling concerns — are
+ordinary local fields the overlay carries through; point them at durable slugs (a
+plan, an epic), not at sibling stubs, which `/slices:draft` deletes on promotion, and
+amend rather than cross-reference two captures of the *same* concern. For example:
+
+```markdown
+# Inbox — <concern>
+
+> ⚠️ **Low-trust capture** — unverified, likely stale. Re-verify before acting.
+
+- Epic: <epic, or —>
+- Priority: <p0–p3, or —>
+- Depends on: <slice, or —>
+- Related: <durable plan/epic slug(s), comma-separated, or —>
+- Blocked on: <tokens> — <rationale — omit when nothing blocks>
+- Source: <origin> <YYYY-MM-DD> — <detail — omit for this repo's own session>
+
+<what was noticed, where, and why it might matter.>
+```
+
 ## How this hardens — and why adopting it early is safe
 
 The kit is **rung one** of each capability it carries, and its artifacts are the
