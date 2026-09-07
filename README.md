@@ -107,6 +107,9 @@ Then:
 /threads:retro quick               # skip the audit (placement still runs)
 /threads:retro the auth refactor   # narrow the scope
 /threads:process-review            # cross-session review; first run bootstraps
+/slices:capture <concern>          # file a one-concern, low-trust stub
+/slices:draft <stub>               # promote it to a plan ending in a review digest
+/slices:check <plan>               # cold gap check; implement-ready only when it survives
 ```
 
 See [`threads-plugin/README.md`](threads-plugin/README.md) for the full command spec.

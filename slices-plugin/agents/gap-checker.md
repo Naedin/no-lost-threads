@@ -31,9 +31,14 @@ Work in this order:
    stated problem; acceptance criteria that test a proxy instead of the real gate;
    criteria with no named verify command; a replacement whose fallout on existing
    behavior is unexamined; tests that assert the implementation rather than the
-   requirement; a bundled second concern hiding inside the slice; a ruling or
-   tension in the plan that changes a recorded decision without naming that
-   decision's own amendment in scope.
+   requirement; a bundled second concern hiding inside the slice — bundled only when
+   it brings its own dependency, its own verification run (a distinct harness, fixture
+   set, or tooling, not a distinct criterion in the same session), or an independently
+   useful landing boundary, since a concern sharing all three with the slice is the
+   same change argument, a split that can name none of the three is not one to ask
+   for, and a doc amendment the change itself requires is part of its argument whatever
+   commit carries it; a ruling or tension in the plan that changes a recorded decision without naming
+   that decision's own amendment in scope.
 
 Report in two kinds, and keep them separate:
 

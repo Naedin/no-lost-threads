@@ -6,7 +6,11 @@ set of habits that pays immediately in an AI-assisted repo, shipped as three
 commands whose artifacts are designed to stay stable as the repo later hardens.
 
 The unit of work is a **slice**: one coherent change argument, independently
-verifiable, completable in a single fresh session.
+verifiable, carved as large as its coherence requires and bounded only by what one
+fresh context can hold whole and self-consistent. Two limits bind it — too much to
+hold, or held material that conflicts with itself — and splitting a coherent change to
+fit them is a concession, never a goal. Splitting small is what large work forces, not
+a virtue: where the coherent change already fits one context, it ships whole.
 
 ## The three commands
 
@@ -89,6 +93,35 @@ amend rather than cross-reference two captures of the *same* concern. For exampl
 
 <what was noticed, where, and why it might matter.>
 ```
+
+### Carrying extra plan sections, and pinning the checker's model
+
+The same overlay serves the plan. A repo whose plans carry sections beyond the invariant
+shape — metadata, a sizing check, a test plan, its own ledgers — points an optional
+`planTemplate` at a plan skeleton, and a repo that wants the gap-checker on a particular
+model names it in `checkerModel`:
+
+```json
+{ "inboxDir": "Plans/inbox", "plansDir": "Plans",
+  "planTemplate": "Plans/templates/plan.md", "checkerModel": "opus" }
+```
+
+`/slices:draft` starts from that template and overlays the invariants — `## Shape`,
+`## Scope`, `## Acceptance`, `## Tensions`, the `## Verification ledger` scaffold at end
+of file, and the `**Status:**` readiness line under the title — auto-emitting any the
+template omits and saying so, never refusing. A template spells an invariant in its own
+words by marking the role on the heading line, `## Summary <!-- slices: shape -->`;
+the roles are `shape`, `scope`, `acceptance`, and `tensions`, and the marker is read
+and dropped, never written into the plan. An unmarked heading is local and carried
+through, sub-headings included, unless it is exactly one of slices' own four or exactly
+`## Verification ledger`, which the scaffold then fills in place. `/slices:check` appends into the fixed ledger — creating
+it at end of file when the plan another drafter wrote has none — and flips only the
+`**Status:**` line `draft` wrote, never writing one into a plan that has none.
+
+`checkerModel` is passed to the gap-checker spawn as given; it takes the harness's
+short model names, the ones its `Agent` tool accepts, not API model ids, and a name the
+harness refuses is narrated and the check runs on the default. With neither field, both commands behave
+exactly as before, so each is pure opt-in.
 
 ## How this hardens — and why adopting it early is safe
 

@@ -9,6 +9,45 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.1.4] — 2026-09-06
+
+### Contract
+
+- **`/slices:draft` and `/slices:check` are template- and config-aware through two
+  optional fields.** `.claude/slices.json` gains `planTemplate` and `checkerModel`.
+  Absent — every current config, this repo's and the reference adopter's included — both
+  commands behave as before: the built-in plan block is unchanged, read identical to the
+  0.1.3 text. Set, `draft` starts from the adopter's plan template and overlays the fixed
+  invariants — `## Shape`, `## Scope`, `## Acceptance`, `## Tensions`, the
+  `## Verification ledger` scaffold at end of file, and the `**Status:**` readiness line
+  under the title — resolving each by a role marker on the template's own heading
+  (`## Summary <!-- slices: shape -->`; roles `shape`, `scope`, `acceptance`, `tensions`;
+  the marker is read and dropped, never written), then by an exact slices heading, then
+  auto-emitting what neither resolves and saying so, never refusing. Local sections are
+  carried through with their placeholders untouched, sub-headings included; a template's
+  H1 is the title. `check` reads `checkerModel` and passes it to the gap-checker spawn as
+  given, narrating it; a refused model is narrated and the check runs on the default;
+  under a true `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` the spawn omits `model` and says the
+  flag overrode the field. `check` creates the `## Verification ledger` at end of file
+  when a plan another drafter wrote has none, and never writes a `**Status:**` line into
+  such a plan — the verdict stays in-thread. Benefit: an adopter carries its own plan
+  sections through a template and pins the checker's model through config, so a
+  `/plugin update` never forks either command. Adopter-side edit: none — both fields are
+  additive and opt-in, their absence preserves prior behavior, and no adopter holds
+  either.
+
+### Added
+
+- **The split test.** `/slices:draft`'s carve step and the gap-checker's "bundled second
+  concern" class carry one rule: a second concern is bundled only when it brings its own
+  dependency, its own verification run (a distinct harness, fixture set, or tooling), or
+  an independently useful landing boundary; sharing all three is one change argument.
+- **The slice definition names its two limits.** Both commands state a slice as one
+  coherent change argument, independently verifiable, bounded by overflow and
+  self-conflict — never split by habit.
+- **`/slices:check` resolves a bare plan name** under `plansDir`, or `Plans` when there is
+  no config.
+
 ## threads [0.7.3] — 2026-09-03
 
 ### Fixed

@@ -1,3 +1,4 @@
+<!-- audience: human -->
 # checks: repo guardrails as scripts behind a gate
 
 A Claude Code plugin carrying checks a repo turns on one at a time, each a plain
