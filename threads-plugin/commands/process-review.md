@@ -70,6 +70,8 @@ convention in the moment. Fields:
   uses. It is the one input that can yield a non-doc proposal; without it the funnel is
   doc-churn-shaped end to end. Written by this command alone — no other step in the system
   appends here. Absent → narrate and skip.
+- `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
+  short name passed through as given. Absent, the agent file's own pin applies.
 - `markTag` — default `process-review-mark`.
 
 **The two files are separate on purpose.** The ledger holds decisions *not* to act and is
@@ -245,7 +247,9 @@ as its yield thins. The gate is what keeps the review affordable at scale.
    `finding-placer` (`subagent_type: threads:finding-placer`) **once, with all
    surviving candidates** — pass each as pattern → evidence → proposal, with your
    ripeness call attached; it returns the target section, the existing text judged
-   against, and the concrete edit. **Name the candidate docs**: `processDocs` plus the
+   against, and the concrete edit. When `placerModel` is set, pass it as the spawn's
+   `model` and say so; a refused model is narrated and the spawn retried without it.
+   **Name the candidate docs**: `processDocs` plus the
    specific files this run surfaced as hot or stale. You already paid for that view, and
    rebuilding it is the placer's largest cost. If the agent or the `Agent` tool is
    unavailable, place here and narrate that the amend-before-add bar was applied by a

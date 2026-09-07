@@ -86,6 +86,8 @@ to pay for that. Hand it off.
 
 Spawn `finding-placer` (`subagent_type: threads:finding-placer`) **once, with all surviving
 findings** — batched, not per-finding, so it can catch two findings that are one lesson.
+When `placerModel` is set in `.claude/threads.json`, pass it as the spawn's `model` and say
+so in one line; if the harness refuses that model, say so and spawn again without it.
 Pass each as **issue → evidence → cost → suggested fix**, plus your **adopt now / adopt
 if it recurs** call. That call needs the session, so it starts with you — but pass it as
 *provisional*: step 3b can settle it with evidence you don't have.

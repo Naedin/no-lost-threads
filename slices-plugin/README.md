@@ -31,13 +31,16 @@ a virtue: where the coherent change already fits one context, it ships whole.
   is load-bearing), tries to break it: re-verifies load-bearing claims at
   file-and-line, walks the change from the user's side, then hunts standard
   failure classes. No plan is implement-ready until it survives; every check
-  leaves a ledger line in the plan.
+  leaves a ledger line in the plan, stamped with the plugin version that wrote it.
 
 Two policies ship as stated rules rather than machinery, deliberately:
 
 - **The two-lane rule.** Full drafting and checking for changes to shipped
-  behavior; low-risk work (docs, reversible chores) may skip the front of the
-  pipeline — but whatever verification guards landing is **never** skipped.
+  behavior whose shape is not yet clear; low-risk work (docs, reversible chores) may
+  skip the front of the pipeline — but whatever verification guards landing is
+  **never** skipped. A change to a plugin's own command text takes the light lane:
+  edit, run the command once from the working tree, commit with a changelog line. No
+  plan and no gap check; the run is the check.
 - **Process telemetry** belongs to the [`threads`](../threads-plugin/README.md)
   plugin (marker commits, retro capture, cross-session review). The kits compose;
   neither duplicates the other.
@@ -122,6 +125,46 @@ it at end of file when the plan another drafter wrote has none — and flips onl
 short model names, the ones its `Agent` tool accepts, not API model ids, and a name the
 harness refuses is narrated and the check runs on the default. With neither field, both commands behave
 exactly as before, so each is pure opt-in.
+
+### Filling your own sections — `draftBrief`
+
+`/slices:draft` fills the template's local sections too, not only the invariants — a
+plan is drafted whole. Each local section's placeholder is its instruction. For rules
+too long for a placeholder (how your repo enumerates UI states, what its test plan
+routes through, which types trigger a compatibility check), point `draftBrief` at a
+markdown file and the drafter applies it:
+
+```json
+{ "inboxDir": "Plans/inbox", "plansDir": "Plans",
+  "planTemplate": "Plans/templates/plan.md", "draftBrief": "Plans/templates/draft-rules.md" }
+```
+
+A section whose placeholder names another writer, or says to omit it at draft time, is
+carried through or omitted as told.
+
+### Carrying your own gap classes — `checkBrief`
+
+A repo whose plans need checks beyond the built-in failure classes — its platform's
+accessibility rules, a data-format compatibility check, a domain-specific hazard list —
+points `checkBrief` at a markdown file of those classes:
+
+```json
+{ "inboxDir": "Plans/inbox", "plansDir": "Plans",
+  "planTemplate": "Plans/templates/plan.md", "checkBrief": "Plans/templates/gap-classes.md" }
+```
+
+`/slices:check` hands that file's path to the cold checker beside the plan's path, and
+the checker runs its classes after the built-in ones. It is repo rules, not drafting
+context, so the read stays cold. This is how a repo that already owns a rich gap-check
+wraps `/slices:check` instead of keeping two checkers: the local classes move into the
+brief, the local command calls `/slices:check`, and nothing is duplicated.
+
+### What the check writes
+
+Under its record line the check appends one row per load-bearing claim it verified —
+the claim, the command that verified it, one line of output — and one per claim it could
+not, marked `unverified` with what would settle it. The record's commit sha is the
+baseline; a later session re-runs only the rows whose cited paths moved since it.
 
 ## How this hardens — and why adopting it early is safe
 

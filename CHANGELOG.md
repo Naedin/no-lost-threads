@@ -1,13 +1,29 @@
 <!-- audience: human -->
 # Changelog
 
-Notable changes to this marketplace's plugins (**threads**, **slices**, **checks**), newest
+Notable changes to this marketplace's plugins (**threads**, **slices**, **guards**), newest
 first per plugin. Versions track each plugin's `version` in its
 `.claude-plugin/plugin.json` and in
 [`marketplace.json`](.claude-plugin/marketplace.json); each release is tagged
 `<plugin>--v<version>`.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## slices [0.1.5] — 2026-09-07
+
+### Contract
+
+- **`/slices:draft` fills the template's local sections.** Previously carried through as placeholders for the adopter's own commands to fill; now filled from their placeholder text and the optional **`draftBrief`** file in `.claude/slices.json` — an adopter-owned file of section-filling rules. A section whose placeholder names another writer or says omit-at-draft is still left alone. A plan is drafted whole; an adopter's draft command reduces to orient, call `/slices:draft`, do its own bookkeeping. Adopter-side edit: none.
+- **`checkBrief`** in `.claude/slices.json` — optional path to an adopter-owned file of local gap classes and user-side lenses; `/slices:check` hands it to the cold checker beside the plan's path, and the checker runs those classes after the built-in ones. This is the hook that lets a repo with its own gap-check wrap `/slices:check` instead of running two checkers. Absent → unchanged behavior. Adopter-side edit: none.
+- **Claim rows in the ledger.** Under its record line, `/slices:check` now appends one indented row per load-bearing claim the checker verified — the claim, the generating command, one line of output — and one per claim it could not, marked `unverified`. The record line itself gains `slices <version>` after the date. Both additive; a reader that only parsed the record line still can. Adopter-side edit: none, though a repo with its own claim ledger can now read this section instead.
+
+### Added
+
+- **`/slices:draft`** — a light-lane check before anything else (a concern touching no shipped behavior needs no plan); a near-duplicate verdict that consolidates before drafting, and a dedup sweep over inbox, plans, and completed; feasibility and sequencing axes on the surviving claims; every artifact the draft names is opened at draft time; a deferral written into the plan body becomes a stub in the same change; a criterion's command is one you ran, and a negative criterion carries a liveness condition; tension entries state the lever (what overriding costs); runs `/slices:check` on the new plan in the same session without being asked, and handles a mis-carved verdict.
+- **`/slices:check`** — a **mis-carved** verdict (a shape problem, not gaps: back to a stub, never repaired in place); a folded fix sweeps the plan body; when findings keep coming after the plan should be done, stop folding and fix the problem one layer down; an escalated question carries the agent's own recommendation.
+- **Gap-checker** — new classes: a special case layered on shared infrastructure where a structural fix is the right altitude; a deferral premise a since-landed change falsified; a hazard analysed in one direction only; boundary states and resumption in the user walk; runnable mechanisms run in both polarities. Reports claim rows and a three-way verdict.
+- **`/slices:capture`** — a stub about a plugin command's behavior names the plugin and version observed; the dedup grep covers plans and completed, not only the inbox.
+- **README** — a change to a plugin's own command text takes the light lane: edit, run once, commit.
 
 ## slices [0.1.4] — 2026-09-06
 
@@ -47,6 +63,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   self-conflict — never split by habit.
 - **`/slices:check` resolves a bare plan name** under `plansDir`, or `Plans` when there is
   no config.
+
+## threads [0.7.4] — 2026-09-07
+
+- **`placerModel`** in `.claude/threads.json` pins the `finding-placer`'s model; both commands pass it to the spawn, and a refused model falls back to the agent's default. The README no longer tells adopters to edit the cached agent file.
 
 ## threads [0.7.3] — 2026-09-03
 
@@ -119,6 +139,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   alone cannot say. The channel by which an outside observation arrives is not part
   of the line.
 
+## guards [0.2.0] — 2026-09-07
+
+- **Renamed from `checks` to `guards`.** The plugin directory is `guards-plugin/`, the config is `.claude/guards.json`, the install is `guards@no-lost-threads`, and the hook path is `guards-plugin/adapters/git`. Check ids, the config's shape, and the exit codes are unchanged. The name no longer collides with `/slices:check`.
+
 ## checks [0.1.0] — 2026-09-02
 
 ### Added
@@ -126,7 +150,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Initial release of `checks`, repo guardrails as scripts behind a gate** — the
   third capability module. One script per check with a stable id, pass and fail
   fixture trees proven by `test.sh`, and exit codes 0 / 1 / 2 meaning pass, findings,
-  refused; severity is the rung's, set per check in `.claude/checks.json` as `warn` or
+  refused; severity is the rung's, set per check in `.claude/guards.json` as `warn` or
   `block`, so enforcement climbs by config and never by migration. `run.py` maps
   findings through rungs and exits 2 itself when a check cannot run, so a broken gate
   is never a passed one. A git pre-commit adapter exports the index to a temporary

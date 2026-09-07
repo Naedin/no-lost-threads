@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# checks — prove every check on its fixtures and the runner on its contract.
+# guards — prove every check on its fixtures and the runner on its contract.
 # Prints one line per case with the expected and observed exit code; exits 1 on
 # the first wrong one.
 #
@@ -50,23 +50,23 @@ r="$tmp/runner"
 mkdir -p "$r/.claude"
 expect 0 "runner: no config" python3 "$here/run.py" --root "$r"
 
-printf '{' > "$r/.claude/checks.json"
+printf '{' > "$r/.claude/guards.json"
 expect 2 "runner: malformed config" python3 "$here/run.py" --root "$r"
 
-printf '{"checks": {"no-such-check": {"rung": "warn"}}}' > "$r/.claude/checks.json"
+printf '{"checks": {"no-such-check": {"rung": "warn"}}}' > "$r/.claude/guards.json"
 expect 2 "runner: unknown check id" python3 "$here/run.py" --root "$r"
 
 cp -R "$here/checks/anchors/fixtures/fail/dead-anchor/." "$r/"
-printf '{"checks": {"anchors": {"rung": "block"}}}' > "$r/.claude/checks.json"
+printf '{"checks": {"anchors": {"rung": "block"}}}' > "$r/.claude/guards.json"
 expect 1 "runner: block finding refuses" python3 "$here/run.py" --root "$r"
 
-printf '{"checks": {"anchors": {"rung": "warn"}}}' > "$r/.claude/checks.json"
+printf '{"checks": {"anchors": {"rung": "warn"}}}' > "$r/.claude/guards.json"
 expect 0 "runner: warn finding passes" python3 "$here/run.py" --root "$r"
 python3 "$here/run.py" --root "$r" 2>/dev/null | grep -q '^warn anchors: ' \
   || { echo "FAIL  runner: warn finding is printed with its prefix"; exit 1; }
 printf 'ok    %-52s\n' "runner: warn finding is printed with its prefix"
 
-printf '{"checks": {"anchors": {"rung": "warn", "exclude": ["*.md"]}}}' > "$r/.claude/checks.json"
+printf '{"checks": {"anchors": {"rung": "warn", "exclude": ["*.md"]}}}' > "$r/.claude/guards.json"
 expect 2 "runner: refused check refuses regardless of rung" python3 "$here/run.py" --root "$r"
 
 echo "all cases passed"

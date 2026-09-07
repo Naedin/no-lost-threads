@@ -1,5 +1,5 @@
 <!-- audience: human -->
-# checks: repo guardrails as scripts behind a gate
+# guards: repo guardrails as scripts behind a gate
 
 A Claude Code plugin carrying checks a repo turns on one at a time, each a plain
 script with a stable id, run by a gate that refuses a commit on a finding. Rung is
@@ -29,8 +29,8 @@ check.py --root DIR [--paths PATH]... [--exclude GLOB]...
   scope is unreadable, or nothing is in scope. A check decides finding or not
   finding; severity is the rung's, never the check's.
 
-**`.claude/checks.json`** names the enabled checks and each one's rung. A check absent
-from `checks` does not run. `paths` and `exclude` are optional and mean what the flags
+**`.claude/guards.json`** names the enabled checks and each one's rung. A check absent
+from `guards` does not run. `paths` and `exclude` are optional and mean what the flags
 above mean:
 
 ```json
@@ -63,13 +63,13 @@ run is never a passed one.
 `adapters/git/pre-commit` exports the index to a temporary tree with
 `git checkout-index` and runs `run.py` there, so the gate judges the commit's content
 and a cross-file check sees every target file. Its exit is the runner's exit. When the
-index carries no `.claude/checks.json` it exits 0 with no output, so the adapter is
+index carries no `.claude/guards.json` it exits 0 with no output, so the adapter is
 inert in a repo that never opted in.
 
 Install, from a checkout that carries this plugin in its tree:
 
 ```
-git config core.hooksPath checks-plugin/adapters/git
+git config core.hooksPath guards-plugin/adapters/git
 ```
 
 That install line assumes the plugin lives in the repo. Installed from the
@@ -81,7 +81,7 @@ versions after this one.
 ## Proving a check
 
 ```
-bash checks-plugin/test.sh
+bash guards-plugin/test.sh
 ```
 
 Runs every fixture case and the two refusal cases for every check, then the runner's

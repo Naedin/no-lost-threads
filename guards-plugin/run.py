@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""checks runner — reads .claude/checks.json at the root, runs each enabled check,
+"""guards runner — reads .claude/guards.json at the root, runs each enabled check,
 and maps its findings through the check's rung.
 
   run.py [--root DIR]        DIR defaults to the git top level, else the cwd.
@@ -27,7 +27,7 @@ RUNGS = ("warn", "block")
 
 
 def err(msg):
-    print(f"checks: {msg}", file=sys.stderr)
+    print(f"guards: {msg}", file=sys.stderr)
 
 
 def git_toplevel():
@@ -64,10 +64,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=None,
-                    help="repo root holding .claude/checks.json (default: git top level)")
+                    help="repo root holding .claude/guards.json (default: git top level)")
     args = ap.parse_args()
     root = pathlib.Path(args.root or git_toplevel()).resolve()
-    config = root / ".claude" / "checks.json"
+    config = root / ".claude" / "guards.json"
     if not config.exists():
         return 0
 

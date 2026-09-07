@@ -67,8 +67,10 @@ spawns no placer.
 
 The auditor's model follows your session. The placer is pinned to **Sonnet**: it's
 handed the docs and the findings, so its job is judgment against text in front of it
-rather than open-ended search, and pinning keeps a frequently-run pass cheap. Change
-`model:` in `agents/finding-placer.md` if you'd rather it match your session.
+rather than open-ended search, and pinning keeps a frequently-run pass cheap. To run it
+on another model, set `placerModel` in `.claude/threads.json` (a harness short name such
+as `"opus"`); both commands pass it to the placer spawn. Never edit the installed agent
+file — it lives in the plugin cache and `/plugin update` overwrites it.
 
 ## `/threads:process-review` — the cross-session review
 

@@ -36,8 +36,9 @@ that wants the built-in stub.
 
 ## 1. One concern, deduped
 
-Grep the inbox (filenames and stub titles) for the concern's seam before minting a
-new file. **Amend an existing stub rather than duplicating it** — a second
+Grep `plansDir` recursively — inbox filenames and stub titles, plan titles, completed
+plans — for the concern's seam before minting a new file; a concern is often already
+framed under another name, or already delivered. **Amend an existing stub rather than duplicating it** — a second
 observation of the same concern strengthens the stub's evidence; it doesn't earn a
 sibling. If the argument bundles two concerns, split them: one stub each.
 
@@ -118,6 +119,14 @@ the line exists so a later reader can tell an observation made here from one
 brought in, and so the origins can be counted. Origin is one of `user`,
 `repo:<name>`, or `carved:<plan-basename>`, then the date, then ` — ` and the
 detail (the command, the window, the doc). How it arrived is not part of the line.
+
+**A concern about a plugin command names the version that ran.** When the stub reports
+the behavior of a `/slices:` or `/threads:` command, the body's first line names the plugin
+and version observed — `slices <version>`, read from
+`${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` for this plugin, or from
+`claude plugin list` for another — so the report can be matched to a release or to a
+working tree loaded with `--plugin-dir`. Both branches write it; it is body text, not a
+field, so no template or grammar changes.
 
 ## 3. Confirm and return
 
