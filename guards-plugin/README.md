@@ -57,6 +57,8 @@ run is never a passed one.
 |---|---|---|
 | `anchors` | a `](path#frag)` whose `frag` is not an explicit `<a id="frag">` in the target (heading-derived slugs fail by design); a relative `](path)` whose target does not exist. External links are skipped. | every tracked `*.md` under the root when the root is a git checkout, else every `*.md` under it |
 | `war-stories` | narrative provenance in prose: `this session`, `maintainer:`, `user:`, `had to say/redirect/point/stop`, `emergency`, `was caught by`, `never arrived`. A rule states its mechanism and its rung; the incident goes in the commit message. | none; `paths` is required |
+| `retro-log` | a line the retro log's grammar cannot read: not a key line (`<class>/<shape>`), an occurrence (`YYYY-MM-DD \| source \| text`), a one-line status (`LANDED\|RETIRED\|UPSTREAM\|REOPENED <ref> — text`), a continuation, or blank; an unknown status token; a status entry over one line; a section after the entries. The grammar is the `threads` plugin's `scripts/retro-log.py`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
+| `review-ledger` | a section other than Live, Falsifications, or Resolved; a dated window line inside a Live entry (`09-04: no fire`, `Re-deferred 2026-09-02:`) where one `last checked: <date> — <state>` line belongs; a Live entry over 12 lines; a Resolved entry over 3 lines. | `ledgerPath` in `.claude/threads.json`, default `.claude/threads-review-ledger.md` |
 
 ## The gate
 

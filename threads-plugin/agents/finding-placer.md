@@ -84,10 +84,10 @@ Plus cross-finding merges, and anything you couldn't place, with the reason.
 The log is **not** a process doc and nothing is ever placed there. It is a capture stream
 your caller appends to, and you do two things with it.
 
-**Grep it; never read it whole.** It grows with every retro, and an unbounded read here is
-the one thing that makes this pass too slow to be worth spawning. Grep for the class
-tokens and vocabulary your findings suggest, and read the hits in place — the same
-discipline as §2.
+**Match against the key list your caller handed you; never read the log whole.** The list
+is one line per key with its occurrence count and state (`retro-log.py view --keys`), and
+it is the whole corpus of shapes. Grep the log itself only for a hit's detail, and read
+that in place — the same discipline as §2.
 
 ### Write a key for each finding
 
@@ -140,7 +140,8 @@ call on the evidence — that fence from §4 holds here exactly as it does every
   genuinely contradict it, note that — don't silently drop it.
 - **Only ever growing the doc.** If the right placement is a removal or a narrowing,
   propose that.
-- **Reading the retro log end to end.** Grep it. It only gets longer.
+- **Reading the retro log end to end.** The key list is the corpus; the log is for a hit's
+  detail.
 - **A key carrying the session's nouns** — the failure that silently makes the whole log
   undedupable, and the one thing only you can prevent.
 - **Minting a near-duplicate of a key you just read**, or talking yourself into a match

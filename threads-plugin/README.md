@@ -140,7 +140,15 @@ threads-plugin/
   agents/retro-auditor.md         Read-only sub-agent for the fresh-context audit (its brief)
   agents/finding-placer.md        Read-only sub-agent that sites findings in your process docs (both commands)
   scripts/extract-record.py       Transcript → compact timeline (used by the fresh-context audit)
+  scripts/retro-log.py            The retro log's view (state and counts per key) and compaction
 ```
+
+**The retro log is an append-only stream, read through a view.** Sessions append; a
+recurrence is the same key with a new dated line, a landing is the key with one `LANDED
+<sha>` line, and `.gitattributes` merges the file by union so concurrent sessions never
+conflict. `python3 <plugin>/scripts/retro-log.py view --keys` derives each key's state and
+occurrence count; `compact` is the review's one rewrite. The `guards` plugin's `retro-log`
+and `review-ledger` checks hold both files to their grammar.
 
 No hooks ship, and nothing runs on a schedule or at session start: both commands are
 explicit-only.

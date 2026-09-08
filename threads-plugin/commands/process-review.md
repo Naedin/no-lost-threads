@@ -60,8 +60,9 @@ convention in the moment. Fields:
 - `ledgerPath` — deferral ledger: what a *review* declined, plus the signal that would
   promote it. Default `.claude/threads-review-ledger.md`.
 - `retroLogPath` — retro log: what *sessions* captured and no review has adjudicated yet.
-  Default `.claude/threads-retro-log.md`. Written append-only by `/threads:retro`; this
-  command is its only mutator.
+  Default `.claude/threads-retro-log.md`. An append-only stream `/threads:retro` writes;
+  `scripts/retro-log.py view` derives each key's state and count from it, and this command
+  is its only mutator, through `scripts/retro-log.py compact` and re-keying.
 - `invariantDocs` — optional, **ordered** (highest authority first): the docs stating what
   this repo holds true. Read at step 0a, before any commit. Absent → the review has no
   input above the commit stream and says so.
@@ -116,10 +117,10 @@ then negotiate with the answers in hand; do not interview blind.
 4. **Confirm `processDocs`** — the one thing inspection can't reliably answer. Ask.
 5. **Seed** (only after confirmation): write `.claude/threads.json`, then re-run the
    step-3 proof reading the pattern back out of the real file; create the retro log at
-   `retroLogPath` with a header stating its entry contract (one greppable, domain-free key
-   line per entry, detail indented beneath, entries appended under an `## Entries`
-   heading rather than at end-of-file, a same-key entry meaning a recurrence and
-   nothing else — see step 0 of the review); tag
+   `retroLogPath` with a header stating the grammar in `scripts/retro-log.py`'s docstring
+   (key line, occurrence lines, one-line status lines, entries under `## Entries` and
+   nothing after them) and propose `<retroLogPath> merge=union` for the repo's
+   `.gitattributes`, which is what lets concurrent sessions append; tag
    `git tag <markTag> HEAD`. Then run one normal pass so the first run delivers value.
    **Migration case:** a repo already keeping a hand-built recurrence log should have it
    adopted as `retroLogPath` if its entries can carry keys, not have a second one started
@@ -140,16 +141,20 @@ commits of process-doc churn — here's what this tool does with that."*
    `invariantDocs` → narrate and skip.
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
-   window: a human accepted each one and a cold reader named its shape.
+   window: a human accepted each one and a cold reader named its shape. Read it through
+   the view, never whole: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys`
+   is one line per key with its state and occurrence count; `view --key <key>` is one
+   key's detail; `view` alone is every live key with detail, which is the read to avoid.
    - **Re-key first, then count — in that order.** A key written at slice altitude cannot
      match anything, so counting before re-keying yields a number the re-key invalidates,
      after every ranking decision has already been made against it. Read every key as a
-     set, rewrite the ones still carrying their session's nouns, *then* count. Entries
-     flagged `key (uncold)` come first, but the sweep is over all of them.
-   - **Count occurrences per key.** Entries sharing a key are the *same finding
-     recurring*; the log is append-only, so a repeat is extra entries rather than an
-     edited one. A key appearing more than once is the promotion the log exists to make
-     visible — rank those first and carry the occurrence count as the evidence.
+     set, rewrite the ones still carrying their session's nouns — a re-key edits the key
+     line wherever it appears, the one edit the stream permits, and only this command
+     makes it — then `compact`, *then* count from the view. Keys flagged `(uncold)` come
+     first, but the sweep is over all of them.
+   - **Count occurrences per key** from the view. A key with two or more occurrences is
+     the promotion the log exists to make visible — rank those first and carry the count
+     as the evidence.
    - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
      view, which is strictly better standing for ranking than the single session that set
      it — so re-rank freely, in either direction. Record the re-rank and the reason; never
@@ -318,9 +323,14 @@ never folded into unrelated work.
   do, and 0c already said so.
 - **Maintain the retro log (`retroLogPath`) — you are its only mutator.** Retro appends
   and never edits, so everything below is yours, and nothing else in the system will do
-  it. Under `read-only`, propose these rather than applying them.
-  - **Entries whose findings landed** collapse to a pointer at the landing commit, the
-    same motion the ledger uses.
+  it. Under `read-only`, propose these rather than applying them. The `guards`
+  `retro-log` check is the shape gate; run it after.
+  - **A finding that landed** gets the key + one `LANDED <sha> — <where>` line appended,
+    if the landing session did not append it. **A retirement** is the key + one
+    `RETIRED <date> — <why>` line; **one that must land elsewhere** is `UPSTREAM <ref>`.
+  - **Then compact:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact` — one
+    block per key, closed keys reduced to their status line. It is the only rewrite of
+    the file and it is deterministic; a violation it refuses on is repaired by hand first.
   - **Re-key before you retire.** Entries flagged `key (uncold)` were keyed by the
     session that did the work, which is the context least able to write a domain-free
     key — re-key those first, and never read their failure to match as evidence of a
@@ -337,12 +347,19 @@ never folded into unrelated work.
   - **Note any key-quality drift in one line** when it holds across the corpus (keys too
     specific to ever match, or so broad they'd match anything). It is the health signal
     for the whole dedup mechanism.
-- Update the ledger (`ledgerPath`) — it is a working file the review reads in full every
-  run, not an archive, so an append-only ledger accelerates per-window:
-  - New deferrals carry what + why + **promoting signal** + date. The gate for any
-    entry: *would a future review act differently without it?* If not, it doesn't go in.
-  - An entry whose promotion **landed** collapses to a pointer at the landing commit;
-    the commit body keeps the story.
+- Update the ledger (`ledgerPath`) — a working file the review reads in full every run,
+  so it holds current state and never a window's narrative. Three sections, each entry a
+  top-level bullet; the `guards` `review-ledger` check is the gate:
+  - **Live** — what was deferred, why, its **promoting signal**, and one
+    `last checked: <date> — <state>` line, rewritten in place each run; at most 12 lines.
+    A dated window line (`09-04: no fire`) is the failure — the state replaces the old
+    state, it does not follow it. The gate for any entry: *would a future review act
+    differently without it?*
+  - **Falsifications** — kept whole; their job is stopping a repeat.
+  - **Resolved** — a pointer at the landing commit, at most 3 lines; the commit body
+    keeps the story.
+  - **This run's narrative** — what fired, what was held, the counts — goes in the body
+    of this run's own `<markerPattern>` commit, never into the ledger.
   - A number recorded in the ledger carries its **generating command**, not just its
     value — a later run re-measures instead of reconciling stale figures under
     similar labels.
@@ -361,6 +378,8 @@ never folded into unrelated work.
   staleness survivors get `git blame`.
 - **Retiring retro-log entries on age alone**, or retiring one that is merely mis-keyed —
   re-key first; blind retirement hides the failure it should surface.
+- **Writing a window's narrative into the ledger**, or editing a log line other than a key
+  being re-keyed. The commit body is the narrative's home; the stream is append-only.
 - **Treating retro's disposition as settled.** You have better standing to rank than the
   session that set it; use it, and record the re-rank.
 - **Counting keys before re-keying them** — the count is then invalidated by your own

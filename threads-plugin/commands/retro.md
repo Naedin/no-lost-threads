@@ -97,9 +97,12 @@ if it recurs** call. That call needs the session, so it starts with you — but 
 past. Rediscovering the repo cold is the placer's single largest cost, and you're not
 cold. It still reads what it places against; it just shouldn't hunt for it.
 
-**Name the retro log too** — `retroLogPath` from `.claude/threads.json` (default
-`.claude/threads-retro-log.md`). It is not a process doc and nothing is ever *placed*
-there; the placer reads it to key the findings, per below.
+**Hand it the key list too.** Run
+`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys` — one line per key with
+its occurrence count and state, derived from `retroLogPath` in `.claude/threads.json` —
+and pass that output with the brief. The log itself is not a process doc and nothing is
+ever *placed* there; the placer matches against the list and greps the log only for a
+hit's detail.
 
 ### 3b. Keys and recurrence — what comes back
 
@@ -188,19 +191,28 @@ Read `retroLogPath` from `.claude/threads.json` (default `.claude/threads-retro-
   set it up. **Don't create the config or the log yourself** — bootstrap belongs to that
   command.
 
-**Append only. Never edit or remove an existing entry, ever** — not to mark one landed,
-not to tidy, not to collapse a duplicate. Parallel slices mean concurrent retros against
-one repo, and two sessions rewriting the log at once silently drop each other's work.
-Recurrence — and *only* recurrence — is recorded by appending a *new* entry that reuses
-the *same key*, so a repeat never requires touching what's already there. That key line is
-the occurrence count `/threads:process-review` reads as evidence, so a same-key append
-made for any other reason reports a recurrence that never happened. Compaction,
-retirement, and re-keying all belong to `/threads:process-review`, which is single-session
-by requirement and holds the write tools for it.
+**Append only. Never edit or remove an existing line.** The log is a stream that
+concurrent sessions merge by union (the adopter sets `merge=union` on it in
+`.gitattributes`), and union merge is only correct when nobody edits a line already
+there. Every change of state is therefore itself an append, and the current state of a
+key is derived from the stream — `scripts/retro-log.py view` derives it; the grammar is
+in that script's header and in the log's own header:
 
-Each entry: the key line, greppable and on its own, with the detail indented beneath it.
-Follow the shape of entries already in the log; if it's empty, its header states the
-contract. Carry any `key (uncold)` flag from §3 into the entry.
+```
+<class>/<shape>[ (uncold)]                    key line, column 0
+  YYYY-MM-DD | <source> | <text>              an occurrence; continuation lines below it
+  LANDED <sha> — <where it landed>            a status line: exactly one line
+```
+
+- **A new finding** → key line + one occurrence line (continuations as needed).
+- **A recurrence** → the *same key* again + a new occurrence line. The occurrence count
+  is the dated lines under a key, so an occurrence appended for any other reason reports
+  a recurrence that never happened.
+- **A finding the user applied in this session** (the escape hatch below) → the key +
+  one `LANDED <sha> — <where>` line, and nothing else; the narrative is in the commit.
+
+Compaction, re-keying, and retirement belong to `/threads:process-review`, which is
+single-session by requirement. Carry any `key (uncold)` flag from §3 into the key line.
 
 ### The escape hatch — landing straight from retro
 
@@ -218,12 +230,10 @@ don't quietly substitute a different edit. Then check `.claude/threads.json`:
   `<marker>` commit? That's what feeds `/threads:process-review`") and record either
   answer in the config.
 
-The log entry stays exactly as §4a appended it. The landing is recorded by the `<marker>`
-commit, and `/threads:process-review` is what later collapses a landed entry to a pointer
-at it — never a second entry under the same key, which that review counts as a recurrence,
-and never an edit to the one already there. Under `retroTelemetry: false` the user
-declined the marker commit, so the landing is untracked by their own choice; don't
-improvise a substitute in the log.
+Then record the landing in the log as §4a says: the key + one `LANDED <sha> — <where>`
+line appended under it, never an edit to the entry already there, and never a second
+occurrence line. Under `retroTelemetry: false` the user declined the marker commit; the
+status line still goes in, pointing at whatever commit carried the edit.
 
 ## 5. Ripeness nudge — one line, at the end
 
@@ -236,12 +246,10 @@ Measure — cheap, all local git plus one file read:
 - **Pending** — key lines appended to the retro log since the mark. The mark is the
   adjudication boundary `/threads:process-review` advances, so it is the one thing both
   commands share, and pending is derived from it and nothing else:
-  `git diff <markTag> -- <retroLogPath> | grep -c '^+<key-line shape>'`, where the shape
-  is the one the log's own header states, against the working tree so this run's own
-  appends count. Oldest: the date on the first such line. **Never count
-  the whole file.** The log is append-only and the review collapses an adjudicated entry
-  in place, so no entry ever leaves it — a whole-file count is the lifetime total, and
-  reporting it as pending calls a clean review a backlog.
+  `git diff <markTag> -- <retroLogPath> | grep -cE '^\+[a-z][a-z0-9-]*/'`, against the
+  working tree so this run's own appends count. Oldest: the date on the first such line.
+  **Never count the whole file** — a whole-file count is the lifetime total, and reporting
+  it as pending calls a clean review a backlog.
 - **Volume** — marker commits since the mark: `git log <markTag>..HEAD --format='%s%x09%h'
   | grep '<markerPattern>'`, subject-first so the anchored pattern tests the subject.
 - **Concentration** — any file touched by `trigger.concentration` or more of those
@@ -273,9 +281,8 @@ backlog earns a sentence on each run.
   the lesson.** Amend first; let the human promote.
 - **Concatenating the two finding sets** and leaving the user to reconcile them.
 - **Placing findings in this context** when the placer was available.
-- **Editing or removing an existing log entry**, or reusing a key for anything but a
-  recurrence. Append-only has no exceptions; a concurrent retro is why, and the key line
-  is a counter.
+- **Editing or removing an existing log line.** Union merge is why; a state change is an
+  appended status line, a repeat is an appended occurrence, and nothing else reuses a key.
 - **Capturing silently.** Say what was appended and where — a write nobody was told about
   is the same failure as a nudge nobody heard.
 - **Applying edits because the findings look good.** Capture is the default; landing now

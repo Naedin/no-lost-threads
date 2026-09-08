@@ -9,6 +9,25 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.8.0] — 2026-09-07
+
+### Contract
+
+- **The retro log is an append-only stream in a fixed grammar, read through a view.** A key line (`<class>/<shape>`), `YYYY-MM-DD | <source> | <text>` occurrence lines with free continuations, and one-line status lines `LANDED | RETIRED | UPSTREAM | REOPENED <ref> — <text>`; entries under `## Entries` with nothing after. A state change is an appended status line — a finding applied in-session is the key plus `LANDED <sha>` — and a recurrence is an appended occurrence under the same key; nothing edits an existing line, which is what makes `merge=union` correct. New `scripts/retro-log.py`: `view [--keys | --key K]` derives each key's state and occurrence count; `compact` is the review's only rewrite (one block per key, closed keys to their status line; refuses, naming the lines, on anything the grammar cannot read). Adopter-side edit: bring the log to the grammar and run `compact`; set `<retroLogPath> merge=union` in `.gitattributes` if not already set.
+- **The ledger holds current state.** Three sections — Live, Falsifications, Resolved. A Live entry carries what, why, the promoting signal, and one `last checked: <date> — <state>` line rewritten in place each run, at most 12 lines; Resolved is a pointer at most 3 lines; a run's narrative goes in its own marker commit body. Adopter-side edit: cut per-window sections into git history and fold dated window lines into last-checked lines.
+
+### Changed
+
+- **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
+- **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
+
+## guards [0.3.0] — 2026-09-07
+
+### Added
+
+- **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
+- **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
+
 ## slices [0.1.5] — 2026-09-07
 
 ### Contract
