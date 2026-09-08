@@ -203,7 +203,8 @@ concurrent sessions merge by union (the adopter sets `merge=union` on it in
 `.gitattributes`), and union merge is only correct when nobody edits a line already
 there. Every change of state is therefore itself an append, and the current state of a
 key is derived from the stream — `scripts/retro-log.py view` derives it; the grammar is
-in that script's header and in the log's own header:
+that script's docstring (`--help` prints it), the log's header only points at it, and this
+block is the copy that ships with the script:
 
 ```
 <class>/<shape>[ (uncold)]                    key line, column 0

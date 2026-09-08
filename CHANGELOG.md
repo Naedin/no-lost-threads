@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.12.0] — 2026-09-08
+
+### Contract
+
+- **The retro log's header points at the grammar and never copies it.** Bootstrap seeds a header saying the grammar is the threads plugin's `retro-log.py` docstring and that `--help` prints it, then `## Entries`. A copy in the header was a second source nothing refreshed: `compact` keeps the header verbatim and retro never compacts, so every adopter's copy read as current while listing the tokens of a version ago. The appending agent reads the grammar from `/threads:retro`'s own text, which ships with the script. Adopter-side edit: replace the grammar block in the log's header with the pointer sentence; the entries are untouched.
+
 ## threads [0.11.1] — 2026-09-08
 
 ### Fixed

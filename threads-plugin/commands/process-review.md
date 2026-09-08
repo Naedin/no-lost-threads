@@ -132,9 +132,13 @@ then negotiate with the answers in hand; do not interview blind.
    `null` to decline; either is recorded, and the review never asks again.
 5. **Seed** (only after confirmation): write `.claude/threads.json`, then re-run the
    step-3 proof reading the pattern back out of the real file; create the retro log at
-   `retroLogPath` with a header stating the grammar in `scripts/retro-log.py`'s docstring
-   (key line, occurrence lines, one-line status lines, entries under `## Entries` and
-   nothing after them) and propose `<retroLogPath> merge=union` for the repo's
+   `retroLogPath` with a header that **points at** the grammar and never copies it: *the
+   grammar is the threads plugin's `retro-log.py` docstring; `python3
+   <plugin>/scripts/retro-log.py --help` prints it* — then `## Entries` and nothing after
+   them. A copy in the header is a second source nothing refreshes (`compact` keeps the
+   header verbatim), so it reads as current while listing the tokens of a version ago;
+   the appending agent reads the grammar from `/threads:retro`'s own text, released with
+   the script. Propose `<retroLogPath> merge=union` for the repo's
    `.gitattributes`, which is what lets concurrent sessions append, together with a
    `guards` run on the merged tree in the repo's landing step, since a union merge runs
    no pre-commit hook; tag

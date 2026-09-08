@@ -37,8 +37,11 @@ The entry grammar (the guards `retro-log` check enforces the same one):
                                                   state nor its count; the view shows
                                                   it in detail, compaction keeps it
 
-Entries sit under a `## Entries` heading; nothing follows them. The log's path is
-`retroLogPath` in `.claude/threads.json` (default `.claude/threads-retro-log.md`).
+Entries sit under a `## Entries` heading; nothing follows them. The header above it is
+free prose that points here (`--help` prints this) and never copies the grammar: a copy
+is a second source nothing refreshes, since `compact` keeps the header verbatim. The
+log's path is `retroLogPath` in `.claude/threads.json` (default
+`.claude/threads-retro-log.md`).
 
 A key's state is its last block in stream order, ADJUDICATED blocks skipped: an
 occurrence, or a REOPENED, FILED, or HELD status, is live; LANDED, RETIRED, UPSTREAM,
