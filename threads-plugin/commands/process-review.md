@@ -145,6 +145,8 @@ commits of process-doc churn — here's what this tool does with that."*
    the view, never whole: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys`
    is one line per key with its state and occurrence count; `view --key <key>` is one
    key's detail; `view` alone is every live key with detail, which is the read to avoid.
+   A warning on the view's stderr names a line the grammar cannot read: repair that line
+   by hand first — you are the mutator — so `compact` does not refuse on it later.
    - **Re-key first, then count — in that order.** A key written at slice altitude cannot
      match anything, so counting before re-keying yields a number the re-key invalidates,
      after every ranking decision has already been made against it. Read every key as a

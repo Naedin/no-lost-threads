@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.8.1] — 2026-09-07
+
+### Fixed
+
+- **`retro-log.py view` reads a log that breaks the grammar**, naming each violation on stderr and rendering the rest, so `/threads:retro` still hands the placer the key list in an adopter that has not yet repaired its log; `compact` alone refuses.
+
 ## threads [0.8.0] — 2026-09-07
 
 ### Contract

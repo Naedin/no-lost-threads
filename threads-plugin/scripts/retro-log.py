@@ -26,8 +26,10 @@ Entries sit under a `## Entries` heading; nothing follows them. The log's path i
 
 A key's state is its last status line in stream order: none or REOPENED is live,
 the rest closed. Its occurrence count is its dated lines across every block that
-carries the key. Exit 0 done; 2 refused, with the violations listed — the grammar
-is the contract, and a stream that breaks it is repaired by hand before compaction.
+carries the key. `view` reads a stream that breaks the grammar, naming each
+violation on stderr and reading the offending line as plain detail; `compact`
+refuses on one (exit 2), because a rewrite of a stream it cannot read loses lines.
+The grammar is the contract; the guards `retro-log` check is its gate.
 """
 import argparse
 import json
@@ -120,7 +122,8 @@ def parse(text):
             continue
         if not DETAIL.match(line):
             violations.append(f"line {n}: not a key line, a detail line, or blank")
-            cur = None
+            if cur is not None:
+                cur.lines.append("  " + line)
             continue
         if cur is None:
             violations.append(f"line {n}: detail line with no key above it")
@@ -242,11 +245,13 @@ def main():
         refuse([f"no log at {path}"])
     text = path.read_text(encoding="utf-8")
     header, blocks, violations = parse(text)
-    if violations:
-        refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])
     if args.mode == "view":
+        for v in violations:
+            print(f"retro-log: warning: {v}", file=sys.stderr)
         sys.stdout.write(render_view(blocks, args.keys, args.key))
         return 0
+    if violations:
+        refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])
     new = render_compact(header, blocks)
     before, after = text.count("\n"), new.count("\n")
     by_key = keys_in_order(blocks)

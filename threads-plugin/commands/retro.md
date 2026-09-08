@@ -100,9 +100,11 @@ cold. It still reads what it places against; it just shouldn't hunt for it.
 **Hand it the key list too.** Run
 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys` — one line per key with
 its occurrence count and state, derived from `retroLogPath` in `.claude/threads.json` —
-and pass that output with the brief. The log itself is not a process doc and nothing is
-ever *placed* there; the placer matches against the list and greps the log only for a
-hit's detail.
+and pass that output with the brief. A warning on its stderr names a line the grammar
+cannot read; the view still renders, and the line is the adopter's to repair (the
+`guards` `retro-log` check says where) — never yours, and never in this session. The log
+itself is not a process doc and nothing is ever *placed* there; the placer matches
+against the list and greps the log only for a hit's detail.
 
 ### 3b. Keys and recurrence — what comes back
 
