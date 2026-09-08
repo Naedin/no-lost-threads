@@ -74,8 +74,17 @@ Install, from a checkout that carries this plugin in its tree:
 git config core.hooksPath guards-plugin/adapters/git
 ```
 
-That install line assumes the plugin lives in the repo. Installed from the
-marketplace, this version is inert: it ships no hook file and no command, and the
+That install line assumes the plugin lives in the repo. A repo with its own hook that
+wants the gate from a sibling checkout of this plugin resolves the path through the
+primary's `.git`, not the current worktree, or the gate is inert in every worktree:
+
+```bash
+guards="$(git rev-parse --path-format=absolute --git-common-dir)/../../no-lost-threads/guards-plugin/run.py"
+if [ -f "$guards" ]; then python3 "$guards" || exit 1
+else echo "pre-commit: guards skipped, plugin not beside this checkout" >&2; fi
+```
+
+Installed from the marketplace, this version is inert: it ships no hook file and no command, and the
 adapter it carries is not wired to anything. The Claude blocking-hook adapter, and a
 `--vendor` option that copies a check into the adopting repo for a frozen gate, are the
 versions after this one.

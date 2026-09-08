@@ -27,6 +27,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
 
+## guards [Unreleased]
+
+### Changed
+
+- **README** — wiring the gate from a sibling checkout resolves the path through `--git-common-dir`, so it fires in worktrees, and says so on stderr when it skips.
+
 ## guards [0.3.0] — 2026-09-07
 
 ### Added
