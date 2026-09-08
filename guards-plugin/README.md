@@ -57,7 +57,8 @@ run is never a passed one.
 |---|---|---|
 | `anchors` | a `](path#frag)` whose `frag` is not an explicit `<a id="frag">` in the target (heading-derived slugs fail by design); a relative `](path)` whose target does not exist. External links are skipped. | every tracked `*.md` under the root when the root is a git checkout, else every `*.md` under it |
 | `war-stories` | narrative provenance in prose: `this session`, `maintainer:`, `user:`, `had to say/redirect/point/stop`, `emergency`, `was caught by`, `never arrived`. A rule states its mechanism and its rung; the incident goes in the commit message. | none; `paths` is required |
-| `retro-log` | a line the retro log's grammar cannot read: not a key line (`<class>/<shape>`), an occurrence (`YYYY-MM-DD \| source \| text`), a one-line status (`LANDED\|RETIRED\|UPSTREAM\|REOPENED <ref> — text`), a continuation, or blank; an unknown status token; a status entry over one line; a section after the entries. The grammar is the `threads` plugin's `scripts/retro-log.py`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
+| `retro-log` | a line the retro log's grammar cannot read: not a key line (`<class>/<shape>`), an occurrence (`YYYY-MM-DD \| source \| text`), a one-line status (`LANDED\|RETIRED\|UPSTREAM\|FILED\|NOTED\|HELD\|REOPENED <ref> — text`), a continuation, or blank; an unknown status token; a status entry over one line; a section after the entries. The grammar is the `threads` plugin's `scripts/retro-log.py`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
+| `retro-log-size` | an occurrence in the retro log over 8 lines, counted from its dated line through its last continuation. Separate from `retro-log` so the grammar can sit at `block` while existing entries come under the cap at `warn`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
 | `review-ledger` | a section other than Live, Falsifications, or Resolved; a dated window line inside a Live entry (`09-04: no fire`, `Re-deferred 2026-09-02:`) where one `last checked: <date> — <state>` line belongs; a Live entry over 12 lines; a Resolved entry over 3 lines. | `ledgerPath` in `.claude/threads.json`, default `.claude/threads-review-ledger.md` |
 
 ## The gate
@@ -65,8 +66,9 @@ run is never a passed one.
 `adapters/git/pre-commit` exports the index to a temporary tree with
 `git checkout-index` and runs `run.py` there, so the gate judges the commit's content
 and a cross-file check sees every target file. Its exit is the runner's exit. When the
-index carries no `.claude/guards.json` it exits 0 with no output, so the adapter is
-inert in a repo that never opted in.
+index carries no `.claude/guards.json` it exits 0 with one stderr line saying nothing was
+judged, so the adapter is inert in a repo that never opted in and a vacuous pass never
+reads as a working one.
 
 Install, from a checkout that carries this plugin in its tree:
 
@@ -75,14 +77,22 @@ git config core.hooksPath guards-plugin/adapters/git
 ```
 
 That install line assumes the plugin lives in the repo. A repo with its own hook that
-wants the gate from a sibling checkout of this plugin resolves the path through the
-primary's `.git`, not the current worktree, or the gate is inert in every worktree:
+wants the gate from a sibling checkout of this plugin calls this adapter, which judges the
+index the way the hook does, and resolves the path through the primary's `.git`, not the
+current worktree, or the gate is inert in every worktree:
 
 ```bash
-guards="$(git rev-parse --path-format=absolute --git-common-dir)/../../no-lost-threads/guards-plugin/run.py"
-if [ -f "$guards" ]; then python3 "$guards" || exit 1
+guards="$(git rev-parse --path-format=absolute --git-common-dir)/../../no-lost-threads/guards-plugin/adapters/git/pre-commit"
+if [ -f "$guards" ]; then bash "$guards" || exit 1
 else echo "pre-commit: guards skipped, plugin not beside this checkout" >&2; fi
 ```
+
+Calling `run.py` directly from a hook judges the working tree instead, and an unstaged
+edit blocks an unrelated commit.
+
+A rebase or a union merge runs no pre-commit hook, so a file two branches both appended
+to reaches the default branch unjudged. A landing step that runs `run.py` on the rebased
+tree before the push is the gate for that path.
 
 Installed from the marketplace, this version is inert: it ships no hook file and no command, and the
 adapter it carries is not wired to anything. The Claude blocking-hook adapter, and a

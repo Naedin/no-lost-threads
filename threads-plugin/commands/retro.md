@@ -204,14 +204,32 @@ in that script's header and in the log's own header:
 <class>/<shape>[ (uncold)]                    key line, column 0
   YYYY-MM-DD | <source> | <text>              an occurrence; continuation lines below it
   LANDED <sha> — <where it landed>            a status line: exactly one line
+  FILED <ref> — <the stub carrying it>        the key stays live; a recurrence counts
+                                              against the stub
+  NOTED <date> — <what worked and why>        a record: closed at write, never counted
+  HELD <review-sha> — <proposal>              written by the review only: proposed, not
+                                              approved; the view lists these first
 ```
 
-- **A new finding** → key line + one occurrence line (continuations as needed).
+- **A new finding** → key line + one occurrence line, continuations to **eight lines at
+  most**: the cited moment, the cost, the placement (`Placement: file §section — amend
+  "…"`). What does not fit goes where the placement points; the `guards`
+  `retro-log-size` check holds the cap.
+- **A positive record** (what worked, kept as evidence) → key + one `NOTED <date> —
+  <text>` line and no occurrence. It is closed the moment it is written; a record is
+  never a recurrence.
 - **A recurrence** → the *same key* again + a new occurrence line. The occurrence count
   is the dated lines under a key, so an occurrence appended for any other reason reports
   a recurrence that never happened.
 - **A finding the user applied in this session** (the escape hatch below) → the key +
   one `LANDED <sha> — <where>` line, and nothing else; the narrative is in the commit.
+
+**Every append is a whole entry that begins with a key line.** Never add continuation
+lines to an entry already in the file, even the last one: a union merge orders one
+side's lines after the other's, so continuation lines appended on a branch land under
+whatever block another session appended on the default branch, silently. A union merge
+also runs no pre-commit hook, so the adopter's landing step runs the `guards` checks on
+the merged tree before the push; that is where a merged stream is judged.
 
 Compaction, re-keying, and retirement belong to `/threads:process-review`, which is
 single-session by requirement. Carry any `key (uncold)` flag from §3 into the key line.

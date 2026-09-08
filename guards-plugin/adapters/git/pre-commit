@@ -5,13 +5,15 @@
 #
 # Install, from a checkout that carries the plugin:
 #   git config core.hooksPath guards-plugin/adapters/git
-# Inert when the index carries no .claude/guards.json: exit 0, no output.
+# Inert when the index carries no .claude/guards.json: exit 0, one stderr line saying
+# so — a silent pass reads the same as a working one.
 # Otherwise the runner's exit is the hook's exit — 1 refuses on a block finding,
 # 2 refuses because the gate could not run.
 
 plugin="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)" || exit 2
 
 if ! git ls-files --cached --error-unmatch -- .claude/guards.json >/dev/null 2>&1; then
+  echo "guards: no .claude/guards.json in the index, nothing judged" >&2
   exit 0
 fi
 

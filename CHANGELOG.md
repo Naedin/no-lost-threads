@@ -9,6 +9,16 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.9.0] — 2026-09-07
+
+### Contract
+
+- **`FILED <ref>` status** — a finding routed to a stub or plan. The key stays live in the view (a further occurrence counts against the stub) where `RETIRED` would have hidden it. Adopter-side edit: a line that meant "filed, count against it" takes `FILED`, not `RETIRED`.
+- **`NOTED <date>` status** — a positive record, closed at write and never counted; `/threads:retro` writes a what-worked finding as key + `NOTED` and no occurrence. Adopter-side edit: append `NOTED` under existing record-only keys so `compact` closes them.
+- **An occurrence is at most eight lines** — the moment, the cost, the placement; `/threads:retro` writes to that shape and the `guards` `retro-log-size` check holds it, at whatever rung the adopter sets. Adopter-side edit: none required; existing entries over the cap show as findings at `warn`.
+- **Every append is a whole entry beginning with a key line** — never continuation lines onto an entry already in the file; under union merge those land under another session's block. A union merge runs no hook, so the adopter's landing step runs the `guards` checks on the merged tree before the push (the reference adopter's land-docs does). Adopter-side edit: add that run to the landing step.
+- **`HELD <review-sha>` status** — a proposal the review made and nobody approved: its own live state, listed first in the view, reported first by the next run, then `LANDED` or `RETIRED`. A held candidate keyed to nothing goes in the ledger's Live with *promoting signal: approval*. An autonomous run's output reaches the next run through the view, never only through a commit body.
+
 ## threads [0.8.1] — 2026-09-07
 
 ### Fixed
@@ -27,11 +37,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
 
-## guards [Unreleased]
+## guards [0.4.0] — 2026-09-07
 
 ### Changed
 
-- **README** — wiring the gate from a sibling checkout resolves the path through `--git-common-dir`, so it fires in worktrees, and says so on stderr when it skips.
+- **README** — wiring the gate from a sibling checkout calls the git adapter (judges the index, not the working tree) and resolves the path through `--git-common-dir`, so it fires in worktrees, and says so on stderr when it skips.
+- **`retro-log`** accepts the `FILED`, `NOTED`, and `HELD` statuses.
+- **Git adapter** says on stderr when the index carries no config and nothing was judged, so a vacuous pass never reads as a working one.
+- **README** names the path no hook judges — a rebase or union merge — and the landing-step run that gates it.
+- **`retro-log-size`** — an occurrence over eight lines; a separate id so the cap can run at `warn` beside the grammar at `block`.
 
 ## guards [0.3.0] — 2026-09-07
 

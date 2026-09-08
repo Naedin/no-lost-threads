@@ -120,7 +120,9 @@ then negotiate with the answers in hand; do not interview blind.
    `retroLogPath` with a header stating the grammar in `scripts/retro-log.py`'s docstring
    (key line, occurrence lines, one-line status lines, entries under `## Entries` and
    nothing after them) and propose `<retroLogPath> merge=union` for the repo's
-   `.gitattributes`, which is what lets concurrent sessions append; tag
+   `.gitattributes`, which is what lets concurrent sessions append, together with a
+   `guards` run on the merged tree in the repo's landing step, since a union merge runs
+   no pre-commit hook; tag
    `git tag <markTag> HEAD`. Then run one normal pass so the first run delivers value.
    **Migration case:** a repo already keeping a hand-built recurrence log should have it
    adopted as `retroLogPath` if its entries can carry keys, not have a second one started
@@ -143,8 +145,10 @@ commits of process-doc churn — here's what this tool does with that."*
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
    the view, never whole: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys`
-   is one line per key with its state and occurrence count; `view --key <key>` is one
-   key's detail; `view` alone is every live key with detail, which is the read to avoid.
+   is one line per key with its state and occurrence count, HELD keys first — those are
+   the last run's unanswered proposals, and this run reports them before anything new;
+   `view --key <key>` is one key's detail; `view` alone is every live key with detail,
+   which is the read to avoid.
    A warning on the view's stderr names a line the grammar cannot read: repair that line
    by hand first — you are the mutator — so `compact` does not refuse on it later.
    - **Re-key first, then count — in that order.** A key written at slice altitude cannot
@@ -329,7 +333,17 @@ never folded into unrelated work.
   `retro-log` check is the shape gate; run it after.
   - **A finding that landed** gets the key + one `LANDED <sha> — <where>` line appended,
     if the landing session did not append it. **A retirement** is the key + one
-    `RETIRED <date> — <why>` line; **one that must land elsewhere** is `UPSTREAM <ref>`.
+    `RETIRED <date> — <why>` line; **one that must land elsewhere** is `UPSTREAM <ref>`;
+    **one routed to a stub or plan** is `FILED <ref>` — the key stays live, so a further
+    occurrence counts against the stub instead of vanishing into a closed key.
+  - **A candidate this run proposed and held** (an autonomous run, or one the user did
+    not answer) is `HELD <this run's marker sha> — <the proposal in one line>` on its
+    key. HELD is its own state: nothing owns the proposal and nothing picks it up until
+    someone approves, which is why the view lists HELD keys first and the next run
+    reports them before anything else. A held candidate keyed to nothing goes in the
+    ledger's Live with *promoting signal: approval*. Approved → `LANDED`; declined →
+    `RETIRED` with the reason. A held proposal that lives only in a commit body is lost
+    to the next run.
   - **Then compact:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact` — one
     block per key, closed keys reduced to their status line. It is the only rewrite of
     the file and it is deterministic; a violation it refuses on is repaired by hand first.

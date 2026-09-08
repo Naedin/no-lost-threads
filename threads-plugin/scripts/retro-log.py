@@ -19,13 +19,18 @@ The entry grammar (the guards `retro-log` check enforces the same one):
     LANDED <sha> — <where it landed, one line>    status line — exactly one line
     RETIRED <date-or-sha> — <why>                 status tokens: LANDED, RETIRED,
     UPSTREAM <ref> — <where>                      UPSTREAM (closed);
-    REOPENED <date-or-sha> — <why>                REOPENED (live again)
+    FILED <ref> — <the stub or plan carrying it>  FILED (live: recurrences count
+    REOPENED <date-or-sha> — <why>                against the stub); REOPENED (live)
+    NOTED <date> — <what worked and why>          NOTED (closed at write: a record,
+                                                  never a recurrence)
+    HELD <review-sha> — <the proposal, one line>  HELD (live: the review proposed and
+                                                  nobody approved; read first)
 
 Entries sit under a `## Entries` heading; nothing follows them. The log's path is
 `retroLogPath` in `.claude/threads.json` (default `.claude/threads-retro-log.md`).
 
-A key's state is its last status line in stream order: none or REOPENED is live,
-the rest closed. Its occurrence count is its dated lines across every block that
+A key's state is its last status line in stream order: none, REOPENED, FILED, or
+HELD is live, the rest closed; the view lists HELD keys first. Its occurrence count is its dated lines across every block that
 carries the key. `view` reads a stream that breaks the grammar, naming each
 violation on stderr and reading the offending line as plain detail; `compact`
 refuses on one (exit 2), because a rewrite of a stream it cannot read loses lines.
@@ -40,11 +45,11 @@ import sys
 
 KEY = re.compile(r"^([a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*)( \(uncold\))?$")
 OCCURRENCE = re.compile(r"^  (\d{4}-\d{2}-\d{2}) \| ([^|]+?) \|\s*(.*)$")
-STATUS = re.compile(r"^  (LANDED|RETIRED|UPSTREAM|REOPENED) (\S+(?: \+ \S+)*)(?:\s+(?:[—-]+\s*)?(.*))?$")
+STATUS = re.compile(r"^  (LANDED|RETIRED|UPSTREAM|REOPENED|FILED|NOTED|HELD) (\S+(?: \+ \S+)*)(?:\s+[—-]+\s+(.*))?$")
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DETAIL = re.compile(r"^  ")
 HEADING = re.compile(r"^## ")
-CLOSED = {"LANDED", "RETIRED", "UPSTREAM"}
+CLOSED = {"LANDED", "RETIRED", "UPSTREAM", "NOTED"}
 ENTRIES = "## Entries"
 
 
@@ -134,13 +139,21 @@ def parse(text):
             elif OCCURRENCE.match(line):
                 pass
             elif STATUS_LIKE.match(line):
-                violations.append(
-                    f"line {n}: unknown status \"{STATUS_LIKE.match(line).group(1).strip()}\"; "
-                    "use LANDED, RETIRED, UPSTREAM, or REOPENED")
+                tok = STATUS_LIKE.match(line).group(1).split()[0]
+                if tok in ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD"):
+                    violations.append(f"line {n}: status line must be \"{tok} <ref> — <text>\"")
+                else:
+                    violations.append(
+                        f"line {n}: unknown status \"{tok}\"; "
+                        "use LANDED, RETIRED, UPSTREAM, FILED, NOTED, HELD, or REOPENED")
             else:
                 violations.append(
                     f"line {n}: first detail line must be \"YYYY-MM-DD | source | text\" "
                     "or \"STATUS ref — text\"")
+        elif not cur.status and STATUS.match(line):
+            violations.append(
+                f"line {n}: status line inside an occurrence entry ({cur.key}); a status is its "
+                "own entry: the key line again, then the status line")
         cur.lines.append(line)
     for b in blocks:
         if not b.lines:
@@ -188,19 +201,19 @@ def render_view(blocks, keys_only, only=None):
         dates = sorted(d for b in bs for d in b.dates)
         rec = (key, bs, st, dates)
         (closed if st in CLOSED else live).append(rec)
-    live.sort(key=lambda r: (-len(r[3]), r[3][0] if r[3] else ""))
+    live.sort(key=lambda r: (r[2] != "HELD", -len(r[3]), r[3][0] if r[3] else ""))
     recurred = sum(1 for r in live + closed if len(r[3]) >= 2)
     n_closed = {s: sum(1 for r in closed if r[2] == s) for s in sorted(CLOSED)}
     out = [f"{len(by_key)} keys · {len(live)} live · "
            + " · ".join(f"{v} {k.lower()}" for k, v in n_closed.items())
            + f" · {recurred} recurred (two or more occurrences)"]
     out.append("")
-    out.append(f"## Live ({len(live)}) — most occurrences first")
+    out.append(f"## Live ({len(live)}) — HELD first, then most occurrences")
     for key, bs, st, dates in live:
         span = f"{dates[0]}..{dates[-1]}" if len(dates) > 1 else (dates[0] if dates else "-")
         flag = " (uncold)" if any(b.uncold for b in bs) else ""
-        reopened = "  REOPENED" if st == "REOPENED" else ""
-        out.append(f"{key}{flag}  ×{len(dates)}  {span}{reopened}")
+        marker = f"  {st}" if st in ("REOPENED", "FILED", "HELD") else ""
+        out.append(f"{key}{flag}  ×{len(dates)}  {span}{marker}")
         if not keys_only:
             for b in bs:
                 out.extend(b.lines if not b.status else [one_line(b)])
