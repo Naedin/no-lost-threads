@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.11.1] — 2026-09-08
+
+### Fixed
+
+- **`apply-mechanical` lands on the guards, never on class alone.** Six guards, all required: docs in `processDocs` only (a companion script, config, or budget edit holds the candidate); additive only (a deletion, rewrite, or consolidation of an existing rule sentence holds); the key live and never `LANDED`, `REOPENED`, or `FILED`; the target section named in no Live ledger entry; a multi-file candidate lands whole or holds whole; nothing in `invariantDocs`, nothing still referenced deleted, no `add (unconsolidated)`. Measured against one adopter's mechanical set, five landed candidates would have slipped the 0.11.0 guard set. The autonomous landing writes its `LANDED` lines under land-first-cite-second, and the ratchet offer names what the tier will actually reach in that repo.
+
 ## threads [0.11.0] — 2026-09-08
 
 ### Contract

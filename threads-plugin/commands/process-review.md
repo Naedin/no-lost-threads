@@ -54,8 +54,11 @@ convention in the moment. Fields:
   to ratchet to `apply-on-approval`; once they have approved the mechanical line as a batch
   in two or more reviews, offer **once** to ratchet to `apply-mechanical`, under which a run
   the maintainer is not answering lands the `trim` and `amend` candidates itself and holds
-  every other class. Record either answer here and don't re-ask. The consent is the
-  recorded value, never a run's reading of the room; the ladder only goes up by an answer.
+  every other class. The offer says what it ratchets into: the candidates that pass the
+  tier's guards (Output) — in a repo whose `invariantDocs` covers most of its process docs,
+  that is the command docs and templates, and the offer names them. Record either answer
+  here and don't re-ask. The consent is the recorded value, never a run's reading of the
+  room; the ladder only goes up by an answer.
 - `retroTelemetry` — `true` | `false`: whether a finding landed **straight from a retro**
   (its escape hatch, used only when the user asks to apply on the spot) gets a
   `markerPattern` commit. Unset → retro offers once at its next such moment and records
@@ -395,11 +398,29 @@ Nothing is applied without recorded consent. Under `read-only`, present candidat
 Under `apply-on-approval`, land each **approved** edit as its own `<markerPattern>` commit —
 never folded into unrelated work. Under `apply-mechanical`, the same, and a run the
 maintainer is not answering lands the mechanical line — `trim` and `amend` only, each its
-own marker commit, landed first and cited second like any other — and reports it as
-*landed* with the shas rather than *land on your word*; every row is still `HELD`. The class
-that lands is the class the placer assigned against the text it read: a candidate that
-edits a doc named in `invariantDocs`, deletes anything still referenced, or whose placer
-call was `add (unconsolidated)` is a row whatever its class says.
+own marker commit, landed first and cited second like any other, **with its `LANDED` line
+written** (a landing with no status line is re-proposed by the next run) — and reports it
+as *landed* with the shas rather than *land on your word*; every row is still `HELD`. The
+class is what the placer assigned against the text it read, and it is necessary, not
+sufficient: a candidate lands unanswered only if **every** guard below passes, and one
+failing guard holds it whatever its class says.
+
+- **Docs only.** Every file it touches is a doc in `processDocs`; a required companion edit
+  anywhere else — a script, a config, a budget table a doc's growth forces — holds the
+  whole candidate.
+- **Additive only.** Inserted sentences or a cross-reference clause; a deletion or rewrite
+  of an existing rule sentence, a consolidation included, holds — a net-negative diff
+  removes prose the maintainer never saw go.
+- **Live and never landed.** The key is live and carries no `LANDED`, `REOPENED`, or
+  `FILED` block; a shape recurring with its rule present is an application failure the
+  log counts, and a key filed against a stub is filed so prose stops accreting.
+- **Not a watched section.** The target section is named in no Live ledger entry; step 3
+  already reads the ledger, so the check is free.
+- **Whole or not at all.** A candidate that edits several files lands whole or holds
+  whole; one protected file holds the set, since a pointer landed alone points at text
+  that does not exist.
+- **Not protected.** No file in `invariantDocs`, nothing still referenced deleted, and no
+  placer call of `add (unconsolidated)`.
 
 ## On completion
 
@@ -517,9 +538,10 @@ call was `add (unconsolidated)` is a row whatever its class says.
 - **Writing while a peer review is in flight**, or without re-reading the mark and the log
   blob right before the first write — the pre-flight exists because this command is the
   one mutator and nothing else serializes it.
-- **Landing a row under `apply-mechanical`** — the tier covers `trim` and `amend`; a
-  `rule`, `carve`, `config`, `tooling`, or `motion` candidate waits for its answer however
-  small it looks, and an invariant doc is never edited unanswered.
+- **Landing on class alone under `apply-mechanical`** — the class admits a candidate to
+  the guards, it never lands one; an amend that drags a script edit, deletes a sentence,
+  sits on a landed or filed key, touches a watched section, or lands half of a pair is
+  held however small it looks, and an invariant doc is never edited unanswered.
 - **Handing the maintainer the record.** Pattern → evidence → proposal per candidate is
   for the commit body and the next run; a person gets the decision block, and a wording
   amendment listed as a decision is the row that hides the real one.
