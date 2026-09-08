@@ -9,7 +9,13 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## threads [Unreleased]
+## threads [0.10.0] — 2026-09-08
+
+### Changed
+
+- **`/threads:retro` fixes a defect in this session's own artifact instead of offering to** (§4b). When the audit's evidence is a `file:line` in something the session wrote or landed, the fix needs no decision the user has not taken, and the landing's gate can check it, the retro names the fix, applies it, lands it through the lane the fix qualifies for with no marker, and records it as a `Fixed: <artifact> — <sha>` continuation line inside the lesson's occurrence — never a `LANDED` status, which would close the lesson's key with its placement unapplied. The fix and its landing precede the log append so the sha exists; the line counts against the eight. Provenance is per statement, a choice owned by the artifact's next reader is recorded rather than presented, a file an open branch moves is a finding, and the size gate applies to process proposals only. `test.sh` proves a `Fixed:` continuation line passes the `retro-log` check and leaves the key live. "Don't pivot the retro" and "capture is the default" now name the feature work and the process finding they were written for. The auditor brief tells a file-evidenced finding apart from a moment-evidenced one.
+- **A status line is one physical line, however long** — the grammar block in the command and the script header say so and show a long `NOTED` unwrapped; the `retro-log` check already refused a wrapped one.
+- **`extract-record.py` keeps the head and tail of a long user turn**, as it did for agent turns, marks every elision, and heads the record with a note saying so; the auditor brief says an elided turn cannot ground a negative attribution finding.
 
 ### Fixed
 

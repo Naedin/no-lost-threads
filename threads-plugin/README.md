@@ -37,7 +37,10 @@ premature lock-in, mode confusion, and stale workflow habits.
   largest and applying an edit costs the most — and a session that ends with the output
   unread loses everything it found. `/threads:process-review` adjudicates the log later,
   in the fresh context that decision actually wants. If you'd rather land something
-  immediately, say so and it lands.
+  immediately, say so and it lands. The one thing retro fixes unasked is a defect in an
+  artifact the session itself wrote or landed — the moment it is found is the cheapest
+  the fix will ever be, and a wrong artifact is the next reader's premise; the process
+  lesson behind it is still captured.
 - **"If it recurs" becomes measurable.** The placer gives each finding a short,
   domain-free key and checks it against the log, so *adopt if it recurs* is settled by
   looking rather than by hoping — the second time a friction shows up, retro says so and

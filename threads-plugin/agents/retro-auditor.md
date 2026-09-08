@@ -13,7 +13,11 @@ did not do this work, so you carry none of its anchoring.
 You will be given the path to a timeline record extracted from the session. Read it
 (USER = user turns, SAID = the agent's text outputs, DID = its tool actions, in
 order). It is the full sequence of what was asked → done → said; an agent's private
-reasoning is not in the record, so don't infer it or claim to have caught it.
+reasoning is not in the record, so don't infer it or claim to have caught it. The record's
+first line says how long turns were cut and that ` […] ` marks each cut. **An elided turn
+cannot ground a negative finding**: if the agent attributes something to the user and the
+candidate USER turn carries an elision, that is "unverifiable in the record" — one line,
+not a finding — never "the user did not say it".
 
 Judge the work **cold**, hunting the meta-issues a session tends to miss about itself:
 
@@ -37,6 +41,11 @@ ownership, not a flag). Don't list every occurrence — that just recreates the 
 accept-and-move-on fatigue at review time. When you do flag one, the durable fix points
 outward, to a read-time guardrail in the repo's process docs: this audit catches the
 instance after the fact but can't change the read-time response that let it through.
+
+**When the evidence is a file, not a moment**, cite it as `path:line` and say in the
+finding that the file was written or landed by this session, when the DID events show
+it — the command fixes such a defect in the artifact itself and captures only the lesson,
+so the two need telling apart in your report.
 
 Cite the specific USER/SAID/DID events as evidence. If the session is clean, say so
 plainly — do not pad, and do not invent findings because you were asked to look. Record

@@ -16,7 +16,9 @@ The entry grammar (the guards `retro-log` check enforces the same one):
   <class>/<shape>[ (uncold)]                      key line, column 0
     YYYY-MM-DD | <source> | <text>                occurrence; continuation lines
       ...more text, any indent of two or more     follow it freely
-    LANDED <sha> — <where it landed, one line>    status line — exactly one line
+    LANDED <sha> — <where it landed, one line>    status line — one physical line,
+                                                  however long; a wrapped one reads as
+                                                  continuation prose
     RETIRED <date-or-sha> — <why>                 status tokens: LANDED, RETIRED,
     UPSTREAM <ref> — <where>                      UPSTREAM (closed);
     FILED <ref> — <the stub or plan carrying it>  FILED (live: recurrences count

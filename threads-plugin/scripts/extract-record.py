@@ -18,8 +18,10 @@ that to the user and falls back to the self-pass.
 
 Writes the timeline to a temp file and prints its path + stats. Drops sub-agent
 sidechains, tool-result payloads, and system-reminder turns; caps long turns so a
-multi-hundred-KB transcript compresses to a few KB. Agent turns are capped generously
-and keep their head *and* tail, so end-of-turn commitments/deferrals reach the audit.
+multi-hundred-KB transcript compresses to a few KB. User and agent turns are capped
+generously and keep their head *and* tail, so end-of-turn commitments/deferrals reach
+the audit; every elision is marked " […] " in place, and the record's first line says
+so, because a cold reader must not read an elided turn as "the user never said it".
 """
 import sys, os, json, glob, tempfile
 
@@ -67,6 +69,13 @@ def short(s, n, tail=0):
     return s[:n] + "…"
 
 
+USER_CAP, USER_TAIL = 2500, 800
+SAID_CAP, SAID_TAIL = 2500, 800
+NOTE = ("note: a \" […] \" inside an event marks text the extractor elided (turns are kept "
+        "to {u} chars for USER and {s} for SAID, head plus tail). Text absent from an "
+        "elided turn is unverifiable in this record, not absent from the session.")
+
+
 def main():
     src = resolve_transcript()
     rows = []
@@ -87,7 +96,9 @@ def main():
                     if isinstance(c, list) else "")
                 txt = txt.strip()
                 if txt and not txt.startswith("<"):   # drop system-reminder / tool-result-only turns
-                    rows.append(("USER ↦", short(txt, 1200)))
+                    # User turns carry the constraints and attributions the audit checks
+                    # against; a head-only cut manufactures "the user never said" findings.
+                    rows.append(("USER ↦", short(txt, USER_CAP, tail=USER_TAIL)))
             elif t == "assistant" and isinstance(c, list):
                 for b in c:
                     if not isinstance(b, dict):
@@ -95,7 +106,7 @@ def main():
                     if b.get("type") == "text" and b.get("text", "").strip():
                         # Agent turns carry the reasoning/claims/commitments the audit
                         # hunts for; keep head+tail so the cold reviewer sees the end.
-                        rows.append(("  SAID", short(b["text"], 2500, tail=800)))
+                        rows.append(("  SAID", short(b["text"], SAID_CAP, tail=SAID_TAIL)))
                     elif b.get("type") == "tool_use":
                         inp = b.get("input") or {}
                         key = (inp.get("file_path") or inp.get("command")
@@ -106,6 +117,7 @@ def main():
     out = tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", suffix=".md", prefix="retro-record-", delete=False)
     with out:
+        out.write(NOTE.format(u=USER_CAP, s=SAID_CAP) + "\n\n")
         for tag, body in rows:
             out.write(f"{tag}: {body}\n")
     print(f"source: {src}")

@@ -1,5 +1,5 @@
 ---
-description: Retrospective pass — review the work in this conversation as process telemetry (drift, scope leak, ignored user signals, unverified claims, premature lock-in, mode confusion, stale habits). By default a fresh-context sub-agent audits the observable session record cold; a second one places the findings against this repo's process docs and keys them against the retro log, so a recurrence is detected rather than assumed. Findings are captured to that log for `/threads:process-review` to adjudicate, not applied here. `quick` skips the audit, not the placement. Explicit-only; never auto-fires.
+description: Retrospective pass — review the work in this conversation as process telemetry (drift, scope leak, ignored user signals, unverified claims, premature lock-in, mode confusion, stale habits). By default a fresh-context sub-agent audits the observable session record cold; a second one places the findings against this repo's process docs and keys them against the retro log, so a recurrence is detected rather than assumed. Findings are captured to that log for `/threads:process-review` to adjudicate, not applied here — except a defect the audit finds in an artifact this session itself wrote or landed, which the retro fixes while the context that can fix it cheaply still exists. `quick` skips the audit, not the placement. Explicit-only; never auto-fires.
 argument-hint: "[quick] [optional scope note]"
 allowed-tools: Bash, Read, Grep, Glob, Agent
 ---
@@ -150,9 +150,11 @@ Two outcomes, **both first-class**:
 - **"No retro changes recommended."** Correct for clean work — do not invent findings
   because the command ran. State it and stop.
 - **A punch list** of candidate doc / pattern / trap / guardrail / agent-guidance
-  edits, **in-thread**, and **captured to the retro log** (§4a) rather than applied. If a
-  proposal is large enough that diffs aid review, present the *what* first, then the
-  staged *how* on approval.
+  edits, **in-thread**, and **captured to the retro log** (§4a) rather than applied. The
+  one exception is a defect in an artifact this session produced (§4b): that is fixed,
+  logged in its entry, and leads the list. If a process proposal is large enough that
+  diffs aid review, present the *what* first, then the staged *how* on approval; a §4b
+  fix is not size-gated.
 
 Each finding: **`[source]` `key` issue → evidence (cite the event) → cost → placement**,
 where placement is `finding-placer`'s proposal — target section, the existing text it was
@@ -167,16 +169,19 @@ things stay here:
 
 - Findings are candidates for a human to accept, reject, or refine — **never
   auto-adopted**, placement proposal included. Capturing one is not adopting it: the log
-  entry changes no rule and takes no effect.
+  entry changes no rule and takes no effect. A §4b fix adopts nothing either: it brings
+  an artifact back to what the session had already decided.
 - Bias toward *adopt-if-it-recurs* for one-off frictions; reserve *adopt now* for
   recurring or high-severity patterns. That's a session judgment: you have the session,
   the placer doesn't. §3b can promote the call on evidence; nothing demotes it.
 
 ## 4a. Capture — append to the retro log
 
-**Capture is the default destination for every finding, both dispositions.** This is the
-largest context the session will have, so it is the most expensive point at which to apply
-an edit, and an unread punch list is a lost one. An append is cheap, always completes, and
+**Capture is the default destination for every process finding, both dispositions.** This
+is the largest context the session will have, so it is the most expensive point at which
+to apply a process edit — one whose target doc has to be read cold — and an unread punch
+list is a lost one. (A defect in this session's own artifact is the opposite case: the
+context is what makes the fix cheap. That is §4b.) An append is cheap, always completes, and
 survives the session; `/threads:process-review` adjudicates the log later, in the fresh
 context that work requires.
 
@@ -203,12 +208,21 @@ in that script's header and in the log's own header:
 ```
 <class>/<shape>[ (uncold)]                    key line, column 0
   YYYY-MM-DD | <source> | <text>              an occurrence; continuation lines below it
-  LANDED <sha> — <where it landed>            a status line: exactly one line
-  FILED <ref> — <the stub carrying it>        the key stays live; a recurrence counts
-                                              against the stub
-  NOTED <date> — <what worked and why>        a record: closed at write, never counted
-  HELD <review-sha> — <proposal>              written by the review only: proposed, not
-                                              approved; the view lists these first
+  LANDED <sha> — <where it landed>            status lines. Each is ONE physical line,
+  FILED <ref> — <the stub carrying it>        however long — a wrapped one reads as
+  NOTED <date> — <what worked and why>        continuation prose and the guard refuses it.
+  HELD <review-sha> — <proposal>              LANDED: applied. FILED: live; a recurrence
+                                              counts against the stub. NOTED: a record,
+                                              closed at write, never counted. HELD: the
+                                              review proposed, nobody approved; listed first
+```
+
+A long status line stays on one line, so a `NOTED` entry looks like this and never like a
+paragraph:
+
+```
+positive/recurrence-match-promoted-the-call
+  NOTED 2026-09-08 — the placer reported the key already present, §3b promoted adopt-if-it-recurs to adopt-now on that evidence, and the user accepted without re-deriving the case; reading the log before the call is earning its cost.
 ```
 
 - **A new finding** → key line + one occurrence line, continuations to **eight lines at
@@ -216,13 +230,19 @@ in that script's header and in the log's own header:
   "…"`). What does not fit goes where the placement points; the `guards`
   `retro-log-size` check holds the cap.
 - **A positive record** (what worked, kept as evidence) → key + one `NOTED <date> —
-  <text>` line and no occurrence. It is closed the moment it is written; a record is
-  never a recurrence.
+  <text>` line — one physical line, however long — and no occurrence. It is closed the
+  moment it is written; a record is never a recurrence.
+- **A finding whose artifact was fixed under §4b** → the ordinary key + occurrence, with
+  one continuation line `Fixed: <artifact> — <sha>`. It counts against the eight, so
+  compress the moment or the cost to make room — never the placement. No status line:
+  the artifact is corrected, the lesson is still open, and a status line would close it.
+  §4b runs before this append, so the sha exists when the line is written.
 - **A recurrence** → the *same key* again + a new occurrence line. The occurrence count
   is the dated lines under a key, so an occurrence appended for any other reason reports
   a recurrence that never happened.
 - **A finding the user applied in this session** (the escape hatch below) → the key +
-  one `LANDED <sha> — <where>` line, and nothing else; the narrative is in the commit.
+  one `LANDED <sha> — <where>` line, one physical line and nothing else; the narrative is
+  in the commit.
 
 **Every append is a whole entry that begins with a key line.** Never add continuation
 lines to an entry already in the file, even the last one: a union merge orders one
@@ -254,6 +274,58 @@ Then record the landing in the log as §4a says: the key + one `LANDED <sha> —
 line appended under it, never an edit to the entry already there, and never a second
 occurrence line. Under `retroTelemetry: false` the user declined the marker commit; the
 status line still goes in, pointing at whatever commit carried the edit.
+
+## 4b. A defect in this session's own artifact — fix it, then capture the lesson
+
+Sometimes the audit's evidence is not a moment in the record but a **file:line in
+something this session wrote or landed**: a stub whose exit evidence contradicts itself,
+a hedge the user voiced transcribed as a decision taken, a fix named mid-session that
+reached no stub. That is two deliverables, and capture is the lane for only one of them.
+The **process lesson** (the shape that let it happen) is a finding: key it, place it,
+capture it under §4a as usual. The **artifact** is wrong now, on a branch or on the
+default branch, and a wrong artifact is the next reader's premise. This session holds the
+whole measurement; a fresh one re-derives it. The §4a cost argument runs the other way.
+
+Fix the artifact in the retro when all three hold:
+
+- **Provenance, per statement** — the defective lines are this session's: written in
+  this session's commits or working-tree edits, and untouched since by anyone else
+  (`git blame` on the lines, or a diff against the session's commit). Having changed the
+  file elsewhere is not provenance over a defect in it, and a file another author has
+  since rewritten is theirs. A file an open branch or PR moves, deletes, or rewrites is
+  also theirs: a finding here, and a note to whoever owns that motion, never a fix.
+- **No open decision of the user's** — the edit follows from the finding's evidence and
+  needs no call the user has not made. A choice that belongs to the artifact's next
+  reader (a drafter, a slice) is *recorded* in the artifact as a choice with its owner,
+  which is a specified edit; only a choice that is the user's makes the defect one to
+  present instead of fix.
+- **Same gate** — whatever checked the artifact when it landed (the adopter's landing
+  step, the `guards` run) can check the fix the same way. "Fix it" means the artifact the
+  finding cites, never the source it describes; a source edit fails this gate in an
+  adopter whose docs lane rejects source, and correctly.
+
+Then **say what you are about to fix and where, one line per artifact, and fix it.** Don't
+ask — the edit is specified by the finding and this is its cheapest moment; don't do it
+silently either. If the original is not yet committed, the fix rides in the working tree
+with it. If it landed, land the fix through the lane the fix itself qualifies for — a
+docs-only fix takes the docs lane even when the original went through a code PR — as one
+commit naming the artifacts. That commit is not a process change and takes no
+`markerPattern` marker; the log append goes wherever the adopter's capture normally goes.
+
+Log the fix **inside the lesson's occurrence, never as a status line**: the finding is
+keyed and captured under §4a like any other, and one of its continuation lines reads
+`Fixed: <artifact> — <sha>`. A `LANDED` line would close the key, and the view would then
+report a lesson as landed whose placement nobody applied. The artifact is corrected; the
+lesson stays open until `/threads:process-review` lands or retires it.
+
+**Order: fix and land first, append second.** §4a's append comes after this step, however
+the sections are numbered, so the fix's sha exists when the line is written. Where there
+is no sha — the append rides in the same commit as the fix, or the fix is still
+uncommitted — write `Fixed: <artifact> — rides this capture`; the line is detail, and the
+path alone still greps.
+
+When any of the three fails, the defect still **leads the punch list**, as a defect with
+the edit specified — it outranks a process finding because it is live.
 
 ## 5. Ripeness nudge — one line, at the end
 
@@ -293,8 +365,9 @@ backlog earns a sentence on each run.
 
 ## Anti-patterns
 
-- **Reviewing the code instead of the process.** If you spot a bug, capture it
-  elsewhere — don't pivot the retro.
+- **Reviewing the feature work instead of the process.** A bug in the code under
+  review is captured elsewhere — don't pivot the retro. A defect in an artifact this
+  session itself produced is §4b, not a pivot.
 - **Inventing findings on clean work.** "No changes recommended" is the goal-state.
 - **Claiming to have caught internal reasoning.** You only see the observable record.
 - **Auto-adopting findings**, or **adding a new rule when an existing one could absorb
@@ -305,8 +378,13 @@ backlog earns a sentence on each run.
   appended status line, a repeat is an appended occurrence, and nothing else reuses a key.
 - **Capturing silently.** Say what was appended and where — a write nobody was told about
   is the same failure as a nudge nobody heard.
-- **Applying edits because the findings look good.** Capture is the default; landing now
-  happens only when the user asks for it.
+- **Pointing at a defect in your own artifact and offering to fix it.** "Say the word"
+  costs the user a turn to buy an edit this session already has; §4b names it and fixes
+  it.
+- **Applying process edits because the findings look good.** Capture is the default for
+  a process finding; a rule lands from retro only when the user asks (the escape hatch).
+  The §4b own-artifact fix is the one edit the retro applies unasked, and it names the
+  fix first.
 - **Offering to run `/threads:process-review` in this session.** It requires a context
   that didn't do the work, and this one did.
 - **Vague findings** with no cited moment, and **only fault-finding** — record what

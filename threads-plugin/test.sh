@@ -57,4 +57,18 @@ ok "view warns, compact refuses, on an unrepaired log"
 # 5. closed keys reduce to one status line; NOTED is closed
 python3 "$rl" view --keys --root "$tmp" --log log.md 2>/dev/null | grep -q '^positive/c .*NOTED' || fail "NOTED key not in the closed section"
 ok "NOTED closes at write"
+
+# 6. a §4b artifact fix is a `Fixed:` continuation line: the key stays live, the check passes
+cat > "$tmp/fixed.md" <<'EOF'
+## Entries
+
+scope-leak/e
+  2026-09-08 | retro | claimed the slice decides nothing.
+    Placement: doc.md §section — amend "x".
+    Fixed: Plans/inbox/stub.md — 99faec68
+EOF
+python3 "$check" --root "$tmp" --paths fixed.md >/dev/null 2>&1 || fail "a Fixed: continuation line fails the retro-log check"
+python3 "$rl" view --keys --root "$tmp" --log fixed.md 2>/dev/null | grep -q '^scope-leak/e .*×1' || fail "a Fixed: line closed or lost the key"
+python3 "$rl" view --keys --root "$tmp" --log fixed.md 2>/dev/null | grep -q '^scope-leak/e .*LANDED' && fail "a Fixed: line read as a status"
+ok "an artifact fix inside the occurrence keeps the lesson live"
 echo "all cases passed"
