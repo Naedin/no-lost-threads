@@ -108,8 +108,10 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   asked for. It always points you at a *fresh* session, since the review can't run in the
   one it reviews. Never urgent, never acted on unprompted.
 - **Nothing silent.** Applying anything requires recorded consent (`applyMode`,
-  starting `read-only`); every run states which inputs it used and what the next tier
-  up would buy.
+  starting `read-only`, ratcheting by an answer to `apply-on-approval` and then to
+  `apply-mechanical`, where a run nobody is answering lands wording amendments and trims
+  itself and holds everything else); every run states which inputs it used and what the
+  next tier up would buy.
 
 `/threads:retro` feeds this loop from both ends: findings it captures are the pending
 stream, and anything you do land straight from a retro becomes a marker commit — the
@@ -150,7 +152,11 @@ threads-plugin/
 recurrence is the same key with a new dated line, a landing is the key with one `LANDED
 <sha>` line, and `.gitattributes` merges the file by union so concurrent sessions never
 conflict. `python3 <plugin>/scripts/retro-log.py view --keys` derives each key's state and
-occurrence count; `compact` is the review's one rewrite. The `guards` plugin's `retro-log`
+occurrence count, and its filters (`--held`, `--recurred`, `--since <date>`, `--live`) are
+the reads the review makes, so a log of a few hundred keys is never read whole; a held
+proposal shows the date it was held and its age. The review's ruling on a key — a re-rank,
+a count-only call — is an `ADJUDICATED <date>` line that changes neither state nor count.
+`compact` is the review's one rewrite. The `guards` plugin's `retro-log`
 and `review-ledger` checks hold both files to their grammar.
 
 No hooks ship, and nothing runs on a schedule or at session start: both commands are

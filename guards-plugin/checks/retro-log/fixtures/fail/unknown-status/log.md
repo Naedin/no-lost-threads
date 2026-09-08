@@ -13,4 +13,4 @@ drift/repeated-manual-motion-never-written-down (uncold)
 drift/repeated-manual-motion-never-written-down
   LANDED abc1234 — DEVELOPMENT.md §Landing, the motion stated.
 unverified-claim/count-read-off-a-truncated-listing
-  ADJUDICATED 2026-09-05 — one-off; the listing was bounded.
+  DEFERRED 2026-09-05 — one-off; the listing was bounded.

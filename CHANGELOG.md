@@ -9,6 +9,27 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.11.0] — 2026-09-08
+
+### Contract
+
+- **`HELD` is keyed on the review's date, not its marker sha** — `HELD <date> — <letter, class, proposal>`. The marker commit is the commit that carries the HELD lines, so its sha cannot be cited by them; the date names it (`git log --grep <markerPattern> --since/--until`). The view shows each held key's date and age in days. Adopter-side edit: a doc stating the grammar as `HELD <review-sha>` says `HELD <date>`; existing sha-keyed lines stay valid (the ref is any token) and simply carry no age.
+- **`ADJUDICATED <date> — <ruling>` is the review's annotation on a key** — a re-rank, a count-only ruling at a key whose rule is present, a build trigger on a filed stub, a withdrawn re-rank. Its own entry under the key line, one physical line; it changes neither the key's state nor its occurrence count, `compact` keeps it (on a closed key too, after the closing status), and `view --key` shows it. Before this the only vehicles were an occurrence (which counts) and a status (which moves state), so rulings were written as continuation prose, where the size cap counted them and a status-only last block read them as an unknown status. Adopter-side edit: a ruling written as continuation prose inside an occurrence is moved to its own `ADJUDICATED` entry — the review does it as its mutation, with `compact` after. The migration is lossy for a key that had already closed: a compaction before this release reduced it to its status line, and the prose ruling went with the occurrence it sat in; the commit body of that review still has it.
+
+### Added
+
+- **`view` filters are the review's reads** — `--held` (unanswered proposals, with age), `--recurred` (two or more occurrences, or an occurrence after a closing status: the shape back with its rule present ranks with the repeats), `--since <date>` (keys with an occurrence, status, or annotation on or after), `--live` (no closed section). They compose; the summary line counts the whole log and says how many keys the filter shows; without `--keys` a filtered view carries detail, so the recurred set's bodies are one read. `--key` repeats. `/threads:process-review` step 0b names these reads in order and reserves bare `--keys` for a small log — at two hundred keys the whole listing exceeds one tool result.
+- **Pre-flight: one review at a time.** The review fetches and records the mark and the log blob **on the remote's default branch** before reading (a peer lands there while the local head sits untouched), identifies a peer session by working directory and branch (never a worktree name, which another repo's session can carry) where the harness exposes a listing, and re-reads both facts immediately before its first write; either moved → rebase, run the gate on the rebased tree, re-read, then write; refuse only on a conflict or a red gate.
+- **Land first, cite second.** `LANDED` shas and any sha the ledger cites are written after the landing commits are pushed, each read back from the remote by subject in a commit of its own, since the landing rebase rewrites a branch-side sha.
+- **The output opens with a decision block for the maintainer, and nothing sits above it.** A four-column table — Letter · Decision (the artifact and the motion, never the retro key) · Recommend (approve / retire / split / fold) · Why (one or two sentences resting on what the run measured, reversibility stated when it bears) — one row per candidate that genuinely needs a judgment; then one sentence *Mechanical, land on your word:* with the letters; then one line naming what happens next if answered as recommended. Every row's premise is re-measured against the default branch before it is written. The record (pattern → evidence → proposal, placements, tier, tally) follows for the commit body and the next run. Every candidate carries a class — `trim`, `amend`, `rule`, `carve`, `config`, `tooling`, `motion` — and `trim`/`amend` are mechanical by default; the class groups, it does not gate. The record (pattern → evidence → proposal) still follows, for the commit body and the next run.
+- **`applyMode: apply-mechanical`** — the third tier, offered once after the maintainer has approved the mechanical line as a batch in two or more reviews and recorded like the others. Under it a run the maintainer is not answering lands the `trim` and `amend` candidates itself, each its own marker commit, landed first and cited second, and reports them as landed; every other class is still `HELD`, an `invariantDocs` file is never edited unanswered, and an `add (unconsolidated)` placement is a row whatever its class. The approval queue was measured as the bottleneck; this is the part of it that never needed a person.
+- **Bootstrap asks for `capabilityEvidencePath`** where inspection finds tooling the repo builds and uses (`scripts/`, hooks, checks, a plugin dir); a later run in such a repo with the field unset asks once, and `null` records a decline. A store unset for an adopter's whole life leaves the funnel doc-shaped with no one ever asked.
+
+### Changed
+
+- **The ledger's 12-line cap is stated per entry** in the command text, as the check already applied it.
+- `test.sh` proves the annotation's transparency and compaction, the held age, and each filter.
+
 ## threads [0.10.0] — 2026-09-08
 
 ### Changed
@@ -50,6 +71,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
+
+## guards [0.6.0] — 2026-09-08
+
+### Changed
+
+- **`retro-log`** accepts the `ADJUDICATED <date> — <text>` annotation (threads: the review's ruling on a key), one line and its own entry like a status; one inside an occurrence entry is refused as a status there is. The unknown-status message lists it.
+- **`review-ledger`** states its Live and Resolved caps as per entry; the check always applied them so.
 
 ## guards [0.5.0] — 2026-09-08
 

@@ -49,9 +49,13 @@ convention in the moment. Fields:
 - `trigger` — `{ "n": 10, "concentration": 3 }` (volume backstop; distinct-commit
   re-touch bar). Read by `/threads:retro` to decide whether its closing ripeness nudge
   fires.
-- `applyMode` — `read-only` | `apply-on-approval`. Starts `read-only`. Once the user
-  has approved candidates in two or more reviews, offer **once** to ratchet up; record
-  either answer here and don't re-ask.
+- `applyMode` — `read-only` | `apply-on-approval` | `apply-mechanical`. Starts
+  `read-only`. Once the user has approved candidates in two or more reviews, offer **once**
+  to ratchet to `apply-on-approval`; once they have approved the mechanical line as a batch
+  in two or more reviews, offer **once** to ratchet to `apply-mechanical`, under which a run
+  the maintainer is not answering lands the `trim` and `amend` candidates itself and holds
+  every other class. Record either answer here and don't re-ask. The consent is the
+  recorded value, never a run's reading of the room; the ladder only goes up by an answer.
 - `retroTelemetry` — `true` | `false`: whether a finding landed **straight from a retro**
   (its escape hatch, used only when the user asks to apply on the spot) gets a
   `markerPattern` commit. Unset → retro offers once at its next such moment and records
@@ -70,7 +74,11 @@ convention in the moment. Fields:
   and rungs rather than doc sections. Only relevant where the repo builds tooling it also
   uses. It is the one input that can yield a non-doc proposal; without it the funnel is
   doc-churn-shaped end to end. Written by this command alone — no other step in the system
-  appends here. Absent → narrate and skip.
+  appends here. Absent → narrate and skip, except in a repo that builds tooling it also
+  uses (a `scripts/` dir, hook scripts, checks, a plugin directory), where the narration is
+  a question the review asks **once**: set the path, or record `null` here to decline, and
+  the question is not asked again. Unset in such a repo, the review's only non-doc input is
+  missing and every upstream-bound finding has no store.
 - `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
   short name passed through as given. Absent, the agent file's own pin applies.
 - `markTag` — default `process-review-mark`.
@@ -105,6 +113,8 @@ then negotiate with the answers in hand; do not interview blind.
      become the default workflow sets for the staleness sweep.
    - Enhancements present: `gh` on PATH + a GitHub remote? An agent memory store
      (`MEMORY.md`)?
+   - Tooling the repo builds and uses: a `scripts/` dir, hook scripts, checks, a plugin
+     directory. Present → `capabilityEvidencePath` has a job here, and step 4 asks for it.
 2. **Report** what you detected, which inputs you'll use, and which fallback tiers apply.
 3. **Negotiate the marker** — propose the default `docs(process/<scope>):`, *or* an
    adaptation fitting the repo's existing style (e.g. a `chore(...)` repo → offer
@@ -114,7 +124,9 @@ then negotiate with the answers in hand; do not interview blind.
    won't travel. Then **prove it fires**: run the grep against one sample subject per
    lane, using the pattern exactly as it will be written to the config. A marker that
    fails its own grep test is not adopted.
-4. **Confirm `processDocs`** — the one thing inspection can't reliably answer. Ask.
+4. **Confirm `processDocs`** — the one thing inspection can't reliably answer. Ask. Where
+   step 1 found tooling, ask for `capabilityEvidencePath` in the same breath: a path, or
+   `null` to decline; either is recorded, and the review never asks again.
 5. **Seed** (only after confirmation): write `.claude/threads.json`, then re-run the
    step-3 proof reading the pattern back out of the real file; create the retro log at
    `retroLogPath` with a header stating the grammar in `scripts/retro-log.py`'s docstring
@@ -133,6 +145,23 @@ commits of process-doc churn — here's what this tool does with that."*
 
 ## The review — cheap → expensive (never read every diff)
 
+**Pre-flight — one review at a time.** This command is the only mutator of the retro log
+and the ledger and it advances a shared tag, and nothing else stops two reviews from running
+at once. Before reading anything, `git fetch` and record the two facts a peer run would
+move, **on the remote's default branch, never the local head**: `git rev-parse <markTag>`
+and `git rev-parse origin/<default>:<retroLogPath>` — a peer lands on the default branch
+while this checkout's head sits untouched, so a local read is unchanged in exactly the case
+the check exists for. Where the harness exposes a session listing, look: a peer is
+identified by its **working directory and branch**, never by a worktree name, which a later
+session on another repo can carry — a review on this repo already in flight means stop and
+say so. Then, **immediately before the first write** (a log append, the ledger edit,
+`compact`, the tag), fetch and re-read both facts. Either moved → a peer landed while this
+one ran: **re-derive, then write** — rebase onto `origin/<default>` (the log merges by
+union; the ledger is a working file), run the `guards` gate on the rebased tree since a
+rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a rebase
+conflict or a red gate; a run that has spent its budget is not thrown away for a clean
+rebase.
+
 0. **Free — the reads that size the run.** All three are cheap; none is optional where
    configured. Do them before looking at a single commit.
 
@@ -144,11 +173,19 @@ commits of process-doc churn — here's what this tool does with that."*
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
-   the view, never whole: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys`
-   is one line per key with its state and occurrence count, HELD keys first — those are
-   the last run's unanswered proposals, and this run reports them before anything new;
-   `view --key <key>` is one key's detail; `view` alone is every live key with detail,
-   which is the read to avoid.
+   the view's filters, never whole — the reads below are the run's reads, in order, and
+   each is one tool result at any log size:
+   - `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys --held` — the last
+     run's unanswered proposals, each with the date it was held and its age in days. This
+     run reports them before anything new, oldest first.
+   - `view --keys --recurred` — every key at two or more occurrences, the promotion the
+     log exists to make visible.
+   - `view --keys --since <the mark's date>` — what this window touched; the re-key sweep
+     reads these plus the `(uncold)` ones.
+   - `view --key <key>` — one key's detail, for the keys the reads above surfaced.
+   `view --keys` alone is every key on one line each and is the read for a small log; past
+   a hundred keys it outgrows a tool result, and `view` with detail is the read to avoid at
+   any size. The summary line counts the whole log whatever the filter.
    A warning on the view's stderr names a line the grammar cannot read: repair that line
    by hand first — you are the mutator — so `compact` does not refuse on it later.
    - **Re-key first, then count — in that order.** A key written at slice altitude cannot
@@ -163,15 +200,23 @@ commits of process-doc churn — here's what this tool does with that."*
      as the evidence.
    - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
      view, which is strictly better standing for ranking than the single session that set
-     it — so re-rank freely, in either direction. Record the re-rank and the reason; never
-     silently overwrite the original call.
+     it — so re-rank freely, in either direction. Record the re-rank and the reason as an
+     `ADJUDICATED <date> — <ruling>` line on the key — its own entry, the key line again
+     above it — never as continuation prose inside an occurrence, which the grammar reads
+     as the occurrence's own text, the size cap counts, and a status-only last block turns
+     into an unknown status. An annotation changes neither the key's state nor its count,
+     which is what lets a count-only ruling, a build trigger, or a withdrawn re-rank sit on
+     the key without moving it. Never silently overwrite the original call.
    - **Empty log, or no `retroLogPath`** → narrate and skip, like any detected input.
 
    **0c — capability evidence** (`capabilityEvidencePath`), where the repo builds the
    tooling it uses. Entries here name a contract and a rung rather than a doc section, so
    they are the only input that can produce a non-doc proposal. Without it, every input in
    this funnel is doc-churn-shaped and the output can only ever be doc edits. Count keys
-   the same way. Absent → narrate and skip.
+   the same way. Absent → narrate and skip; absent **and unset** (no `null` in the config)
+   in a repo that builds tooling it uses → the narration is the once-only question in
+   Config: ask for a path or a `null`, record the answer, and do not ask again. A store
+   that stays unset for the life of an adopter is the funnel silently doc-shaped.
 
    **Then reconcile it against 0b, and carry the number.** A retro-log `Placement:` may
    name this store, and nothing but this command writes here — so a placement that names
@@ -268,6 +313,49 @@ as its yield thins. The gate is what keeps the review affordable at scale.
 
 ## Output (in-thread; `applyMode` governs whether approved edits are applied)
 
+**Two audiences, two shapes.** Everything from *Pending captures* down is the **record**:
+pattern → evidence → proposal per candidate, complete enough that the next run and the
+marker commit body can stand on it. The maintainer reads none of it to decide. What they
+read is the **decision block**, which opens the output, and **nothing else sits above it** —
+no evidence, no placements, no tier narration, no tally.
+
+**Before a row is written, re-measure its premise against the default branch, now.** A
+candidate can have landed since it was held, or gone moot on a decision the maintainer took
+elsewhere; a row whose premise is stale spends the one attention budget the block exists to
+protect. Re-measured and gone → `RETIRED` or `LANDED` in the log, not a row.
+
+The block, in this order:
+
+1. **The table** — one row per candidate that genuinely needs the maintainer: a trade-off, a
+   product or policy call, a change hard to reverse. Four columns:
+   - **Letter.**
+   - **Decision** — one clause naming *the artifact and the motion* ("carve the pin protocol
+     into its own routed doc", "retire the four-carrier landing rule"), never the retro key
+     or the finding's pattern; the maintainer does not carry the key vocabulary between
+     sessions.
+   - **Recommend** — one word: approve, retire, split, or fold.
+   - **Why** — one or two sentences, each resting on something *this run measured* (an
+     occurrence count, a signal that fired, a landed commit, a filed/built ratio), with the
+     reversibility stated when it bears. Never the candidate's rationale restated.
+   A row without a recommendation hands the maintainer the review's own work; a row the
+   maintainer cannot answer from the row alone belongs in the record instead.
+2. **One sentence**: *Mechanical, land on your word:* followed by the letters.
+3. **One line** naming what happens next if every row is answered as recommended.
+
+Held candidates are rows or letters like any other, with their age from `view --held` in
+the Why when it bears; the ageing detail goes in the record.
+
+Every candidate carries a **class** so the block and the log can sort it without re-reading
+it: `trim` (a net removal, or a cross-reference clause into existing text), `amend` (wording
+inside an existing rule, a consolidation), `rule` (a new rule or bullet), `carve` (a new doc,
+a split with its routing), `config` (a field in a config file), `tooling` (a script, a check,
+a capability), `motion` (a backlog motion — a stub filed, a field re-formed, a plan moved or
+deleted — which is not a doc edit at all). `trim` and `amend` are the mechanical sentence by
+default; the rest are rows. The class predicts where judgment is likely; it groups, it does
+not gate — a `rule` the maintainer waves through is still a row, answered in a word.
+
+**The record**, below the block:
+
 - **Pending captures** from step 0, led by any key with more than one occurrence — the
   finding, its occurrence count with dates, the placement retro already proposed, and your
   ranking (with the re-rank noted where it differs from retro's). Each already carries an
@@ -303,12 +391,23 @@ as its yield thins. The gate is what keeps the review affordable at scale.
 - **Tally** — all-time process improvements (subjects only, same as step 1):
   `git log HEAD --format='%s' | grep -c '<markerPattern>'` (derived, never stored).
 
-Nothing is applied without approval. Under `read-only`, present candidates only. Under
-`apply-on-approval`, land each **approved** edit as its own `<markerPattern>` commit —
-never folded into unrelated work.
+Nothing is applied without recorded consent. Under `read-only`, present candidates only.
+Under `apply-on-approval`, land each **approved** edit as its own `<markerPattern>` commit —
+never folded into unrelated work. Under `apply-mechanical`, the same, and a run the
+maintainer is not answering lands the mechanical line — `trim` and `amend` only, each its
+own marker commit, landed first and cited second like any other — and reports it as
+*landed* with the shas rather than *land on your word*; every row is still `HELD`. The class
+that lands is the class the placer assigned against the text it read: a candidate that
+edits a doc named in `invariantDocs`, deletes anything still referenced, or whose placer
+call was `add (unconsolidated)` is a row whatever its class says.
 
 ## On completion
 
+- **Land first, cite second.** A sha written before its commit is on the default branch is
+  a sha the landing rebase rewrites. Every `LANDED <sha>` line, and every sha the ledger
+  cites, is written *after* the landing commits are pushed, with each sha read back from
+  the remote by subject (`git log origin/<default> --grep '<the candidate's subject>'`),
+  in a commit of its own. Never cite a branch-side sha.
 - Advance the mark: `git tag -f <markTag> <commit>` — where `<commit>` is an
   **ancestor of the default branch**, after any approved edits have landed there. `HEAD`
   is only right when that's where you are; a branch tip that a squash or rebase later
@@ -337,13 +436,21 @@ never folded into unrelated work.
     **one routed to a stub or plan** is `FILED <ref>` — the key stays live, so a further
     occurrence counts against the stub instead of vanishing into a closed key.
   - **A candidate this run proposed and held** (an autonomous run, or one the user did
-    not answer) is `HELD <this run's marker sha> — <the proposal in one line>` on its
-    key. HELD is its own state: nothing owns the proposal and nothing picks it up until
-    someone approves, which is why the view lists HELD keys first and the next run
-    reports them before anything else. A held candidate keyed to nothing goes in the
-    ledger's Live with *promoting signal: approval*. Approved → `LANDED`; declined →
-    `RETIRED` with the reason. A held proposal that lives only in a commit body is lost
-    to the next run.
+    not answer) is `HELD <today's date> — <letter, class, the proposal in one line>` on
+    its key, and the lines ride **this run's marker commit** — the date is the ref because
+    a commit cannot cite its own sha, and that date names the marker commit (`git log
+    --grep '<markerPattern>' --since <date> --until <date+1>`). HELD is its own state:
+    nothing owns the proposal and nothing picks it up until someone approves, which is
+    why the view lists HELD keys first, with their age, and the next run reports them
+    before anything else. A held candidate keyed to nothing goes in the ledger's Live with
+    *promoting signal: approval*. Approved → `LANDED`; declined → `RETIRED` with the
+    reason. A held proposal that lives only in a commit body is lost to the next run.
+  - **A ruling on a key that moves nothing** — a re-rank, a count-only call at a key whose
+    rule is present, a build trigger on a filed stub, a re-rank withdrawn — is
+    `ADJUDICATED <today's date> — <the ruling in one line>` on the key: its own entry,
+    never continuation prose inside an occurrence. It changes neither the state nor the
+    count, `compact` keeps it, and `view --key` shows it, so the next run reads the ruling
+    where the key is instead of in a commit body.
   - **Then compact:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact` — one
     block per key, closed keys reduced to their status line. It is the only rewrite of
     the file and it is deterministic; a violation it refuses on is repaired by hand first.
@@ -367,7 +474,8 @@ never folded into unrelated work.
   so it holds current state and never a window's narrative. Three sections, each entry a
   top-level bullet; the `guards` `review-ledger` check is the gate:
   - **Live** — what was deferred, why, its **promoting signal**, and one
-    `last checked: <date> — <state>` line, rewritten in place each run; at most 12 lines.
+    `last checked: <date> — <state>` line, rewritten in place each run; each entry at most
+    12 lines — the cap is per entry, the section has none.
     A dated window line (`09-04: no fire`) is the failure — the state replaces the old
     state, it does not follow it. The gate for any entry: *would a future review act
     differently without it?*
@@ -406,3 +514,20 @@ never folded into unrelated work.
 - **Running the full funnel against a corpus with no recurrence** — the gate exists
   because measurement cost rises with repo size while a fixed funnel's yield does not.
 - **Silent fallback** — always narrate the tier and its upgrade path.
+- **Writing while a peer review is in flight**, or without re-reading the mark and the log
+  blob right before the first write — the pre-flight exists because this command is the
+  one mutator and nothing else serializes it.
+- **Landing a row under `apply-mechanical`** — the tier covers `trim` and `amend`; a
+  `rule`, `carve`, `config`, `tooling`, or `motion` candidate waits for its answer however
+  small it looks, and an invariant doc is never edited unanswered.
+- **Handing the maintainer the record.** Pattern → evidence → proposal per candidate is
+  for the commit body and the next run; a person gets the decision block, and a wording
+  amendment listed as a decision is the row that hides the real one.
+- **A row named by its key, missing its recommendation, or resting on a stale premise** —
+  the Decision names the artifact and the motion, the Recommend column is never empty, and
+  every premise is re-measured against the default branch before the row is written.
+- **Citing a sha the commit cannot know, or one a rebase will rewrite** — the date keys
+  `HELD`; a `LANDED` sha is read back from the remote after the push; and a ruling is an
+  `ADJUDICATED` line, never continuation prose.
+- **Checking the local head for a peer's landing**, or refusing on a clean rebase — the
+  pre-flight reads the remote's default branch and re-derives.

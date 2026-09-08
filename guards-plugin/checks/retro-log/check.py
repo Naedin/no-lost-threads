@@ -10,11 +10,14 @@ or blank. Under `## Entries`:
   <class>/<shape>[ (uncold)]                  key line, column 0
     YYYY-MM-DD | <source> | <text>            occurrence, continuation lines below it
     LANDED|RETIRED|UPSTREAM|FILED|NOTED|HELD|REOPENED <ref> — <text>   status: one line
+    ADJUDICATED <date> — <text>               annotation: one line, the review's ruling
+                                              on a key; its own entry like a status
 
 Findings: a line that is none of these; a first detail line that is neither an
 occurrence nor a status; an unknown status token; a status entry longer than one
-line (the narrative belongs in the commit); a status line inside an occurrence entry
-(a status is its own entry, key line repeated); a section after the entries.
+line (the narrative belongs in the commit); a status or annotation line inside an
+occurrence entry (each is its own entry, key line repeated); a section after the
+entries.
 
 Scope: `--paths` names the log(s) — each entry a root-relative file, or an fnmatch
 glob where `*` crosses `/` as in a git pathspec; a literal is tried first, so a name
@@ -43,7 +46,8 @@ import sys
 ID = "retro-log"
 KEY = re.compile(r"^([a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*)( \(uncold\))?$")
 OCCURRENCE = re.compile(r"^  (\d{4}-\d{2}-\d{2}) \| ([^|]+?) \|\s*(.*)$")
-STATUS = re.compile(r"^  (LANDED|RETIRED|UPSTREAM|REOPENED|FILED|NOTED|HELD) (\S+(?: \+ \S+)*)(?:\s+[—-]+\s+(.*))?$")
+TOKENS = ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD", "ADJUDICATED")
+STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?:\s+[—-]+\s+(.*))?$")
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DETAIL = re.compile(r"^  ")
 HEADING = re.compile(r"^## ")
@@ -212,11 +216,11 @@ def check(rel, text):
                 pass
             elif STATUS_LIKE.match(line):
                 tok = STATUS_LIKE.match(line).group(1).split()[0]
-                if tok in ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD"):
+                if tok in TOKENS:
                     out.append((n, f'status line must be "{tok} <ref> — <text>"'))
                 else:
-                    out.append((n, f'unknown status "{tok}"; '
-                                   "use LANDED, RETIRED, UPSTREAM, FILED, NOTED, HELD, or REOPENED"))
+                    out.append((n, f'unknown status "{tok}"; use ' + ", ".join(TOKENS[:-1])
+                                   + f", or {TOKENS[-1]}"))
             else:
                 out.append((n, 'first detail line must be "YYYY-MM-DD | source | text" '
                                'or "STATUS ref — text"'))

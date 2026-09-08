@@ -211,10 +211,13 @@ in that script's header and in the log's own header:
   LANDED <sha> — <where it landed>            status lines. Each is ONE physical line,
   FILED <ref> — <the stub carrying it>        however long — a wrapped one reads as
   NOTED <date> — <what worked and why>        continuation prose and the guard refuses it.
-  HELD <review-sha> — <proposal>              LANDED: applied. FILED: live; a recurrence
+  HELD <date> — <proposal>                    LANDED: applied. FILED: live; a recurrence
                                               counts against the stub. NOTED: a record,
                                               closed at write, never counted. HELD: the
                                               review proposed, nobody approved; listed first
+  ADJUDICATED <date> — <ruling>               the review's annotation on a key — a re-rank,
+                                              a count-only ruling; changes neither state
+                                              nor count. The review writes it; retro never
 ```
 
 A long status line stays on one line, so a `NOTED` entry looks like this and never like a

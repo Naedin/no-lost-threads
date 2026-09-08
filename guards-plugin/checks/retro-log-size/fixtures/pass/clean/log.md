@@ -21,4 +21,4 @@ mode-confusion/shared-term-covers-two-motions
 positive/cold-check-caught-what-the-anchored-draft-missed
   NOTED 2026-09-06 — two cold diff checks converged where five prose checks had not.
 scope-leak/edit-landed-without-exercising-the-sibling-path
-  HELD 9f9f9f9 — candidate A: pre-pr §2 pins bullet rewritten tree-wide.
+  HELD 2026-09-07 — candidate A: pre-pr §2 pins bullet rewritten tree-wide.

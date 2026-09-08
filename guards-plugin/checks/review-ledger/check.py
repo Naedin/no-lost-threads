@@ -7,14 +7,16 @@ The review reads the ledger in full every run, so it carries only what a future
 review acts on: three sections, each entry a top-level bullet.
 
   ## Live …            what was deferred, why, its promoting signal, and one
-                       `last checked: <date> — <state>` line; at most 12 lines
+                       `last checked: <date> — <state>` line; each entry at most
+                       12 lines
   ## Falsifications …  kept whole; no cap
   ## Resolved …        a pointer at the landing commit; at most 3 lines
 
 Findings: any other section (a per-window review log belongs in the review's own
 marker commit); a dated window line inside a Live entry (`09-04: no fire`,
 `Re-deferred 2026-09-02:`) — the state is rewritten in place, not accreted; a Live
-entry over 12 lines; a Resolved entry over 3 lines.
+entry over 12 lines; a Resolved entry over 3 lines. Both caps are per entry; the
+sections have no cap of their own.
 
 Scope: `--paths` names the ledger(s) — each entry a root-relative file, or an fnmatch
 glob where `*` crosses `/` as in a git pathspec; a literal is tried first, so a name
