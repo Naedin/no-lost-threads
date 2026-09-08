@@ -9,6 +9,14 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [Unreleased]
+
+### Fixed
+
+- **`compact` kept a status block inside an occurrence entry**, merging every block of a key under one key line, which the grammar reads as continuation prose and the `retro-log` check refuses; a status block now keeps its own key line, and compacting a canonical log changes nothing.
+- **`compact` dropped occurrences appended after a closing status.** A key's state is now its last block: an occurrence after `LANDED` reopens the key, `view` marks it `recurred after LANDED`, and compaction keeps every block.
+- **`test.sh`** proves both shapes, idempotence, and the view-warns/compact-refuses split; the workshop's pre-land runs every plugin's suite.
+
 ## threads [0.9.0] — 2026-09-07
 
 ### Contract
@@ -36,6 +44,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
+
+## guards [0.5.0] — 2026-09-08
+
+### Added
+
+- **`"export"` in `.claude/guards.json`** — git pathspecs the git adapter exports before judging, instead of the whole index. Absent, unchanged. An export that drops a config the gate steers by — `.claude/guards.json`, or `.claude/threads.json` where the logs live — refuses with exit 2 before any check runs, naming the file. Past a missing config a check judges nothing and says nothing, so an export is verified rather than trusted.
+
+### Changed
+
+- **`run.py` handed a root with no `.claude/guards.json`** says so on stderr and still exits 0, so a run that judged nothing never reads as one that passed.
+- **`test.sh` proves the git adapter**, not only the checks and the runner: inert without a config, a narrow export that judges a clean tree and still catches a finding, an export dropping either config refusing, and an export dropping a file in a check's scope refusing by name. The scope helper every check carries is held byte-identical across the five, since only one copy is exercised. A linked-worktree case covers what a plain `git init` fixture cannot: the adapter judging that worktree's own index rather than the primary's, and the install line's relative `core.hooksPath` running the hook the worktree carries. In a one-level repo a wrong path still resolves, so the case has to be a real worktree to pin either. A git-checkout fixture pins the `git ls-files` half of glob resolution, which the walk-branch cases cannot see; `says` asserts the exit code alongside the message; the suite neutralizes the ambient git config, under which a fixture could stage nothing and assert exit 0 over an empty tree; and each fix above carries a case that fails when the fix is reverted.
+- **`paths` takes a glob**, matched the way `exclude` already is — Python `fnmatch` over the root-relative path, so `*` crosses `/` as in a git pathspec. A process-doc set is `["CLAUDE.md", "Plans/active/*.md"]` rather than a hand-listed copy that goes stale the next time a doc is added. Literal entries are unchanged.
+- **An entry in `paths` that names no file refuses (exit 2), naming the entry.** It used to be skipped, so a typo or a moved file narrowed the universe and the check reported a pass over whatever was left — the same silent narrowing as an export that matched nothing. Adopter-side edit: a config carrying a stale literal path now refuses instead of judging less than it claims.
+- **README** — keep `core.hooksPath` relative, which git resolves against each worktree's own top level; an absolute path points every worktree at one checkout's copy. A `*` in a git pathspec crosses `/`, which is what makes `.claude/*` sufficient.
+
+### Fixed
+
+- **A check whose `git` call failed exited 1, which the runner reads as findings.** `anchors` has shipped this since it began listing with `git ls-files`: an unreadable index, or `git` absent from `PATH`, raised out of the check, and Python's exit 1 became "this check found something" — at rung `warn`, a check that died with a traceback reported clean and the commit passed. Every check now maps an unexpected exception to exit 2, and the runner carries a refusal upward regardless of rung.
+- **The export pipeline read only `git checkout-index`'s status**, so a pathspec `git` rejects emptied the export while the pipeline reported success; the config-drop guard then blamed a list that was merely too narrow. The pipeline runs under `pipefail` and names the pathspec as the cause.
+- **An export that half-covered a check's scope passed over what survived.** A check listed its universe by walking the exported tree, so `paths: ["docs/*.md"]` under `export: ["docs/good.md"]` judged one file and reported clean while `run.py` on the same checkout found the other — the silent narrowing the gate exists to catch, reachable from the config alone. The adapter now hands every check the index listing through `GUARDS_INDEX`; a check takes its universe from that listing and refuses on a file in scope the tree lacks, naming it and the list, for a glob, a literal, a default universe, and a discovered log alike. `export` is a copy budget, never a scope; `paths` and `exclude` narrow a check.
+- **`anchors` reported a link target the export dropped as missing.** Property 2 tested the exported tree, so under `export: ["*.md"]` every link to an image or a text file was a finding and the commit refused. A target now resolves against the tree or the index listing, as a file or a directory; one in neither is still a finding.
+- **A glob skipped a tracked file deleted without `git rm`** while a literal naming the same file refused, so `run.py` on a working tree judged less than the index claims for one spelling of the scope and not the other. The listing keeps the file and the check refuses naming it. The adapter, which judges the index, is unaffected.
+- **A `paths` or `exclude` entry beginning `./` matched nothing**: the listing is root-relative and the entry was matched as written, so `./docs/good.md` selected the file as a literal while `./docs/*.md` refused as "matches no file". Entries are normalized before matching, and one reaching outside the root refuses instead of being read.
+- **A `paths` entry was matched as a glob before being tried as a literal**, so a tracked file whose name carries `[` refused as "matches no file" though `git` itself matches it. Literals are tried first, as a git pathspec does.
+- **An `anchors` glob reached past markdown**, so `paths: ["docs/*"]` pulled in a PNG, failed to decode it, and refused every commit. A glob now narrows within the check's own universe.
+- **A directory in `paths` refused with "no such file"** though it exists; it now says to name the files under it.
+- **The README's sibling-checkout hook snippet ended `|| exit 1`**, rewriting the adapter's exit 2 to 1 and telling the wrapper's caller the gate found something when the gate could not run. It ends `|| exit $?`. An adopter that copied the snippet has this in its own hook.
 
 ## guards [0.4.0] — 2026-09-07
 

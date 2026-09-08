@@ -24,7 +24,7 @@
       "name": "guards",
       "source": "./guards-plugin",
       "description": "Repo guardrails as scripts behind a gate \u2014 one script per check with a stable id and exit codes 0 / 1 / 2 meaning pass, findings, refused; .claude/guards.json names the enabled checks and each one's rung, warn or block; a git pre-commit adapter judges the index and is inert in a repo with no config. Two checks ship: anchors (every in-repo section link resolves to an explicit <a id> and every relative link target exists) and war-stories (narrative provenance in process docs). Rung as config is the enforcement ladder made add-only.",
-      "version": "0.4.0"
+      "version": "0.5.0"
     }
   ]
 }

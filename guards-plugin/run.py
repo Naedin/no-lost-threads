@@ -13,7 +13,8 @@ Exit 1: a block check found something.
 Exit 2: the config is unreadable or malformed, names a check id that does not
         exist, or any check exited 2 — regardless of rung. A gate that cannot run
         is never a passed one.
-No config at the root: exit 0, no output.
+No config at the root: exit 0 and one stderr line saying nothing was judged — a
+run that judged nothing never reads as a run that passed.
 """
 import argparse
 import json
@@ -69,6 +70,7 @@ def main():
     root = pathlib.Path(args.root or git_toplevel()).resolve()
     config = root / ".claude" / "guards.json"
     if not config.exists():
+        err(f"no .claude/guards.json at {root}, nothing judged")
         return 0
 
     try:

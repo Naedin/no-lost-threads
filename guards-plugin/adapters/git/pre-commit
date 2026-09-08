@@ -9,6 +9,20 @@
 # so — a silent pass reads the same as a working one.
 # Otherwise the runner's exit is the hook's exit — 1 refuses on a block finding,
 # 2 refuses because the gate could not run.
+# The export is the whole index unless .claude/guards.json carries "export": a list
+# of git pathspecs naming what the enabled checks read (e.g. ["*.md", ".claude/*"]).
+# The export is never a scope: the checks are handed the index listing (GUARDS_INDEX)
+# and take their universe from it, so an export that drops a file a check reads
+# refuses, naming the file — widen the list, or narrow the check with "paths" or
+# "exclude". An export that drops a config the gate steers by — .claude/guards.json,
+# or .claude/threads.json where the logs live — refuses before any check runs,
+# because a check reading past a missing config judges nothing and says nothing.
+
+refuse() {  # refuse <message> — the gate could not run, which is never a pass
+  echo "guards: $1" >&2
+  echo "guards: commit refused (exit 2)" >&2
+  exit 2
+}
 
 plugin="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)" || exit 2
 
@@ -19,10 +33,41 @@ fi
 
 tmp="$(mktemp -d)" || exit 2
 trap 'rm -rf "$tmp"' EXIT
+tree="$tmp/tree"
+mkdir "$tree" || exit 2
 
-git checkout-index -a --prefix="$tmp/" || { echo "guards: could not export the index" >&2; exit 2; }
+# --full-name: a hook runs at the top level, but a listing relative to any other cwd
+# would name paths the exported tree does not hold.
+git ls-files -z --full-name > "$tmp/index" || refuse "could not list the index"
+export GUARDS_INDEX="$tmp/index"
 
-python3 "$plugin/run.py" --root "$tmp"
+export_specs="$(git show :.claude/guards.json | python3 -c '
+import json, sys
+try:
+    specs = json.load(sys.stdin).get("export", [])
+except Exception:
+    specs = []
+for s in specs:
+    if isinstance(s, str):
+        print(s)')"
+if [ -n "$export_specs" ]; then
+  # pipefail, or only checkout-index's status is read and a pathspec git rejects
+  # empties the export while the pipeline reports success.
+  ( set -o pipefail
+    printf '%s\n' "$export_specs" | tr '\n' '\0' | xargs -0 git ls-files -z -- \
+      | git checkout-index -z --stdin --prefix="$tree/" ) \
+    || refuse "could not export the index; check the pathspecs in \"export\""
+else
+  git checkout-index -a --prefix="$tree/" || refuse "could not export the index"
+fi
+
+for cfg in .claude/guards.json .claude/threads.json; do
+  git ls-files --cached --error-unmatch -- "$cfg" >/dev/null 2>&1 || continue
+  [ -f "$tree/$cfg" ] && continue
+  refuse "the export dropped $cfg, which the gate reads; widen \"export\" in .claude/guards.json"
+done
+
+python3 "$plugin/run.py" --root "$tree"
 status=$?
 if [ "$status" -ne 0 ]; then
   echo "guards: commit refused (exit $status)" >&2

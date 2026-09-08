@@ -29,8 +29,14 @@ The entry grammar (the guards `retro-log` check enforces the same one):
 Entries sit under a `## Entries` heading; nothing follows them. The log's path is
 `retroLogPath` in `.claude/threads.json` (default `.claude/threads-retro-log.md`).
 
-A key's state is its last status line in stream order: none, REOPENED, FILED, or
-HELD is live, the rest closed; the view lists HELD keys first. Its occurrence count is its dated lines across every block that
+A key's state is its last block in stream order: an occurrence, or a REOPENED,
+FILED, or HELD status, is live; LANDED, RETIRED, UPSTREAM, NOTED is closed. An
+occurrence appended after a closing status therefore reopens the key by itself — the
+rule landed and the shape came back — and the view says so. The view lists HELD keys
+first. Compaction keeps every block of a live key, merging only runs of occurrence
+blocks under one key line; a status block keeps its own key line, since a status
+inside an occurrence entry is invisible to the grammar. Compacting a canonical log
+changes nothing. Its occurrence count is its dated lines across every block that
 carries the key. `view` reads a stream that breaks the grammar, naming each
 violation on stderr and reading the offending line as plain detail; `compact`
 refuses on one (exit 2), because a rewrite of a stream it cannot read loses lines.
@@ -169,11 +175,19 @@ def keys_in_order(blocks):
 
 
 def state(blocks_for_key):
-    s = None
+    """The last block decides: its status, or None for an occurrence."""
+    return blocks_for_key[-1].status
+
+
+def recurred_after(blocks_for_key):
+    """The closing status an occurrence came after, or None."""
+    closed = None
     for b in blocks_for_key:
-        if b.status:
-            s = b.status
-    return s
+        if b.status in CLOSED:
+            closed = b.status
+        elif not b.status and closed:
+            return closed
+    return None
 
 
 def one_line(block):
@@ -213,6 +227,9 @@ def render_view(blocks, keys_only, only=None):
         span = f"{dates[0]}..{dates[-1]}" if len(dates) > 1 else (dates[0] if dates else "-")
         flag = " (uncold)" if any(b.uncold for b in bs) else ""
         marker = f"  {st}" if st in ("REOPENED", "FILED", "HELD") else ""
+        again = recurred_after(bs)
+        if again:
+            marker += f"  recurred after {again}"
         out.append(f"{key}{flag}  ×{len(dates)}  {span}{marker}")
         if not keys_only:
             for b in bs:
@@ -233,12 +250,20 @@ def render_compact(header, blocks):
     for key, bs in keys_in_order(blocks).items():
         st = state(bs)
         uncold = any(b.uncold for b in bs)
-        out.append(key + (" (uncold)" if uncold else ""))
+        key_line = key + (" (uncold)" if uncold else "")
         if st in CLOSED:
-            out.append(one_line([b for b in bs if b.status][-1]))
+            out += [key_line, one_line(bs[-1])]
             continue
+        open_run = False
         for b in bs:
-            out.extend(b.lines if not b.status else [one_line(b)])
+            if b.status:
+                out += [key_line, one_line(b)]
+                open_run = False
+            else:
+                if not open_run:
+                    out.append(key_line)
+                    open_run = True
+                out.extend(b.lines)
     return "\n".join(out) + "\n"
 
 
