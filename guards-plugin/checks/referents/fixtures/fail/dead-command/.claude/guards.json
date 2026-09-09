@@ -1,0 +1,1 @@
+{"checks": {"referents": {"rung": "warn", "paths": ["docs/*.md"], "knownCommands": ["threads:", "code-review"], "envPrefixes": ["MYAPP_"]}}}

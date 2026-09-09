@@ -12,9 +12,9 @@
 # The export is the whole index unless .claude/guards.json carries "export": a list
 # of git pathspecs naming what the enabled checks read (e.g. ["*.md", ".claude/*"]).
 # The export is never a scope: the checks are handed the index listing (GUARDS_INDEX)
-# and take their universe from it, so an export that drops a file a check reads
-# refuses, naming the file — widen the list, or narrow the check with "paths" or
-# "exclude". An export that drops a config the gate steers by — .claude/guards.json,
+# and the checkout's top level (GUARDS_TREE) and take their universe from the listing,
+# so an export that drops a file a check reads refuses, naming the file — widen the
+# list, or narrow the check with "paths" or "exclude". An export that drops a config the gate steers by — .claude/guards.json,
 # or .claude/threads.json where the logs live — refuses before any check runs,
 # because a check reading past a missing config judges nothing and says nothing.
 
@@ -40,6 +40,11 @@ mkdir "$tree" || exit 2
 # would name paths the exported tree does not hold.
 git ls-files -z --full-name > "$tmp/index" || refuse "could not list the index"
 export GUARDS_INDEX="$tmp/index"
+# The checkout itself, for a check that must run something in it — plan-sweeps runs a
+# plan's `rg` over sources the export does not hold; referents reads the code tree for an
+# env knob. Git runs a hook at the working tree's top level.
+GUARDS_TREE="$(git rev-parse --show-toplevel)" || refuse "could not find the working tree"
+export GUARDS_TREE
 
 export_specs="$(git show :.claude/guards.json | python3 -c '
 import json, sys

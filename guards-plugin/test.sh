@@ -300,6 +300,32 @@ expect 0 "adapter: a link target the export dropped resolves by the index" hook 
 git -C "$a/links" rm -q --cached docs/note.txt
 expect 1 "adapter: a link target in neither tree nor index is a finding" hook "$a/links"
 
+# The checkout is handed over as GUARDS_TREE. plan-sweeps runs a plan's `rg` over
+# sources the export drops, so the sweep must run in the checkout, not the export; a
+# sweep naming a path the checkout lacks is still a finding. referents resolves a script
+# the export drops by the index listing, and a knob by the index's content.
+mkrepo "$a/tree"
+mkdir -p "$a/tree/Sources" "$a/tree/scripts" "$a/tree/.claude/commands"
+printf 'let role = .fallback\nlet knob = "MYAPP_MODE"\n' > "$a/tree/Sources/a.swift"
+printf '#!/bin/sh\n' > "$a/tree/scripts/run.sh"
+printf '# go\n' > "$a/tree/.claude/commands/go.md"
+printf '# P\n\n- verified by: `rg -n "role: .fallback" Sources`\n' > "$a/tree/plan.md"
+printf '# D\n\nRun `scripts/run.sh`, then `/go`; set `MYAPP_MODE`.\n' > "$a/tree/doc.md"
+printf '{"export": ["*.md", ".claude/*"], "checks": {"plan-sweeps": {"rung": "block", "paths": ["plan.md"]}, "referents": {"rung": "block", "paths": ["doc.md"], "envPrefixes": ["MYAPP_"]}}}' \
+  > "$a/tree/.claude/guards.json"
+git -C "$a/tree" add -A
+expect 0 "adapter: a sweep runs in the checkout the export lacks" hook "$a/tree"
+printf '# P\n\n- verified by: `rg -n "role: .fallback" Sources/Gone.swift`\n' > "$a/tree/plan.md"
+git -C "$a/tree" add -A
+expect 1 "adapter: a sweep over a missing path is a finding" hook "$a/tree"
+hook "$a/tree" 2>/dev/null | grep -q 'Gone.swift' \
+  || { echo "FAIL  adapter: the finding names the missing path"; exit 1; }
+printf 'ok    %-52s\n' "adapter: the finding names the missing path"
+printf '# D\n\nRun `scripts/gone.sh`; set `MYAPP_NOPE`.\n' > "$a/tree/doc.md"
+printf '# P\n' > "$a/tree/plan.md"
+git -C "$a/tree" add -A
+expect 1 "adapter: referents judges the index, not the export" hook "$a/tree"
+
 # A linked worktree. A plain `git init` fixture cannot see either property below:
 # in one, every path collapses onto the primary, so a wrong one still resolves.
 w="$tmp/worktree"

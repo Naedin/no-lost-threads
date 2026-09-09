@@ -146,6 +146,7 @@ threads-plugin/
   agents/finding-placer.md        Read-only sub-agent that sites findings in your process docs (both commands)
   scripts/extract-record.py       Transcript → compact timeline (used by the fresh-context audit)
   scripts/retro-log.py            The retro log's view (state and counts per key) and compaction
+  scripts/land-process-commit.py  Land one marker commit on the default branch from a slice branch, through the repo's own hook
 ```
 
 **The retro log is an append-only stream, read through a view.** Sessions append; a
@@ -158,6 +159,18 @@ proposal shows the date it was held and its age. The review's ruling on a key �
 a count-only call — is an `ADJUDICATED <date>` line that changes neither state nor count.
 `compact` is the review's one rewrite. The `guards` plugin's `retro-log`
 and `review-ledger` checks hold both files to their grammar.
+
+**A marker commit survives the squash by landing on its own.** A squash merge collapses
+a slice branch into one subject, so a `docs(process/<scope>)` commit made on the branch
+never reaches the stream the review reads. `python3 <plugin>/scripts/land-process-commit.py
+<sha>` lands that one commit direct on the default branch from wherever the branch is
+checked out: a throwaway worktree at `origin/<default>`, `git cherry-pick --no-commit`
+then `git commit -C <sha>` so the repo's own pre-commit hook fires (a plain cherry-pick
+runs no hook), a patch-identity check, the push, and on stdout exactly one line — the sha
+re-read from the remote, the only one a log or ledger line may cite. The slice branch is
+then rebased so the duplicate drops. A conflict, a red hook, or a refused push fails loud
+with nothing pushed. The default branch comes from `--branch`, `defaultBranch` in
+`.claude/threads.json`, or `refs/remotes/origin/HEAD`.
 
 No hooks ship, and nothing runs on a schedule or at session start: both commands are
 explicit-only.

@@ -432,7 +432,13 @@ failing guard holds it whatever its class says.
   a sha the landing rebase rewrites. Every `LANDED <sha>` line, and every sha the ledger
   cites, is written *after* the landing commits are pushed, with each sha read back from
   the remote by subject (`git log origin/<default> --grep '<the candidate's subject>'`),
-  in a commit of its own. Never cite a branch-side sha.
+  in a commit of its own. Never cite a branch-side sha. From a slice branch, a marker
+  commit that must not wait for a squash lands by itself through
+  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/land-process-commit.py <sha>`: a throwaway
+  worktree at the remote's default branch, cherry-pick then `git commit -C` so the
+  repo's own pre-commit hook judges it, push, and the only thing on stdout is the sha
+  re-read from the remote — the one to cite; the slice branch is rebased so the
+  duplicate drops.
 - Advance the mark: `git tag -f <markTag> <commit>` — where `<commit>` is an
   **ancestor of the default branch**, after any approved edits have landed there. `HEAD`
   is only right when that's where you are; a branch tip that a squash or rebase later

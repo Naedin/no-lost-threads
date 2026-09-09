@@ -42,7 +42,10 @@ Use the `Agent` tool with this plugin's `gap-checker` agent
 to break the slice plan at `<path>`."* — and, when `checkBrief` is set, one more
 sentence: *"Also run the local gap classes in `<checkBrief path>`."* No background, no
 rationale, no summary of the drafting conversation, no note about what you're unsure
-of. Its brief lives in the agent definition.
+of. Its brief lives in the agent definition, and the plan's own ledger tells it where to
+start: the claim rows under a `drafted at` record are re-run verbatim before anything is
+hunted, so a claim the drafter measured is checked by its command and not by a second
+cold read, and the hunt goes to the sites the rows do not cover.
 
 When `checkerModel` is set and §0's flag is not true, pass it as the spawn's `model`
 and say so in one line; when it is absent, omit `model` and say nothing. If the spawn is refused for that
@@ -90,14 +93,17 @@ and don't pad its clean verdict with your own.
 Append one line to the plan's `## Verification ledger` section **immediately —
 before fixes are discussed or approved, whatever the verdict**. The section may be
 absent — a plan another drafter wrote; then create it at end of file as `/slices:draft`'s
-scaffold with the record in place of the placeholder — the heading, a blank line, then
-`<appended by /slices:check and by later hardening rungs; leave as-is when drafting>`,
-then the record — and say you created it. The line records
+scaffold with the record in place of the drafter's — the heading, a blank line, then
+`<the drafter's claim rows sit under its record line; /slices:check and later hardening rungs append>`,
+then the record — and say you created it. A template may seat the section under its own
+heading (`<!-- slices: ledger -->`); the record goes where the `drafted at` line is. The
+line records
 that the check ran, not that its findings were resolved; a record gated on an
 approval leaves no trace when the approval never comes (measured in a headless
 run: full report delivered, ledger still empty). Update the counts afterward by
-appending a further line if fixes land — never rewrite existing lines. The first
-append into a drafted scaffold replaces its `- (none yet)` placeholder; that, and the
+appending a further line if fixes land — never rewrite existing lines. A drafter's
+`drafted at` record and its rows stay as written; a plan drafted before the rows existed
+carries a `- (none yet)` placeholder, and the first append replaces it. That, and the
 creation above, are the only writes into the ledger that are not appends:
 
 ```
@@ -113,7 +119,9 @@ searching. When the file cannot be read, write `slices ?` rather than omitting t
 
 **Under the record line, the claim rows** — one indented row per load-bearing claim the
 checker verified, carrying the probe and not only the verdict, in the checker's own
-report order:
+report order. A draft-time row the checker re-ran and found unchanged is not copied
+again; a row whose output moved, or that the drafter marked `unverified` and the checker
+settled, is written under the check's record with its new output:
 
 ```
   - <claim> — `<generating command>` — <one line of its output>

@@ -20,6 +20,12 @@ author's framing.
 
 Work in this order:
 
+0. **Re-run the drafter's rows first.** When the plan's ledger carries a `drafted at`
+   record with claim rows under it, run each row's command verbatim against the current
+   tree and compare its output line: a row that moved is a defect, cited with both
+   outputs; a row marked `unverified` is one to settle now. Then look for the sites the
+   plan names that no row covers — a symbol, a file, a test, a precedent with no
+   generating command under it — and treat each as a claim recalled from memory.
 1. **Re-verify every load-bearing claim.** Anything the plan asserts about the
    code — a file exists, a function behaves some way, something is absent — gets
    checked against the repo at file-and-line, with a command, not plausibility.
@@ -59,10 +65,13 @@ Report in two kinds, and keep them separate:
 - **Questions** — anything that hinges on a product or priority call. State the
   decision and the pull in each direction; do not answer it yourself.
 
-Then **the claim rows**: every load-bearing claim you verified, one line each —
-`<claim> — <the command you ran> — <one line of its output>` — and every claim you
-could not, as `<claim> — unverified: <what would settle it>`. These are copied into the
-plan's ledger verbatim, so write them to be re-run, not re-read.
+Then **the claim rows**: every load-bearing claim you verified that the drafter's rows
+did not already hold unchanged, one line each —
+`<claim> — <the command you ran> — <one line of its output>` — every draft-time row whose
+output moved, with the new output, and every claim you could not check, as
+`<claim> — unverified: <what would settle it>`. These are copied into the plan's ledger
+verbatim, so write them to be re-run, not re-read. Say in one line how many draft-time
+rows you re-ran and how many held.
 
 End with one verdict: **holds** (nothing found, or only defects with unambiguous
 fixes), **open** (a question the author cannot answer alone), or **mis-carved** — the
@@ -72,8 +81,9 @@ would mean rewriting its argument.
 
 A plan drafted from a repo template by `/slices:draft` consumes the template's
 `<!-- slices: ... -->` markers, omits sections the template says to omit at draft time,
-and carries a `## Verification ledger` scaffold at end of file. None of that is a
-deviation from the template; do not report it as one.
+and carries a `## Verification ledger` scaffold — at end of file, or under the heading the
+template marked `<!-- slices: ledger -->` — with a `drafted at` record and the drafter's
+rows. None of that is a deviation from the template; do not report it as one.
 
 If the plan holds, say so plainly — a clean verdict is a real finding. Do not
 invent gaps because you were asked to look, and do not restate the plan back at

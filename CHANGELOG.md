@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.13.0] — 2026-09-08
+
+### Added
+
+- **`scripts/land-process-commit.py <sha>`** — lands one marker commit direct on the default branch from a slice branch: fetch; `git worktree add --detach` at `origin/<default>`; `git cherry-pick --no-commit` then `git commit -C <sha>`, so the adopter's own pre-commit hook judges the commit where a plain cherry-pick runs no hook; a patch-id check against the original; push; the sha re-read from the remote is the only line on stdout, so "push before citing a sha" is enforced by the tool rather than remembered; the worktree removed; the slice branch rebased so the duplicate drops. A cherry-pick conflict, a red hook, a patch that came out different, or a refused push exits 1 with nothing pushed; a rebase that fails after the push exits 3 with the sha already printed. Default branch from `--branch`, `defaultBranch` in `.claude/threads.json`, or `refs/remotes/<remote>/HEAD`. `test.sh` proves the landing through a hook, the printed sha against `ls-remote`, the dropped duplicate, and each failure leaving no worktree and no push. `/threads:process-review` §On completion names it under land-first-cite-second.
+
 ## threads [0.12.0] — 2026-09-08
 
 ### Contract
@@ -84,6 +90,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
 
+## guards [0.7.0] — 2026-09-08
+
+### Added
+
+- **`plan-sweeps`** — every single-line code span beginning `rg ` in a plan is split to argv without a shell and run in the checkout with a 20-second bound; `rg` exiting 2 (a malformed regex, a path it cannot open) or not finishing is a finding, exit 0 and 1 are both sane. A span the shell would act on — `;`, `|`, `&`, `$`, a redirect, a glob character outside quotes, `$` or a backtick inside double quotes — or one carrying `--pre`, `--pre-glob`, or `--search-zip` is skipped, never run, and counted on stderr; inside single quotes nothing expands, so a regex alternation runs. Measured on one adopter's three drafted plans: 40 sweeps, 30 run, 10 skipped, 0 findings; its process docs carry two illustrative `rg -E` / `rg -r` fragments, which the allow marker covers. `paths` is required.
+- **`referents`** — a name a code span carries that nothing answers to: a script under `scriptDirs` (default `scripts`) the index does not hold, a `/command` with no `<commandDirs>/<name>.md` (default `.claude/commands`) and no `knownCommands` match (an entry ending `:` is a prefix), a word beginning with an `envPrefixes` entry that occurs in no non-markdown indexed file (`git grep --cached` in the checkout). Spans only, so prose `/tmp` never matches; `<…>` and ellipsis words are placeholders. Measured on one adopter: two illustrative referents (the allow marker) and one real drift, a `/plan` that names no command, twice. Ships at `warn` by recommendation; `paths` is required. The `gh` label class was measured at zero population and would put a network call in a pre-commit hook, so it is not built.
+- **A check's own keys in `.claude/guards.json`** — a check reads what it needs beyond a scope from its own entry, beside `rung`; the runner's contract is unchanged.
+- **`<!-- guards-allow: <id> -->`** on a line exempts that line from the check with that id, for a doc that shows a malformed sweep or names an illustrative script on purpose. Per line, per check.
+- **The git adapter exports `GUARDS_TREE`**, the checkout's top level, beside `GUARDS_INDEX`, so a check can run something in the checkout the export does not hold; `test.sh` proves a sweep runs there and a referent resolves by the index.
+
 ## guards [0.6.0] — 2026-09-08
 
 ### Changed
@@ -134,6 +150,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
 - **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
+
+## slices [0.2.0] — 2026-09-08
+
+### Contract
+
+- **The claim ledger is written at draft time.** `/slices:draft` runs a site-opening pass before the plan is written — every production symbol, file, test, and site the plan will name is opened with a command — and writes the pairs as claim rows under a `- drafted at <sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)` record in the `## Verification ledger`; a site it could not open is an `unverified` row. `/slices:check` and its gap-checker re-run those rows verbatim first, report a row that moved as a defect, and append only rows the draft did not hold. Measured in one adopter: the prose rule ("every named site is opened at draft time") recurred seven times in five days with the rule present, and the one draft that measured its claims before writing held on all three while its thirteen gaps were unopened sites. Adopter-side edit: a plan template whose own ledger section says "written by the check, not the drafter" says the drafter writes it and the check re-runs it; the `- (none yet)` placeholder in already-drafted plans is still replaced by the check's first append.
+- **`ledger` is a template marker role.** A template heading carrying `<!-- slices: ledger -->` — an adopter's `## Claim ledger` its finalize step already reads — is the scaffold's place: the drafter's record and rows are written there and the check appends there, so a repo that wraps `/slices:draft` carries its own ledger name. Previously `ledger` was named as an ignored role. Adopter-side edit: none unless a template wants the section seated; then the marker on that heading.
 
 ## slices [0.1.5] — 2026-09-07
 

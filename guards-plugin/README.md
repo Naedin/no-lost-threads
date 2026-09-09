@@ -47,7 +47,11 @@ above mean:
 {
   "checks": {
     "anchors":     { "rung": "block", "exclude": ["vendor/**"] },
-    "war-stories": { "rung": "warn",  "paths": ["CLAUDE.md", "docs/*.md"] }
+    "war-stories": { "rung": "warn",  "paths": ["CLAUDE.md", "docs/*.md"] },
+    "plan-sweeps": { "rung": "block", "paths": ["Plans/active/*.md"] },
+    "referents":   { "rung": "warn",  "paths": ["CLAUDE.md", ".claude/commands/*.md"],
+                     "knownCommands": ["threads:", "slices:", "code-review"],
+                     "envPrefixes": ["MYAPP_"] }
   }
 }
 ```
@@ -84,12 +88,27 @@ judged nothing never reads as one that passed.
 | `war-stories` | narrative provenance in prose: `this session`, `maintainer:`, `user:`, `had to say/redirect/point/stop`, `emergency`, `was caught by`, `never arrived`. A rule states its mechanism and its rung; the incident goes in the commit message. | none; `paths` is required |
 | `retro-log` | a line the retro log's grammar cannot read: not a key line (`<class>/<shape>`), an occurrence (`YYYY-MM-DD \| source \| text`), a one-line status (`LANDED\|RETIRED\|UPSTREAM\|FILED\|NOTED\|HELD\|REOPENED <ref> — text`) or annotation (`ADJUDICATED <date> — text`), a continuation, or blank; an unknown status token; a status or annotation entry over one line or inside an occurrence; a section after the entries. The grammar is the `threads` plugin's `scripts/retro-log.py`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
 | `retro-log-size` | an occurrence in the retro log over 8 lines, counted from its dated line through its last continuation. Separate from `retro-log` so the grammar can sit at `block` while existing entries come under the cap at `warn`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
+| `plan-sweeps` | a backticked `rg …` in a plan that cannot have run: `rg` exits 2 (a malformed regex, a path it cannot open) or does not finish within 20 seconds. Each single-line code span beginning `rg ` is split to argv without a shell and run in the checkout; a span the shell would act on (`;`, `\|`, `&`, `$`, a redirect, or a glob character outside quotes; `$` or a backtick inside double quotes) and one carrying `--pre`, `--pre-glob`, or `--search-zip` is skipped, never run, and counted on stderr. Exit 0 and 1 are both sane. Fenced blocks are not read. `rg` must be on `PATH`. | none; `paths` is required |
+| `referents` | a name a code span carries that nothing answers to: a script under a `scriptDirs` entry (default `scripts`) that the index does not hold; a `/command` with no `<commandDirs entry>/<name>.md` (default `.claude/commands`) and no match in `knownCommands` (an entry ending `:` is a prefix, `threads:`; any other is the whole name, `code-review`); a word beginning with an `envPrefixes` entry that occurs in no non-markdown file of the index (through `git grep --cached` in the checkout; no prefixes, class off). Spans only, so a prose `/tmp` never matches; a word carrying `<`, `>`, or an ellipsis is a placeholder. The three lists sit in the check's own `.claude/guards.json` entry beside `rung`. | none; `paths` is required |
 | `review-ledger` | a section other than Live, Falsifications, or Resolved; a dated window line inside a Live entry (`09-04: no fire`, `Re-deferred 2026-09-02:`) where one `last checked: <date> — <state>` line belongs; a Live entry over 12 lines; a Resolved entry over 3 lines. | `ledgerPath` in `.claude/threads.json`, default `.claude/threads-review-ledger.md` |
+
+**A check's own keys.** A check that needs more than a scope reads it from its own entry
+in `.claude/guards.json`, beside `rung`, `paths`, and `exclude` — `referents` reads
+`scriptDirs`, `commandDirs`, `knownCommands`, and `envPrefixes` there. The runner passes
+nothing but the root and the scope; the check reads the file at the root, which the git
+adapter always exports.
+
+**The allow marker.** A line carrying `<!-- guards-allow: <id> -->` is not read by the
+check with that id — `plan-sweeps` and `referents` honor it — so a doc can show a
+malformed sweep or name an illustrative `scripts/foo.sh` on purpose. It is per line and
+per check, never a file-wide or population-wide exemption.
 
 ## The gate
 
 `adapters/git/pre-commit` exports the index to a temporary tree with
-`git checkout-index`, hands the checks the index listing through `GUARDS_INDEX`, and
+`git checkout-index`, hands the checks the index listing through `GUARDS_INDEX` and the
+checkout's top level through `GUARDS_TREE` (for a check that must run something in the
+checkout — `plan-sweeps` runs a plan's `rg` over sources the export does not hold), and
 runs `run.py` there, so the gate judges the commit's content and a cross-file check sees
 every target file. Its exit is the runner's exit, except when the export itself is
 wrong — an `"export"` list that drops a config the gate reads refuses with exit 2 before

@@ -114,12 +114,14 @@ model names it in `checkerModel`:
 of file, and the `**Status:**` readiness line under the title — auto-emitting any the
 template omits and saying so, never refusing. A template spells an invariant in its own
 words by marking the role on the heading line, `## Summary <!-- slices: shape -->`;
-the roles are `shape`, `scope`, `acceptance`, and `tensions`, and the marker is read
-and dropped, never written into the plan. An unmarked heading is local and carried
-through, sub-headings included, unless it is exactly one of slices' own four or exactly
-`## Verification ledger`, which the scaffold then fills in place. `/slices:check` appends into the fixed ledger — creating
-it at end of file when the plan another drafter wrote has none — and flips only the
-`**Status:**` line `draft` wrote, never writing one into a plan that has none.
+the roles are `shape`, `scope`, `acceptance`, `tensions`, and `ledger`, and the marker
+is read and dropped, never written into the plan. An unmarked heading is local and
+carried through, sub-headings included, unless it is exactly one of slices' own four or
+exactly `## Verification ledger`, which the scaffold then fills in place; a heading
+marked `ledger` — a repo's own `## Claim ledger` that its finalize step reads — is the
+scaffold's place too. `/slices:check` appends into that ledger — creating it at end of
+file when the plan another drafter wrote has none — and flips only the `**Status:**`
+line `draft` wrote, never writing one into a plan that has none.
 
 `checkerModel` is passed to the gap-checker spawn as given; it takes the harness's
 short model names, the ones its `Agent` tool accepts, not API model ids, and a name the
@@ -159,20 +161,26 @@ context, so the read stays cold. This is how a repo that already owns a rich gap
 wraps `/slices:check` instead of keeping two checkers: the local classes move into the
 brief, the local command calls `/slices:check`, and nothing is duplicated.
 
-### What the check writes
+### What the ledger holds
 
-Under its record line the check appends one row per load-bearing claim it verified —
-the claim, the command that verified it, one line of output — and one per claim it could
-not, marked `unverified` with what would settle it. The record's commit sha is the
-baseline; a later session re-runs only the rows whose cited paths moved since it.
+The drafter writes it first. `/slices:draft` opens every production symbol, file, test,
+and site the plan names before the plan is written, and records each as a claim row
+under a `drafted at <sha>, <date>, slices <version>` line — the claim, the generating
+command, one line of its output; a site it could not open is a row marked `unverified`
+with what would settle it. `/slices:check` re-runs those rows verbatim before it hunts,
+reports a row that moved as a defect, and appends its own record line with the rows it
+added — a claim no draft row covered, a draft row whose output changed. The record's
+commit sha is the baseline; a later session re-runs only the rows whose cited paths
+moved since it. A plan whose ledger has no rows is one whose named sites were never
+measured, which is what the rows exist to make visible.
 
 ## How this hardens — and why adopting it early is safe
 
 The kit is **rung one** of each capability it carries, and its artifacts are the
 contract: stub files with their banner and header, plan files with their
-sections, the ledger line a check appends. Later hardening — lint that enforces
-the banner, a claim ledger behind the gap check, triage over the inbox, a landing
-gate — *adds* checks and appends to these same artifacts. Growth is monotonic:
+sections, the ledger rows a draft writes and a check appends. Later hardening — lint
+that enforces the banner, a check that re-runs the ledger's rows, triage over the inbox,
+a landing gate — *adds* checks and appends to these same artifacts. Growth is monotonic:
 adopting the kit on day one never sets up a migration, because nothing a later
 rung ships changes what these files are.
 

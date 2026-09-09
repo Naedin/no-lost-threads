@@ -64,6 +64,17 @@ precedent ("as Y does"), a rule — and cited at file-and-line or section. A cla
 from memory is a gap. A "behavior X is unchanged" sentence is a negative claim: name the
 test that pins it and walk the case where the new mechanism and the old path meet.
 
+**The site-opening pass writes the ledger.** Before the plan is written, list every
+production symbol, file, test, and site the draft will name; open each one with a command
+(`rg -n`, `git grep`, `sed -n`, a test run) and keep the command and one line of its
+output. Those pairs are the plan's **claim rows** — `<claim> — \`<generating command>\` —
+<one line of its output>` — and §2 writes them into the ledger under a `drafted at` record
+line. A site the pass could not open is a row marked `unverified: <what would settle it>`,
+never a sentence in the body. The rows are what `/slices:check` re-runs before it hunts,
+so write each to be re-run: the exact command, verbatim, against the current tree. The
+rule in prose failed to hold on its own; the rows are the same rule with a row to show
+for it.
+
 A stub that bundles several concerns gets carved into separate stubs first, and exactly
 one is promoted.
 
@@ -123,9 +134,15 @@ reviewed>
 
 ## Verification ledger
 
-<appended by /slices:check and by later hardening rungs; leave as-is when drafting>
-- (none yet)
+<the drafter's claim rows sit under its record line; /slices:check and later hardening rungs append>
+- drafted at <short commit sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)
+  - <claim> — `<generating command>` — <one line of its output>
+  - <claim> — unverified: <what would settle it>
 ```
+
+`<version>` is the `version` field of `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
+read at write time, as `/slices:check` reads it for its own line; `slices ?` when the file
+cannot be read. The record's sha is the baseline the rows were measured against.
 
 ### `planTemplate` is set — overlay the invariants onto it
 
@@ -137,11 +154,11 @@ a template.** Read it by structure, not a mini-language:
   title, as the stub overlay does with `<concern>`.
 - **By role marker first.** A template spells an invariant in its own words by marking
   the role on the heading line — `## Summary <!-- slices: shape -->`. The roles are
-  exactly `shape`, `scope`, `acceptance`, `tensions`. The marker is **consumed, never
-  written**: resolve the role from it and write the heading without it; an HTML comment
-  in a template is a note to its maintainer and is not copied into the plan. A marker
-  naming any other role — `ledger`, `status`, a misspelling — is ignored for that
-  heading, which is then local, and the run says so.
+  exactly `shape`, `scope`, `acceptance`, `tensions`, and `ledger`. The marker is
+  **consumed, never written**: resolve the role from it and write the heading without
+  it; an HTML comment in a template is a note to its maintainer and is not copied into
+  the plan. A marker naming any other role — `status`, a misspelling — is ignored for
+  that heading, which is then local, and the run says so.
 - **Then by slices' own heading.** A heading line that is exactly `## Shape`,
   `## Scope`, `## Acceptance`, or `## Tensions` is that invariant; a heading that merely
   contains the word — `## Acceptance Criteria`, `## Draft tensions` — is not, and
@@ -153,16 +170,19 @@ a template.** Read it by structure, not a mini-language:
   template with no markers therefore gets slices' spelling beside its own — a
   `## Summary` and a `## Shape` both present — and the narration names the duplicate
   and the marker syntax that resolves it.
-- **The ledger and the status line take no marker and have fixed places.** The
-  `**Status: draft …**` line is written immediately under the H1, before any template
-  block — a template with no H1 gets `# <slice title>` prepended first, as the stub
-  overlay does; the `## Verification ledger` scaffold — its three fixed lines — is
-  written at end of file. A template heading that is exactly `## Verification ledger`
-  is the scaffold's place instead: resolved there, its body replaced by the scaffold's
-  two fixed lines, narrated when it is not the last section. Any other template heading
-  naming the ledger or the status is local; when it carries a marker, the ignored marker
-  is narrated, and an unmarked one — the adopter's own `## Claim ledger`, `## Status` —
-  passes in silence.
+- **The status line takes no marker and has a fixed place.** The `**Status: draft …**`
+  line is written immediately under the H1, before any template block — a template with
+  no H1 gets `# <slice title>` prepended first, as the stub overlay does. **The ledger
+  has a fixed place unless the template names one.** The `## Verification ledger`
+  scaffold — the heading, the note line, the `drafted at` record, the claim rows — is
+  written at end of file. A template heading that is exactly `## Verification ledger`,
+  or one carrying `<!-- slices: ledger -->` — an adopter's `## Claim ledger` that its
+  own finalize step reads — is the scaffold's place instead: resolved there, its body
+  replaced by the scaffold's note, record, and rows, narrated when it is not the last
+  section. Any other template heading naming the ledger or the status is local; when it
+  carries a marker naming no role, the ignored marker is narrated, and an unmarked one —
+  `## Status`, an unmarked `## Claim ledger` — passes in silence and is filled as its
+  placeholder says.
 - **Fill.** Under a resolved heading write slices' body shape — the Shape paragraph,
   `- In:` / `- Out:`, `- [ ] … — verified by:` criteria, multi-line tensions — replacing
   only the placeholder text between headings. Sub-headings under a resolved heading are
@@ -192,9 +212,10 @@ a negative criterion ("output contains no X") pairs with a liveness condition �
 code or a positive line proving the command ran — or an aborted command satisfies it by
 printing nothing. A tension entry states the call taken, the pull each way, and the
 lever: what overriding it costs. Tensions are decided, never open; anything unresolved
-is a question for the check, not a tension. The `Verification ledger` section ships
-empty by design: the gap check *appends* to it — its record line and the claim rows
-under it — so the plan format never migrates.
+is a question for the check, not a tension. The `Verification ledger` section holds the
+site-opening pass's rows under a `drafted at` record when the plan is written: the gap
+check *appends* to it — its own record line and rows — so the plan format never
+migrates, and a draft-time row is re-run rather than re-hunted.
 
 ## 3. Promote — delete the stub
 

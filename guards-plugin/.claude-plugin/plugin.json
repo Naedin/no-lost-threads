@@ -1,7 +1,7 @@
 {
   "name": "guards",
-  "version": "0.6.0",
-  "description": "Repo guardrails as scripts behind a gate — one script per check with a stable id and exit codes 0 / 1 / 2 meaning pass, findings, refused; .claude/guards.json names the enabled checks and each one's rung, warn or block; a git pre-commit adapter judges the index and is inert in a repo with no config. Two checks ship: anchors (every in-repo section link resolves to an explicit <a id> and every relative link target exists) and war-stories (narrative provenance in process docs). Rung as config is the enforcement ladder made add-only.",
+  "version": "0.7.0",
+  "description": "Repo guardrails as scripts behind a gate — one script per check with a stable id and exit codes 0 / 1 / 2 meaning pass, findings, refused; .claude/guards.json names the enabled checks and each one's rung, warn or block; a git pre-commit adapter judges the index and is inert in a repo with no config. Checks: anchors (every in-repo section link resolves to an explicit <a id> and every relative link target exists), war-stories (narrative provenance in process docs), plan-sweeps (every backticked rg in a plan runs, without a shell; a malformed one is a finding), referents (a backticked script, /command, or env knob nothing in the repo answers to), retro-log and review-ledger (the threads plugin's log and ledger grammars). Rung as config is the enforcement ladder made add-only.",
   "author": {
     "name": "Jeff Thoene"
   },

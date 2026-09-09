@@ -147,4 +147,87 @@ grep -q '^drift/k \|^drift/l ' "$tmp/since.out" && fail "--since kept a key touc
 python3 "$rl" view --keys --live --root "$tmp" --log held.md 2>/dev/null | grep -q '^## Closed' && fail "--live printed the closed section"
 python3 "$rl" view --keys --since 09-07 --root "$tmp" --log held.md >/dev/null 2>&1 && fail "--since accepted a malformed date"
 ok "HELD shows its age; --held, --recurred, --since, --live narrow the read; --key repeats"
+
+# ---- scripts/land-process-commit.py: one commit lands on the default branch through the
+# adopter's own pre-commit hook, the sha printed is the remote's, the slice branch drops
+# its duplicate, and every failure leaves nothing pushed and no worktree behind.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+lp="$here/scripts/land-process-commit.py"
+L="$tmp/land"
+mkdir -p "$L"
+git init -q --bare -b master "$L/origin.git"
+git clone -q "$L/origin.git" "$L/primary" 2>/dev/null
+g() { git -C "$L/primary" "$@"; }
+g config user.email t@t; g config user.name t; g config core.hooksPath hooks
+mkdir -p "$L/primary/hooks"
+cat > "$L/primary/hooks/pre-commit" <<'HOOK'
+#!/bin/sh
+# marks that it ran, in the file LAND_TEST_MARK names; refuses a message carrying REFUSE
+[ -n "$LAND_TEST_MARK" ] && echo "ran in $(pwd)" >> "$LAND_TEST_MARK"
+if git diff --cached --name-only | grep -q '^refuse\.md$'; then echo "hook: refused" >&2; exit 1; fi
+exit 0
+HOOK
+chmod +x "$L/primary/hooks/pre-commit"
+printf '# base\n' > "$L/primary/CLAUDE.md"
+g add -A; g commit -q -m "base"; g push -q origin master 2>/dev/null
+git -C "$L/origin.git" symbolic-ref HEAD refs/heads/master
+g remote set-head origin -a >/dev/null 2>&1
+g worktree add -q -b slice "$L/slice" master 2>/dev/null
+s() { git -C "$L/slice" "$@"; }
+s config user.email t@t; s config user.name t
+printf 'feature\n' > "$L/slice/feature.txt"; s add -A; s commit -q -m "feat: a slice"
+printf '# base\n\nA process rule.\n' > "$L/slice/CLAUDE.md"; s add -A; s commit -q -m "docs(process/rules): a rule"
+proc="$(s rev-parse HEAD)"
+
+# 1. lands: the hook fired in the throwaway, stdout is the remote's sha, the branch dropped the duplicate
+mark="$L/mark"; : > "$mark"
+landed="$(cd "$L/slice" && LAND_TEST_MARK="$mark" python3 "$lp" "$proc" 2>"$L/err1")" || fail "landing failed: $(cat "$L/err1")"
+remote="$(git -C "$L/origin.git" rev-parse refs/heads/master)"
+[ "$landed" = "$remote" ] || fail "stdout ($landed) is not the remote's sha ($remote)"
+[ "$(wc -l < <(printf '%s\n' "$landed"))" -eq 1 ] || fail "stdout carried more than the sha"
+grep -q 'ran in .*land-process-commit-' "$mark" || fail "the pre-commit hook did not run in the throwaway worktree"
+[ "$(git -C "$L/origin.git" log -1 --format=%s master)" = "docs(process/rules): a rule" ] || fail "the remote's tip is not the process commit"
+[ "$(git -C "$L/origin.git" log --format=%s master | wc -l | tr -d ' ')" -eq 2 ] || fail "the remote got more than one commit"
+grep -q 'patch identical' "$L/err1" || fail "byte-identity line missing"
+[ "$(s rev-list --count origin/master..HEAD)" -eq 1 ] || fail "the slice branch kept the duplicate ($(s rev-list --count origin/master..HEAD) ahead)"
+[ "$(s log -1 --format=%s)" = "feat: a slice" ] || fail "the slice branch's tip is not the feature commit"
+[ "$(g worktree list | wc -l | tr -d ' ')" -eq 2 ] || fail "a throwaway worktree was left behind: $(g worktree list)"
+ok "land-process-commit: lands through the hook, prints the remote's sha, drops the duplicate"
+
+# 2. already landed by patch: refuses, nothing pushed
+(cd "$L/slice" && python3 "$lp" "$proc" >/dev/null 2>"$L/err2") && fail "landed a patch the remote already holds"
+grep -q 'already on origin/master' "$L/err2" || fail "already-landed refusal not named: $(cat "$L/err2")"
+ok "land-process-commit: a patch already upstream is refused"
+
+# 3. a red hook: nothing pushed, no worktree left
+printf 'x\n' > "$L/slice/refuse.md"; s add -A; s -c core.hooksPath=/dev/null commit -q -m "docs(process/x): refused"
+bad="$(s rev-parse HEAD)"; before="$(git -C "$L/origin.git" rev-parse master)"
+(cd "$L/slice" && python3 "$lp" "$bad" >"$L/out3" 2>"$L/err3") && fail "landed past a red hook"
+[ -s "$L/out3" ] && fail "printed a sha though nothing was pushed"
+grep -q 'hook refused' "$L/err3" || fail "red hook not named: $(cat "$L/err3")"
+grep -q 'hook: refused' "$L/err3" || fail "the hook's own output was not surfaced"
+[ "$(git -C "$L/origin.git" rev-parse master)" = "$before" ] || fail "the remote moved on a red hook"
+[ "$(g worktree list | wc -l | tr -d ' ')" -eq 2 ] || fail "a worktree was left after a red hook"
+s reset -q --hard HEAD^
+ok "land-process-commit: a red hook pushes nothing and leaves no worktree"
+
+# 4. a conflict: master moved on the same lines
+g merge -q --ff-only origin/master
+printf '# base\n\nA different rule.\n' > "$L/primary/CLAUDE.md"; g add -A; g commit -q -m "docs(process/rules): other"; g push -q origin master 2>/dev/null
+printf '# base\n\nA third rule.\n' > "$L/slice/CLAUDE.md"; s add -A; s commit -q -m "docs(process/rules): conflicting"
+conf="$(s rev-parse HEAD)"; before="$(git -C "$L/origin.git" rev-parse master)"
+(cd "$L/slice" && python3 "$lp" "$conf" >"$L/out4" 2>"$L/err4") && fail "landed through a conflict"
+[ -s "$L/out4" ] && fail "printed a sha on a conflict"
+grep -q 'conflicts; nothing pushed' "$L/err4" || fail "conflict not named: $(cat "$L/err4")"
+[ "$(git -C "$L/origin.git" rev-parse master)" = "$before" ] || fail "the remote moved on a conflict"
+[ "$(g worktree list | wc -l | tr -d ' ')" -eq 2 ] || fail "a worktree was left after a conflict"
+ok "land-process-commit: a cherry-pick conflict fails loud and pushes nothing"
+
+# 5. tracked changes refuse when a rebase would follow; --no-rebase lifts it; --branch names the target
+printf 'dirty\n' >> "$L/slice/feature.txt"
+(cd "$L/slice" && python3 "$lp" "$conf" >/dev/null 2>"$L/err5") && fail "ran on a dirty tree"
+grep -q 'tracked changes' "$L/err5" || fail "dirty tree not named: $(cat "$L/err5")"
+s checkout -q -- feature.txt
+(cd "$L/slice" && python3 "$lp" "$conf" --branch nosuch >/dev/null 2>"$L/err5b") && fail "landed on a branch the remote lacks"
+ok "land-process-commit: a dirty tree refuses; --branch is honored"
 echo "all cases passed"
