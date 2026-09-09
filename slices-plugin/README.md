@@ -25,12 +25,17 @@ a virtue: where the coherent change already fits one context, it ships whole.
   bundled concerns are carved into separate stubs; the stub is deleted in the
   promotion. The plan ends in a **review digest** — a cold-readable Shape
   paragraph plus at most five tension points — so a human with limited time
-  reviews the contestable decisions, not the whole plan.
+  reviews the contestable decisions, not the whole plan. The cap is the digest's;
+  the plan's own Tensions section carries every contestable call, compressed, never
+  omitted.
 - **`/slices:check <plan>`** — the fresh-context gap check. A sub-agent that did
   not write the plan, handed **only its path** (withholding the drafting context
   is load-bearing), tries to break it: re-verifies load-bearing claims at
   file-and-line, walks the change from the user's side, then hunts standard
-  failure classes. No plan is implement-ready until it survives; every check
+  failure classes — and **applies every unambiguous fix in the plan itself**, since it
+  holds the freshest read; only a product question comes back. One verdict:
+  `FIXED-IN-PLACE`, `NEEDS-DECISION`, or `MIS-CARVED`. No plan is implement-ready
+  until it survives; every check
   leaves a ledger line in the plan, stamped with the plugin version that wrote it.
 
 Two policies ship as stated rules rather than machinery, deliberately:
@@ -53,6 +58,14 @@ re-converted:
 
 ```json
 { "inboxDir": "Plans/inbox", "plansDir": "Plans" }
+```
+
+`plansDir` is the root every dedup sweep covers — inbox, plans, completed. A repo whose
+new plans live in a subdirectory of it names that in an optional `draftDir`, and
+`/slices:draft` writes there while the sweep keeps its root:
+
+```json
+{ "inboxDir": "Plans/inbox", "plansDir": "Plans", "draftDir": "Plans/active/drafted" }
 ```
 
 ### Carrying extra stub fields — an optional template
@@ -157,7 +170,9 @@ points `checkBrief` at a markdown file of those classes:
 
 `/slices:check` hands that file's path to the cold checker beside the plan's path, and
 the checker runs its classes after the built-in ones. It is repo rules, not drafting
-context, so the read stays cold. This is how a repo that already owns a rich gap-check
+context, so the read stays cold. The check's cost scales with the draft's claim rows and
+the brief's classes, each a tool use or more in the cold context, so the brief carries
+only the classes the built-ins lack; a class restating a built-in is paid twice. This is how a repo that already owns a rich gap-check
 wraps `/slices:check` instead of keeping two checkers: the local classes move into the
 brief, the local command calls `/slices:check`, and nothing is duplicated.
 
@@ -170,9 +185,16 @@ command, one line of its output; a site it could not open is a row marked `unver
 with what would settle it. `/slices:check` re-runs those rows verbatim before it hunts,
 reports a row that moved as a defect, and appends its own record line with the rows it
 added — a claim no draft row covered, a draft row whose output changed. The record's
-commit sha is the baseline; a later session re-runs only the rows whose cited paths
-moved since it. A plan whose ledger has no rows is one whose named sites were never
-measured, which is what the rows exist to make visible.
+commit sha is the baseline, and the newest record's sha is the plan's baseline as a
+whole; a later session re-runs only the rows whose cited paths moved since it. Each
+record carries the plugin version that wrote it, which is why the line is a record and
+not a single refreshed field. A plan whose ledger has no rows is one whose named sites
+were never measured, which is what the rows exist to make visible.
+
+```
+- drafted at <sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)
+- gap-checked at <sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, warm-context][, agent-stale]
+```
 
 ## How this hardens — and why adopting it early is safe
 
@@ -190,6 +212,13 @@ Claude Code with sub-agent support (for `/slices:check`; the command narrates an
 degrades to a warm-context check without it). No other dependencies: no scripts,
 no hooks, nothing at session start. All three commands are explicit-only.
 
+A plugin update reaches nothing in a running session: the agent definition loads at
+session start and a command's text at its first invocation, and neither follows the
+update until the session restarts. A session that loaded one side before the update and
+the other after it runs them mismatched; `/slices:check` recognizes an older gap-checker
+by its report's verdict vocabulary, does the agent's part itself, marks the record line
+`agent-stale`, and says a restart is the remedy.
+
 ## Layout
 
 ```
@@ -198,5 +227,5 @@ slices-plugin/
   commands/capture.md             /slices:capture — file a one-concern stub
   commands/draft.md               /slices:draft — stub → plan with review digest
   commands/check.md               /slices:check — fresh-context gap check
-  agents/gap-checker.md           Read-only cold adversary (its brief)
+  agents/gap-checker.md           Cold adversary that edits only the plan (its brief)
 ```

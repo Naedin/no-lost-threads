@@ -36,8 +36,9 @@ that wants the built-in stub.
 
 ## 1. One concern, deduped
 
-Grep `plansDir` recursively — inbox filenames and stub titles, plan titles, completed
-plans — for the concern's seam before minting a new file; a concern is often already
+Sweep `plansDir` recursively with `grep -r` or `rg --no-ignore` (plain `rg` is blind to
+an archive a repo's ignore file hides) — inbox filenames and stub titles, plan titles,
+completed plans — for the concern's seam before minting a new file; a concern is often already
 framed under another name, or already delivered. **Amend an existing stub rather than duplicating it** — a second
 observation of the same concern strengthens the stub's evidence; it doesn't earn a
 sibling. If the argument bundles two concerns, split them: one stub each.

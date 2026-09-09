@@ -179,6 +179,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
 - **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
 
+## slices [0.3.1] — 2026-09-09
+
+### Contract
+
+- **The gap-checker applies its own fixes.** The `gap-checker` agent gains `Edit` and applies every unambiguous or code-derivable defect to the plan in place before it reports, running the fold sweep for each; a fix hinging on a product or priority call stays a question, and nothing is applied on `MIS-CARVED`. `/slices:check` has no approval stop — the report lists each applied fix and the sections it reached, the command verifies the fold and surfaces only questions. Measured in the reference adopter: sessions run autonomously, and a stop for approval is a stall with no fixes landed. The ledger record line and the `**Status:**` flip stay the command's. Adopter-side edit: none.
+- **Verdict tokens are `FIXED-IN-PLACE`, `NEEDS-DECISION`, `MIS-CARVED`** — previously `holds`, `open`, `mis-carved`. Adopted from the reference adopter's wrapper, whose readers already parse them. Adopter-side edit: none unless a reader parsed the old tokens.
+- **The Tensions cap moves from the plan to the digest.** The plan's `## Tensions` section holds every contestable call, compressed, never omitted; the in-thread digest carries at most five, ranked by how much the maintainer's judgment could move them. A plan read cold by a later session needs every tension; the five were only ever for the human's read. Adopter-side edit: none.
+- **`draftDir`** in `.claude/slices.json` — optional; where `/slices:draft` writes a new plan and where `/slices:check` resolves a bare plan name first. `plansDir` stays the root the dedup sweeps cover. Absent → `plansDir`, as before.
+- **The ledger record line is kept as the grammar** — `- drafted at <sha>, <date>, slices <version> — …` and `- gap-checked at …` — over a single refreshed `Verified at:` field: each record carries the plugin version that wrote it and the sha its rows were measured against, and the newest record's sha is the plan's baseline. A reader that wants one commit takes the last `at <sha>` in the section.
+
+### Changed
+
+- **The dedup sweeps run with `grep -r` or `rg --no-ignore`** in `/slices:capture`, `/slices:draft`, and the gap-checker's landed-premise class. A repo's ignore file can hide its archive from plain `rg`, and the sweep then misses a closed concern in silence.
+- **`/slices:check` detects a stale gap-checker.** The harness loads agent definitions at session start and command text at invocation, so after a plugin update a session runs new command text against the old agent until it restarts. A report in the old vocabulary (`holds` / `open` / `mis-carved`), or one stating unambiguous fixes without applying them, is narrated as a stale agent; the command applies the fixes itself and the record line carries `agent-stale` after any `warm-context`. Measured in the reference adopter's first run on 0.3.0: command text 0.3.0, agent 0.2.0, verdict `open`, six one-line fixes stated and none applied, a record line that could not show it. Command text is cached per session too — loaded at the skill's first invocation — so a running session follows a plugin update on neither side until it restarts; the README states the rule.
+- **The README sizes the `checkBrief`**: the cold check's cost scales with the draft's rows and the brief's classes. Measured in the reference adopter: one check of a one-constant slice ran 44 tool uses (21 ledger re-runs, 14 brief classes, the built-ins) for 132k tokens over 9.3 minutes.
+
 ## slices [0.2.0] — 2026-09-08
 
 ### Contract

@@ -11,7 +11,9 @@ anything is built on them** — a stub is a low-trust artifact and says so on it
 face. And a plan is **built for review by a human with limited time**: it ends in
 a review digest — one cold-readable **Shape** paragraph, then at most five
 **tension points**, each a genuinely contestable decision with the pull in both
-directions. The maintainer reviews the tensions, not the whole plan.
+directions. The cap is the digest's, never the plan's: the plan's Tensions section
+holds every contestable call, compressed, and the digest carries the five that most
+need the reviewer. The maintainer reviews the tensions, not the whole plan.
 
 A **slice** is one coherent change argument, independently verifiable, completable
 in a single fresh session — carved as large as its coherence requires and bounded only
@@ -22,8 +24,11 @@ command carves before it promotes.
 ## 0. Config
 
 Read `.claude/slices.json` for `inboxDir` and `plansDir` (bootstrap as in
-`/slices:capture` if absent — same file, same one question), and for `planTemplate` —
-**optional** — a path to an adopter-supplied plan template. `planTemplate` is opt-in:
+`/slices:capture` if absent — same file, same one question), and for three optional
+fields. `draftDir` is where §2 writes the new plan — a repo whose drafted plans live in
+a subdirectory (`Plans/active/drafted`) sets it, and `plansDir` stays the root the §1
+sweep covers; absent, the plan is written in `plansDir`. `planTemplate` is a path to an
+adopter-supplied plan template. `planTemplate` is opt-in:
 absent (this repo's own config, and the common case), §2 writes the built-in plan
 unchanged; a repo sets it only to carry sections beyond the invariant shape. Bootstrap
 never invents one. A `planTemplate` path that does not resolve to a readable file is
@@ -42,9 +47,11 @@ and stop here: the stub is implemented directly and the verification that guards
 still runs. Unsure → draft.
 
 Re-verify the stub's claims against the current tree — with commands and reads, not
-recall. Before treating the concern as new, grep `plansDir` recursively (inbox, plans,
-completed) for its terms: a concern is often already framed under another filename. Then
-one of four verdicts:
+recall. Before treating the concern as new, sweep `plansDir` recursively (inbox, plans,
+completed) for its terms with `grep -r` or `rg --no-ignore`, never plain `rg`: a repo's
+ignore file can hide its archive from ripgrep, and the sweep then misses a closed concern
+in silence. A concern is often already framed under another filename. Then one of four
+verdicts:
 
 - **Still real** → carry on.
 - **Already closed** → report what closed it (the commit, the plan, the code that now does
@@ -94,7 +101,8 @@ the next triage.
 
 ## 2. Write the plan
 
-One markdown file in `plansDir`, named for the slice. The plan's shape has two owners,
+One markdown file in `draftDir` — `plansDir` when it is unset — named for the slice. The
+plan's shape has two owners,
 under the same overlay contract `/slices:capture` uses for the stub. The **fixed
 invariant** sections are this command's and hold in every repo: `## Shape`, `## Scope`,
 `## Acceptance`, `## Tensions`, the `## Verification ledger` scaffold, and the
@@ -127,10 +135,11 @@ Write exactly this shape. Nothing here changes when a repo has no template:
 
 ## Tensions
 
-<at most five decisions made in this plan that are genuinely contestable, each
-stated as the call taken, with the pull in both directions and the lever — what
-overriding it costs: a cheap re-carve, or a reshaped slice. This section is what gets
-reviewed>
+<every decision made in this plan that is genuinely contestable, one compressed entry
+each, stated as the call taken, with the pull in both directions and the lever — what
+overriding it costs: a cheap re-carve, or a reshaped slice. No cap: compress entries,
+never omit one. This section is what gets reviewed; the digest (§4) carries the five
+that most need the reviewer>
 
 ## Verification ledger
 
@@ -226,13 +235,16 @@ that's a capture update, not a promotion.
 
 ## 4. Close with the digest
 
-End in-thread with the review digest — the Shape paragraph and the tension points,
-verbatim from the plan. Then run `/slices:check` on the plan in this same session
+End in-thread with the review digest — the Shape paragraph verbatim from the plan, then
+at most five tension points, ranked by how much the maintainer's judgment could move
+them; the rest ride the plan's section only. The cap is the digest's: a later session
+cold-reading the plan needs every tension, and a human with limited time needs the five
+that matter. Then run `/slices:check` on the plan in this same session
 without being asked; a plan is not done drafting until a fresh context has tried to break
 it. Invoke it as a skill; if the harness cannot load it that way, follow
 `${CLAUDE_PLUGIN_ROOT}/commands/check.md` directly — the same plugin root this command
 runs from, never an installed copy elsewhere on disk, so the check that runs is the one
-this draft shipped with. If the check returns **mis-carved**, the plan does not stand: restore the stub with
+this draft shipped with. If the check returns **MIS-CARVED**, the plan does not stand: restore the stub with
 the check's reframing folded in, delete the plan and any spin-offs that only made sense
 under the carve, and say so — the stub is the tracker again.
 When a `planTemplate` was used and an invariant had to be auto-emitted, a marker was
@@ -246,7 +258,9 @@ check exists precisely because this context just wrote the plan.
 - **Drafting on unverified stub claims.** The audit (§1) is the point.
 - **A plan with no tensions.** Zero contestable decisions means either the slice
   is trivial or the contestable calls were made silently. Say which.
-- **More than five tensions** — that's the whole plan re-litigated, which is the
-  reading cost the digest exists to remove.
+- **More than five tensions in the digest** — that's the whole plan re-litigated in
+  chat, the reading cost the digest exists to remove. The plan's section is uncapped;
+  the digest is the filter, and omitting a tension from the section to fit the digest is
+  the inverse failure.
 - **Promoting a bundle.** One slice per plan; carve first.
 - **Leaving the stub behind** as a stale twin of the plan.
