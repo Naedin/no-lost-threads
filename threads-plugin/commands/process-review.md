@@ -46,9 +46,11 @@ convention in the moment. Fields:
 - `workflowDocs` — optional: files that describe one workflow and are expected to
   co-evolve (e.g. a command pipeline). Absent → detected command directories
   (`.claude/commands/` and the like), each directory treated as one set.
-- `trigger` — `{ "n": 10, "concentration": 3 }` (volume backstop; distinct-commit
-  re-touch bar). Read by `/threads:retro` to decide whether its closing ripeness nudge
-  fires.
+- `trigger` — `{ "n": 10, "concentration": 3 }`: the volume backstop and the
+  distinct-commit re-touch bar, both over **organic** markers — the ones no review landed
+  and that changed something beyond the log and the ledger (Telemetry, below). Read by
+  `/threads:retro` for its closing ripeness nudge, which calls a review *ripe* on a key
+  recurred since the mark, or on either bar, and never on pending captures alone.
 - `applyMode` — `read-only` | `apply-on-approval` | `apply-mechanical`. Starts
   `read-only`. Once the user has approved candidates in two or more reviews, offer **once**
   to ratchet to `apply-on-approval`; once they have approved the mechanical line as a batch
@@ -70,9 +72,15 @@ convention in the moment. Fields:
   Default `.claude/threads-retro-log.md`. An append-only stream `/threads:retro` writes;
   `scripts/retro-log.py view` derives each key's state and count from it, and this command
   is its only mutator, through `scripts/retro-log.py compact` and re-keying.
-- `invariantDocs` — optional, **ordered** (highest authority first): the docs stating what
-  this repo holds true. Read at step 0a, before any commit. Absent → the review has no
-  input above the commit stream and says so.
+- `invariantDocs` — optional, **ordered** (highest authority first): **the core** — the
+  docs that state the repo's authority order and this review's own contract (its
+  conventions, its extensions). Read whole at step 0a, every run, before any commit, so
+  it is short by construction: a doc belongs here only if it outranks the commit stream
+  on *every* run. A domain doc — a traps catalogue, a UI guideline, a testing strategy —
+  is not core however true it is: it is read at step 6 when a finding names it (a
+  **keyed read**, derived per run from the findings themselves), and the placer reads it
+  again for the edit; listing it here reads it once for nothing. Absent → the review has
+  no input above the commit stream and says so.
 - `capabilityEvidencePath` — optional: a log of findings about *capabilities* — contracts
   and rungs rather than doc sections. Only relevant where the repo builds tooling it also
   uses. It is the one input that can yield a non-doc proposal; without it the funnel is
@@ -93,6 +101,36 @@ serve two opposite jobs from one read position.
 
 If `.claude/threads.json` is absent, you are in **bootstrap** (below). If present but a
 field is missing, use the default above and note it.
+
+## Telemetry — three kinds of marker, one of them counted
+
+A marker commit is one whose subject matches `markerPattern`. Three kinds share the
+spelling, and only the first is telemetry:
+
+- **organic** — a process change no review has adjudicated: the retro's escape hatch, a
+  rule landed by hand, a slice's process commit. The trigger, step 1's ranking, and the
+  tally's headline read these.
+- **review** — a commit this command landed: a candidate, its `LANDED` lines, a
+  compaction, the ledger rewrite, the mark. **Every commit this command makes carries the
+  trailer `Process-Review: <today's date>`** (`git commit --trailer 'Process-Review:
+  <date>'`; `land-process-commit.py` preserves it through the cherry-pick). Already
+  adjudicated: its sha is a `LANDED` ref, never churn. A review that counts its own
+  landings as the next window's churn is ripe on itself the next morning, and spends
+  most of its read on what it wrote.
+- **bookkeeping** — a commit touching nothing but `retroLogPath`, `ledgerPath`, or
+  `capabilityEvidencePath`: a retro's capture, a status line. A status flip changed no
+  rule, whatever its subject says.
+
+`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py count` prints the four numbers
+for the window; `list` classifies each marker; `files` ranks the organic commits per file
+and counts the files at `trigger.concentration`; `--all` is the tally; `--head
+origin/<default>` reads the remote's branch. Every stream read below goes through it,
+never a hand-rolled `git log | grep` — subject-first order, the trailer, and the path
+test are three ways to get the number wrong by hand. **Until the mark passes the first
+trailered landing**, commits the review landed before the trailer existed still read as
+organic, so `files` ranks the last untrailered run's churn as if nobody had adjudicated
+it; narrate that for the one or two windows it holds, and read those clusters against
+the log's `LANDED` refs before ranking them.
 
 ## Bootstrap — first run (writes nothing until the user confirms the seed)
 
@@ -124,9 +162,10 @@ then negotiate with the answers in hand; do not interview blind.
    `chore(process/...)`). Surface any collision with an existing convention **before**
    adopting. In a squash-lane repo, negotiate a pattern covering the merge-lane spelling
    too. Prefer character classes to `\|` alternation — `\|` is a GNU extension in BRE and
-   won't travel. Then **prove it fires**: run the grep against one sample subject per
-   lane, using the pattern exactly as it will be written to the config. A marker that
-   fails its own grep test is not adopted.
+   won't travel. Then **prove it fires**: `marker-stream.py count --all --pattern
+   '<the pattern exactly as it will be written to the config>'` against the history, and
+   `list` to see one sample subject per lane classified. A marker that fails its own test
+   is not adopted.
 4. **Confirm `processDocs`** — the one thing inspection can't reliably answer. Ask. Where
    step 1 found tooling, ask for `capabilityEvidencePath` in the same breath: a path, or
    `null` to decline; either is recorded, and the review never asks again.
@@ -172,11 +211,13 @@ rebase.
 0. **Free — the reads that size the run.** All three are cheap; none is optional where
    configured. Do them before looking at a single commit.
 
-   **0a — the repo's own invariants** (`invariantDocs`, in order). Read them. You are
-   about to propose changes to how this repo works, and its stated invariants outrank
-   anything you will derive from a commit stream. **Name what you read in the output** —
-   a step whose result nothing carries is a step that will quietly stop happening. No
-   `invariantDocs` → narrate and skip.
+   **0a — the core** (`invariantDocs`, in order). Read them whole. You are about to
+   propose changes to how this repo works, and its stated invariants outrank anything
+   you will derive from a commit stream. **Name what you read in the output, and which
+   of it bore on a ruling** — the economics block carries both numbers, and a core doc
+   that bore on nothing across several runs is a candidate to leave the core. Every
+   other doc this run opens is a **keyed read** (step 6): named by a finding, read at the
+   moment it bears, never here. No `invariantDocs` → narrate and skip.
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
@@ -247,25 +288,25 @@ expensive path and they are *conditional*, not automatic:
 
 Measurement cost rises with repo size, so a fixed-depth funnel gets more expensive exactly
 as its yield thins. The gate is what keeps the review affordable at scale.
-1. **Free** — list the stream, matching the marker on the **subject** only (it's a subject
-   prefix — a body mention must not count): `git log <markTag>..HEAD --format='%s%x09%h' |
-   grep '<markerPattern>'` — subject first, hash after the tab. (`%h %s` order puts the
-   hash where the anchor looks and matches nothing on any repo, which then presents as the
-   silent-death tier below.) This stream is what **landed**; step 0 is what is **pending**. Then `git show --no-patch
-   --name-only --format= <those hashes>` for the by-file view. Tabulate by scope (parse
-   `<scope>` from each subject) and by file, counting **distinct commits** (re-touch across
-   sessions is the signal, not raw line count).
+1. **Free** — list the stream: `marker-stream.py list`, then `files` (Telemetry). **The
+   organic markers are the stream**; the review's own landings and the bookkeeping
+   commits are two counts in the narration and are never ranked — a cluster made of the
+   last run's candidate landings is the review looking at itself. This stream is what
+   **landed**; step 0 is what is **pending**. Tabulate the organic commits by scope (parse
+   `<scope>` from each subject) and by file, counting **distinct commits** (re-touch
+   across sessions is the signal, not raw line count).
    - **Fallback tier (no marker commits):** cluster churn on `processDocs` paths instead
      (`git log <markTag>..HEAD --name-only -- <processDocs>`, or full history on the very
      first run). Marker commits are the precise signal; path-churn is the coarse one.
      **Narrate that you're on the fallback and what the marker convention would buy.**
    - **Silent-death check:** marker hits == 0 while `processDocs` churn > 0 → surface
      "your telemetry convention may not be firing" (a narrated tier drop, not silent rot).
-     Before concluding it's dead, rule out the measurement itself: an anchored grep run
-     over hash-prefixed lines is zero on every repo — re-run subject-first. Then check
-     the merge lane: if that churn arrived via squash-merged PRs, the markers may be
-     dying in the squash (see bootstrap), not missing — the fix is widening the pattern,
-     not re-negotiating the convention. Zero marker hits is also simply *expected* in a
+     Before concluding it's dead, rule out the measurement itself: `marker-stream.py
+     count --all` is the lifetime count, and zero there against a pattern that once
+     fired is a pattern edit, not a dead convention. Then check the merge lane: if that
+     churn arrived via squash-merged PRs, the markers may be dying in the squash (see
+     bootstrap), not missing — the fix is widening the pattern, not re-negotiating the
+     convention. Zero marker hits is also simply *expected* in a
      repo whose retros all capture and never use the escape hatch — check step 0 before
      diagnosing anything.
 2. **Free** — rank; only clusters above a re-touch bar survive.
@@ -296,8 +337,22 @@ as its yield thins. The gate is what keeps the review affordable at scale.
    exist?): a freshness-only pass on a doc full of dead referents logs "clean" and
    becomes evidence *against* urgency. No workflow surface detected and no
    `workflowDocs` → narrate and skip, like any detected input.
-6. **Expensive — hot clusters and staleness survivors only** — `git show` the churn
-   diffs; `git blame` the staleness survivors to locate their stalest sections,
+6. **Expensive — hot clusters and staleness survivors only.** **Keyed reads first**: the
+   docs this run must open whole are the ones its own findings name, derived, never
+   configured, and **bounded** — `retro-log.py view --recurred --since <the mark's date>
+   --docs` (the docs the *recurred* keys' placements, landings, and stubs point at;
+   never the whole since-mark set, which on a busy repo outweighs the core), each path
+   resolved by basename against the `processDocs` trees — a placement writes
+   `worktrees.md`, the doc is `Plans/active/worktrees.md` — and a path that resolves to no
+   process doc dropped (the flag also returns scripts and stubs, which route a read and
+   are not one), plus the docs a **fired** ledger signal names. Read each once, here,
+   where a candidate is about to be reasoned against it; a doc named by nothing this run
+   is not opened, whatever else the repo holds true. **A hot file from step 1 is never
+   opened whole**: it is read as its churn diff (`git show`) or its blamed section; the
+   placer is the only whole read of a target, and it reads it for the edit. The
+   economics block carries the keyed set's size, so the bound is visible per run. Then
+   `git show` the churn diffs; `git blame` the staleness survivors to locate their
+   stalest sections,
    weighting load-bearing files (referenced by other process docs, or amended by past
    marker commits). Reason about reconcile-into-one-rule vs a structural process /
    repo / tooling move vs *leave — not yet ripe*. High bar: eagerly proposing grand
@@ -395,8 +450,25 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   in them bore on this run, plus the depth-gate decision and what triggered it. A run that
   stopped at the gate says so plainly: that is a complete review, not a truncated one.
 - **Tier narration** — which tier this run used; what the next tier up would buy.
-- **Tally** — all-time process improvements (subjects only, same as step 1):
-  `git log HEAD --format='%s' | grep -c '<markerPattern>'` (derived, never stored).
+- **Tally** — all-time: `marker-stream.py count --all` (derived, never stored). The
+  organic figure is the headline; the review and bookkeeping figures say how much of
+  the stream is the loop's own weight.
+- **Review economics** — the closing block, and the one place the review's own conduct
+  goes. Numbers first, one line each, every one from a command this run already ran:
+  core docs read / core docs that bore on a ruling (count and words); keyed docs opened
+  whole / keyed docs that bore (count and words — a keyed set larger than the core is
+  the bound in step 6 failing); markers read — organic / review / bookkeeping; keys read (the
+  view's summary line) / keys that recurred; this run's own landing errors (a wrong
+  anchor, a mistyped literal, a repaired commit — count and shas); the run's size where
+  the harness shows it (tool calls, wall clock). Then **questions to the maintainer**,
+  never findings: *what should the next run stop reading?* — a core doc that bore on
+  nothing, a ledger watch that has not woken in several windows, a class of capture the
+  retro should stop appending — and any miss of this run's own, phrased as the question
+  it raises. **The review's own misses are lines here and an `Economics:` line beside
+  `Tally:` in the marker commit body, never keys in the log it maintains**: keying the
+  review's conduct into the stream it is trying to shrink feeds the count it measures.
+  The maintainer answers in the thread; an answer that changes a config field or a doc
+  lands as this run's marker commit.
 
 Nothing is applied without recorded consent. Under `read-only`, present candidates only.
 Under `apply-on-approval`, land each **approved** edit as its own `<markerPattern>` commit —
@@ -426,7 +498,21 @@ failing guard holds it whatever its class says.
 - **Not protected.** No file in `invariantDocs`, nothing still referenced deleted, and no
   placer call of `add (unconsolidated)`.
 
+**A landing is a text match, not a paraphrase — under every tier.** The anchor is the
+placer's on-disk quote with its line numbers, wrapped as the file wraps it; an anchor that
+does not match verbatim is a placement to send back, never a sentence to re-find by
+meaning. A value written into a data literal — a number in a budget table, a field in a
+config — is asserted to be of the literal's type before the write (`[0-9]+` for a count):
+a parsed value is a claim about the emitted form, and a wrong one lands as an exemption
+the literal's own checker cannot see. Both are clean-judgment errors, and both are cheaper
+as a check at the write than as an executor sub-agent between judgment and landing.
+
 ## On completion
+
+- **Every commit this run makes carries the trailer `Process-Review: <today's date>`** —
+  candidate landings, the log and ledger bookkeeping, the mark's own commit — so the next
+  run counts none of it as churn (Telemetry). `git commit --trailer 'Process-Review:
+  <date>'`; `land-process-commit.py` carries it through the cherry-pick unchanged.
 
 - **Land first, cite second.** A sha written before its commit is on the default branch is
   a sha the landing rebase rewrites. Every `LANDED <sha>` line, and every sha the ledger
@@ -509,7 +595,13 @@ failing guard holds it whatever its class says.
     12 lines — the cap is per entry, the section has none.
     A dated window line (`09-04: no fire`) is the failure — the state replaces the old
     state, it does not follow it. The gate for any entry: *would a future review act
-    differently without it?*
+    differently without it?* A Live entry may be **dormant**: it carries one `wake:
+    <condition>` line — a key occurrence in the since-mark view, a path in the window's
+    organic stream, a date — and is re-measured, its `last checked` rewritten, only on a
+    run where the wake holds; otherwise the run reads the wake line and nothing else of
+    it. The promoting signal stays as written; the wake is the one-line proxy the run
+    tests first. An entry whose signal has not fired for several windows and whose
+    measurement costs more than a line is the case for it.
   - **Falsifications** — kept whole; their job is stopping a repeat.
   - **Resolved** — a pointer at the landing commit, at most 3 lines; the commit body
     keeps the story.
@@ -563,3 +655,14 @@ failing guard holds it whatever its class says.
   `ADJUDICATED` line, never continuation prose.
 - **Checking the local head for a peer's landing**, or refusing on a clean rebase — the
   pre-flight reads the remote's default branch and re-derives.
+- **Counting the review's own landings, or log-only bookkeeping, as the window's churn**
+  — the trailer and the path test exist so the trigger measures what no review has seen;
+  a hand-rolled `git log | grep` counts all three kinds and the loop feeds itself.
+- **Reading a domain doc at step 0 because a config lists it.** The core is the authority
+  order and this review's contract; everything else is a keyed read at step 6, opened
+  because a finding named it.
+- **Re-finding an anchor by meaning, or writing a parsed value into a literal unchecked**
+  — a mismatch goes back to the placer, a non-number never reaches the file.
+- **Keying the review's own conduct into the log.** It goes in the economics block and
+  the commit body, as a question to the maintainer; the log is the substrate this
+  command is trying to keep small.

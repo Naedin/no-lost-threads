@@ -126,8 +126,14 @@ def main():
 
     current = out("rev-parse", "--abbrev-ref", "HEAD", cwd=root)
     rebase = not a.no_rebase and current != "HEAD"
-    if rebase and out("status", "--porcelain", "--untracked-files=no", cwd=root):
-        err("tracked changes in the tree; commit or set them aside first, or pass --no-rebase")
+    dirty = out("status", "--porcelain", "--untracked-files=no", cwd=root)
+    if rebase and dirty:
+        n = len(dirty.splitlines())
+        err(f"tracked changes in the tree ({n} file{'s' if n != 1 else ''}); the rebase after "
+            f"the push needs a clean tree. If the pre-commit hook just refused a commit, these "
+            f"are its changes and there is no commit to land yet: fix, commit, then rerun with "
+            f"the new sha. Otherwise commit or set them aside first, or pass --no-rebase to "
+            f"land {sha[:10]} and leave this branch alone.")
         return 1
 
     try:

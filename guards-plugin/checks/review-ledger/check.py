@@ -8,7 +8,11 @@ review acts on: three sections, each entry a top-level bullet.
 
   ## Live …            what was deferred, why, its promoting signal, and one
                        `last checked: <date> — <state>` line; each entry at most
-                       12 lines
+                       12 lines. An entry may carry one `wake: <condition>` line —
+                       a key occurrence, a path touched, a date — and is then
+                       dormant: the review reads the wake line each run and
+                       re-measures the entry, rewriting `last checked`, only on a
+                       run where the condition holds
   ## Falsifications …  kept whole; no cap
   ## Resolved …        a pointer at the landing commit; at most 3 lines
 

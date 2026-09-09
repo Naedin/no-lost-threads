@@ -40,8 +40,10 @@ Then stop looking. What you have after this step is what you place against.
 ## 2. Read the target before you propose against it
 
 This pass is only worth a spawn if you open the section you're proposing to amend.
-**Quote the existing text you judged against.** A proposal naming a file but not the
-passage it lands beside hasn't done this job.
+**Quote the existing text you judged against, as it sits on disk** — with its line
+numbers, wrapped as the file wraps it. A proposal naming a file but not the passage it
+lands beside hasn't done this job, and a passage quoted from memory or joined into one
+line is one the landing cannot match.
 
 Read the few plausible homes properly rather than skimming every candidate. In a long
 doc, grep it for the finding's own vocabulary and read the hits in place.
@@ -72,7 +74,10 @@ have, place it and name what's missing. The rule's content belongs to your calle
 ## 5. Return, per finding
 
 - **placement** — amend / merge / narrow / add, with file and section
-- **the existing text**, quoted
+- **the existing text**, quoted **as it sits on disk**: `path:first-last` line numbers,
+  the lines verbatim, a sentence the file wraps quoted wrapped. The landing is a text
+  match against this quote; an unwrapped join or a paraphrase is the anchor that fails
+  to match at landing time, which is the error this line exists to prevent
 - **the edit**, concrete enough to apply without re-deriving it
 - **the alternative rejected**, when you weighed one — a line, not a survey
 - **the key and any match**, when a retro log was named (§6)

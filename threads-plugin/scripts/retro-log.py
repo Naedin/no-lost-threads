@@ -66,7 +66,11 @@ rule present, which ranks with the repeats), `--since DATE` (keys with an occurr
 status, or annotation dated on or after DATE), `--live` (no closed section). Filters
 compose; the summary line counts the whole log and names how many keys the filter
 shows. Without `--keys` a filtered view carries each shown key's detail, so the
-recurred set's bodies are one read; `--key` repeats for a chosen set.
+recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` prints,
+instead of the keys, the files the shown keys name in their detail — a `Placement:`, a
+`LANDED … — <where>`, a `FILED <stub>` — as `<keys naming it>\t<path>`, most first:
+the docs a run should read because its own findings point there, derived from the
+filtered view rather than configured.
 """
 import argparse
 import datetime
@@ -84,6 +88,8 @@ STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DETAIL = re.compile(r"^  ")
 HEADING = re.compile(r"^## ")
+PATH = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w-][\w.-]*\.(?:md|json|py|sh|ya?ml|toml|txt))"
+                  r"(?![\w/])")
 CLOSED = {"LANDED", "RETIRED", "UPSTREAM", "NOTED"}
 ANNOTATION = "ADJUDICATED"
 ENTRIES = "## Entries"
@@ -264,8 +270,21 @@ def held_marker(blocks_for_key, today):
     return f"  HELD {ref}"
 
 
+def render_docs(shown):
+    """The files the shown keys' detail lines name, `<keys naming it>\\t<path>`."""
+    by_path = {}
+    for key, bs, st, dates in shown:
+        for b in bs:
+            for l in b.lines:
+                for p in set(PATH.findall(l)):
+                    p = re.sub(r"^(?:\.\.?/)+", "", p)   # a link relative to the log's dir
+                    by_path.setdefault(p, set()).add(key)
+    ranked = sorted(by_path.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    return "".join(f"{len(ks)}\t{p}\n" for p, ks in ranked)
+
+
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
-                live_only=False, since=None, today=None):
+                live_only=False, since=None, today=None, docs=False):
     today = today or datetime.date.today()
     by_key = keys_in_order(blocks)
     if only:
@@ -297,6 +316,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
     filtered = held or recurred or since
     shown_live = [r for r in live if keep(r)]
     shown_closed = [] if (live_only or held) else [r for r in closed if keep(r)]
+    if docs:
+        return render_docs(shown_live + shown_closed)
     out = [f"{len(by_key)} keys · {len(live)} live · {n_held} held · "
            + " · ".join(f"{v} {k.lower()}" for k, v in n_closed.items())
            + f" · {n_recurred} recurred (two or more occurrences)"]
@@ -371,6 +392,8 @@ def main():
     ap.add_argument("--recurred", action="store_true",
                     help="view: keys with two or more occurrences, or one after a closing status")
     ap.add_argument("--live", action="store_true", help="view: live keys only, no closed section")
+    ap.add_argument("--docs", action="store_true",
+                    help="view: the files the shown keys name, `<keys>\\t<path>`, instead of the keys")
     ap.add_argument("--since", default=None, metavar="YYYY-MM-DD",
                     help="view: keys with an occurrence, status, or annotation dated on or after")
     ap.add_argument("--today", default=None, help=argparse.SUPPRESS)
@@ -393,7 +416,7 @@ def main():
         today = datetime.date.fromisoformat(args.today) if args.today else None
         sys.stdout.write(render_view(blocks, args.keys, args.key, held=args.held,
                                      recurred=args.recurred, live_only=args.live,
-                                     since=args.since, today=today))
+                                     since=args.since, today=today, docs=args.docs))
         return 0
     if violations:
         refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])

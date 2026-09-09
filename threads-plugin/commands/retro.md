@@ -158,7 +158,9 @@ Two outcomes, **both first-class**:
 
 Each finding: **`[source]` `key` issue → evidence (cite the event) → cost → placement**,
 where placement is `finding-placer`'s proposal — target section, the existing text it was
-judged against, and the edit. Any rejected alternative and any `add (unconsolidated)` flag
+judged against, and the edit. **Cost is what was spent**, in the unit it was spent in — a
+gate run, a round trip, a wrong artifact on the default branch, a reversed decision,
+minutes — and *nil* is a valid answer: the capture bar (§4a) reads it. Any rejected alternative and any `add (unconsolidated)` flag
 ride with it, as does any recurrence match from §3b. Under `quick` there's one source, so
 every finding is `[self]` — tag them anyway; the format shouldn't change with the mode.
 
@@ -177,13 +179,31 @@ things stay here:
 
 ## 4a. Capture — append to the retro log
 
-**Capture is the default destination for every process finding, both dispositions.** This
+**Capture is the default destination for a process finding, both dispositions.** This
 is the largest context the session will have, so it is the most expensive point at which
 to apply a process edit — one whose target doc has to be read cold — and an unread punch
 list is a lost one. (A defect in this session's own artifact is the opposite case: the
 context is what makes the fix cheap. That is §4b.) An append is cheap, always completes, and
 survives the session; `/threads:process-review` adjudicates the log later, in the fresh
 context that work requires.
+
+**Capture has a bar.** A finding is appended when at least one holds:
+
+- its **cost was spent** — something the session actually paid (a gate run, a round trip,
+  a wrong artifact landed, a decision reversed), not a risk that did not materialize;
+- it **matches a key already in the log** (§3b) — a recurrence is the log's whole product
+  and is always written, whatever it cost this time;
+- it is **severe or irreversible** on its face.
+
+A nil-cost, unmatched finding — a friction noticed and measured before it cost anything, a
+near miss a doc already covers — goes in the punch list under *below the bar* with the
+reason, and is not appended; the user can say *append it*. Every single-occurrence key is
+carried at read cost by every review until it recurs or is retired, so the bar is what
+keeps the substrate readable: the dedup design is right, the volume feeding it is what the
+bar limits. **A positive is never appended.** It stays in the report — a prevented error
+shown as an observed correction is worth the reader's line — and nothing downstream reads
+it: the review ranks by recurrence, and a `NOTED` key closes at write and counts nothing.
+The grammar keeps `NOTED` for the entries already in adopters' logs; retro writes none.
 
 Read `retroLogPath` from `.claude/threads.json` (default `.claude/threads-retro-log.md`).
 
@@ -214,28 +234,26 @@ block is the copy that ships with the script:
   NOTED <date> — <what worked and why>        continuation prose and the guard refuses it.
   HELD <date> — <proposal>                    LANDED: applied. FILED: live; a recurrence
                                               counts against the stub. NOTED: a record,
-                                              closed at write, never counted. HELD: the
-                                              review proposed, nobody approved; listed first
+                                              closed at write, never counted — readable,
+                                              no longer written (§4a). HELD: the review
+                                              proposed, nobody approved; listed first
   ADJUDICATED <date> — <ruling>               the review's annotation on a key — a re-rank,
                                               a count-only ruling; changes neither state
                                               nor count. The review writes it; retro never
 ```
 
-A long status line stays on one line, so a `NOTED` entry looks like this and never like a
-paragraph:
+A long status line stays on one line, so a `LANDED` entry looks like this and never like
+a paragraph:
 
 ```
-positive/recurrence-match-promoted-the-call
-  NOTED 2026-09-08 — the placer reported the key already present, §3b promoted adopt-if-it-recurs to adopt-now on that evidence, and the user accepted without re-deriving the case; reading the log before the call is earning its cost.
+scope-leak/edit-landed-without-exercising-the-sibling-path
+  LANDED 9f60e91e — .claude/commands/land.md §4: the sibling carrier is amended in the same commit as the primary, and the commit names both; the second carrier was the one the rule kept missing.
 ```
 
 - **A new finding** → key line + one occurrence line, continuations to **eight lines at
   most**: the cited moment, the cost, the placement (`Placement: file §section — amend
   "…"`). What does not fit goes where the placement points; the `guards`
   `retro-log-size` check holds the cap.
-- **A positive record** (what worked, kept as evidence) → key + one `NOTED <date> —
-  <text>` line — one physical line, however long — and no occurrence. It is closed the
-  moment it is written; a record is never a recurrence.
 - **A finding whose artifact was fixed under §4b** → the ordinary key + occurrence, with
   one continuation line `Fixed: <artifact> — <sha>`. It counts against the eight, so
   compress the moment or the cost to make room — never the placement. No status line:
@@ -337,7 +355,7 @@ The log has just grown, and at closeout *opening a new thread* is an available n
 Read `.claude/threads.json`; skip this step entirely if there's no config, no `markTag`
 tag, or nothing accrued.
 
-Measure — cheap, all local git plus one file read:
+Measure — three commands, all local:
 
 - **Pending** — key lines appended to the retro log since the mark. The mark is the
   adjudication boundary `/threads:process-review` advances, so it is the one thing both
@@ -346,18 +364,27 @@ Measure — cheap, all local git plus one file read:
   working tree so this run's own appends count. Oldest: the date on the first such line.
   **Never count the whole file** — a whole-file count is the lifetime total, and reporting
   it as pending calls a clean review a backlog.
-- **Volume** — marker commits since the mark: `git log <markTag>..HEAD --format='%s%x09%h'
-  | grep '<markerPattern>'`, subject-first so the anchored pattern tests the subject.
-- **Concentration** — any file touched by `trigger.concentration` or more of those
-  commits.
+- **Recurred since the mark** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view
+  --keys --recurred --since <the mark's date>` (`git log -1 --format=%ad --date=short
+  <markTag>`). A key at two or more occurrences, or back after its rule landed, is what
+  opens the review's depth gate.
+- **Volume and concentration** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py
+  files`: the **organic** markers since the mark and how many files `trigger.concentration`
+  or more of them touched. The review's own landings (the `Process-Review:` trailer) and
+  commits that touched only the log and the ledger are classified out — counting them is
+  how a review comes out ripe on its own output the next morning.
 
-Say something only when pending is non-zero, or a `trigger` bar is met; when neither
-holds, say nothing — the review is current, and a nudge with nothing behind it is the
-same failure as one nobody heard. Then **one sentence, teasing the finding rather than
-the count**, and telling this session's appends apart from older unreviewed ones — *"six
-findings are pending, all from this session"* is a different report from *"nine findings
-are pending, the oldest about six weeks, and one doc has churned across four process
-commits since the last review,"* and only the second is a backlog.
+**Ripe** means one of: a key recurred since the mark; organic markers at or above
+`trigger.n`; a file at or above `trigger.concentration`. Pending captures alone are not
+ripe — they are the substrate waiting to recur, and a review run on volume pays for the
+funnel to learn that nothing recurred. Say something only when pending is non-zero or a
+bar is met; when neither holds, say nothing — the review is current, and a nudge with
+nothing behind it is the same failure as one nobody heard. Then **one sentence, naming
+ripe or not ripe and teasing the finding rather than the count**, and telling this
+session's appends apart from older unreviewed ones — *"six findings are pending, all from
+this session, none recurred: not ripe"* is a different report from *"nine findings are
+pending, one key recurred since the last review, and one doc has churned across four
+organic process commits,"* and only the second is a backlog.
 
 **Point at a fresh thread, and never offer to run it here.** `/threads:process-review`
 requires a context that did not do the work under review, and this one just did. Say they
@@ -391,5 +418,9 @@ backlog earns a sentence on each run.
   fix first.
 - **Offering to run `/threads:process-review` in this session.** It requires a context
   that didn't do the work, and this one did.
-- **Vague findings** with no cited moment, and **only fault-finding** — record what
-  worked, too.
+- **Vague findings** with no cited moment, and **only fault-finding** — report what
+  worked, too; it is reported, never appended.
+- **Appending below the bar.** A nil-cost finding that matches nothing is a line in the
+  report, not a key the next review carries; a positive is never a key at all.
+- **Calling a review ripe on pending captures**, or on a marker count that includes the
+  last review's own landings — ripe is a recurrence since the mark or an organic bar.

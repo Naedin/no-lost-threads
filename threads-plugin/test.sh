@@ -148,6 +148,70 @@ python3 "$rl" view --keys --live --root "$tmp" --log held.md 2>/dev/null | grep 
 python3 "$rl" view --keys --since 09-07 --root "$tmp" --log held.md >/dev/null 2>&1 && fail "--since accepted a malformed date"
 ok "HELD shows its age; --held, --recurred, --since, --live narrow the read; --key repeats"
 
+# 9. --docs derives the files the shown keys name, counted by key, from the filtered view
+cat > "$tmp/docs.md" <<'EOF2'
+## Entries
+
+drift/n
+  2026-09-01 | s1 | one.
+    Placement: Plans/active/pre-pr.md §Pins — amend "x".
+drift/n
+  2026-09-05 | s2 | two (see .claude/commands/closeout.md:12 and docs/direction.md).
+drift/o
+  2026-09-02 | s1 | once.
+    Placement: Plans/active/pre-pr.md §2.
+drift/p
+  LANDED abc1234 — docs/principles.md §measure.
+EOF2
+python3 "$rl" view --recurred --docs --root "$tmp" --log docs.md 2>/dev/null > "$tmp/docs.out" || fail "--docs refused"
+grep -qx '1	Plans/active/pre-pr.md' "$tmp/docs.out" || fail "--docs under --recurred did not count pre-pr.md once: $(cat "$tmp/docs.out")"
+grep -qx '1	.claude/commands/closeout.md' "$tmp/docs.out" || fail "--docs missed a dotted-directory path with a :line suffix"
+grep -q 'principles' "$tmp/docs.out" && fail "--docs under --recurred showed a path from an unshown key"
+python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | head -1 | grep -qx '2	Plans/active/pre-pr.md' || fail "--docs over the whole log did not rank pre-pr.md first at 2 keys"
+python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -qx '1	docs/principles.md' || fail "--docs missed the path in a LANDED line"
+ok "--docs lists the files the shown keys name, most-named first"
+
+# ---- scripts/marker-stream.py: the marker stream classified — organic, review (the
+# Process-Review trailer), bookkeeping (log/ledger-only) — so the trigger and the tally
+# count what no review has adjudicated.
+ms="$here/scripts/marker-stream.py"
+M="$tmp/ms"; mkdir -p "$M"
+git init -q -b main "$M"; m() { git -C "$M" "$@"; }
+m config user.email t@t; m config user.name t
+mkdir -p "$M/.claude"
+cat > "$M/.claude/threads.json" <<'EOF2'
+{ "markerPattern": "^[a-z(]*process[:/)]", "markTag": "process-review-mark",
+  "retroLogPath": ".claude/retro-findings.log", "ledgerPath": ".claude/ledger.md",
+  "trigger": { "n": 10, "concentration": 2 } }
+EOF2
+printf '# base\n' > "$M/CLAUDE.md"; printf '## Entries\n' > "$M/.claude/retro-findings.log"; printf '## Live\n' > "$M/.claude/ledger.md"
+m add -A; m commit -q -m "base"; m tag process-review-mark
+printf 'rule 1\n' >> "$M/CLAUDE.md"; m add -A; m commit -q -m "docs(process/claude): rule 1"
+printf 'k/a\n  2026-09-01 | s | x.\n' >> "$M/.claude/retro-findings.log"; printf 'entry\n' >> "$M/.claude/ledger.md"; m add -A; m commit -q -m "docs(process/retro): capture two"
+printf 'rule 2\n' >> "$M/CLAUDE.md"; m add -A; m commit -q -m "docs(process/claude): rule 2 — candidate A" -m "Held 2026-09-08, approved." --trailer "Process-Review: 2026-09-09"
+printf 'k/b\n  LANDED abc — x.\n' >> "$M/.claude/retro-findings.log"; m add -A; m commit -q -m "docs(process/retro): A LANDED" --trailer "Process-Review: 2026-09-09"
+printf 'feature\n' > "$M/f.txt"; m add -A; m commit -q -m "feat: not a marker (docs(process) in the body only)" -m "docs(process/x): quoted"
+printf 'rule 3\n' >> "$M/CLAUDE.md"; printf 'z\n' >> "$M/.claude/ledger.md"; m add -A; m commit -q -m "process: a squash subject (#7)"
+python3 "$ms" count --root "$M" > "$M/count.out" 2>"$M/err" || fail "marker-stream count failed: $(cat "$M/err")"
+grep -q '^5 markers since process-review-mark (20[0-9-]*, [0-9a-f]*)\.\.HEAD: 2 organic · 2 review · 1 bookkeeping$' "$M/count.out" || fail "count line wrong: $(cat "$M/count.out")"
+python3 "$ms" list --root "$M" 2>/dev/null > "$M/list.out"
+grep -q '^review	.*candidate A$' "$M/list.out" || fail "a trailered candidate landing is not review"
+grep -q '^review	.*A LANDED$' "$M/list.out" || fail "trailered bookkeeping is review, not bookkeeping"
+grep -q '^bookkeeping	.*capture two$' "$M/list.out" || fail "a log+ledger-only commit is not bookkeeping"
+grep -q '^organic	.*squash subject' "$M/list.out" || fail "a ledger+doc commit under the squash spelling is not organic"
+grep -q 'not a marker' "$M/list.out" && fail "a body-only mention counted as a marker"
+python3 "$ms" files --root "$M" 2>/dev/null > "$M/files.out"
+grep -q '^2	CLAUDE.md$' "$M/files.out" || fail "files did not count CLAUDE.md at 2 organic commits: $(cat "$M/files.out")"
+grep -q '^1	.claude/ledger.md$' "$M/files.out" || fail "files did not count the ledger's one organic touch"
+grep -q '1 at or above concentration 2' "$M/files.out" || fail "files did not name the concentration count: $(cat "$M/files.out")"
+python3 "$ms" count --all --root "$M" 2>/dev/null | grep -q '^5 markers since all of HEAD' || fail "--all did not read the whole history"
+python3 "$ms" count --since HEAD~3 --root "$M" 2>/dev/null | grep -q "^2 markers" || fail "--since did not replace the mark"
+python3 "$ms" count --pattern '^docs(process' --root "$M" 2>/dev/null | grep -q '^4 markers' || fail "--pattern with a bare paren did not override as a BRE"
+m tag -d process-review-mark >/dev/null
+python3 "$ms" count --root "$M" >/dev/null 2>"$M/err2" && fail "ran with no mark and no --since"
+grep -q 'no such rev: process-review-mark' "$M/err2" || fail "a missing mark was not named: $(cat "$M/err2")"
+ok "marker-stream: organic / review / bookkeeping classified; files, --all, --since, --pattern; a missing mark refuses"
+
 # ---- scripts/land-process-commit.py: one commit lands on the default branch through the
 # adopter's own pre-commit hook, the sha printed is the remote's, the slice branch drops
 # its duplicate, and every failure leaves nothing pushed and no worktree behind.

@@ -41,6 +41,12 @@ premature lock-in, mode confusion, and stale workflow habits.
   artifact the session itself wrote or landed — the moment it is found is the cheapest
   the fix will ever be, and a wrong artifact is the next reader's premise; the process
   lesson behind it is still captured.
+- **Capture has a bar.** A finding is appended when it cost the session something, when
+  it matches a key already in the log, or when it is severe on its face. A nil-cost
+  friction that matches nothing is reported and not appended (say *append it* to
+  override), and what worked is reported and never appended: every key the log carries
+  is read by every later review until it recurs, and the review ranks by recurrence, so
+  a key that can never rank is pure read cost.
 - **"If it recurs" becomes measurable.** The placer gives each finding a short,
   domain-free key and checks it against the log, so *adopt if it recurs* is settled by
   looking rather than by hoping — the second time a friction shows up, retro says so and
@@ -102,11 +108,30 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   with them, ranks any key that shows up more than once, and is free to re-rank what a
   single session called urgent now that it can see across sessions.
 - **`/threads:retro` tells you when a review looks ripe.** One sentence at the end of a
-  retro — what's pending, how old, and what's churned since the last review — delivered at
-  closeout, when the backlog has just grown and opening a new thread is the natural next
-  move. No hooks ship: a nudge at session start would compete with the task you just
-  asked for. It always points you at a *fresh* session, since the review can't run in the
-  one it reviews. Never urgent, never acted on unprompted.
+  retro — what's pending, whether anything recurred since the last review, and what's
+  churned — delivered at closeout, when the backlog has just grown and opening a new
+  thread is the natural next move. No hooks ship: a nudge at session start would compete
+  with the task you just asked for. It always points you at a *fresh* session, since the
+  review can't run in the one it reviews. Never urgent, never acted on unprompted. *Ripe*
+  means a key recurred or the organic process commits crossed a bar; pending captures
+  alone never make a review ripe.
+- **The review does not count itself.** Every commit the review lands carries a
+  `Process-Review: <date>` trailer, and a commit that touched only the log or the ledger
+  is bookkeeping; `scripts/marker-stream.py` classifies the stream into organic, review,
+  and bookkeeping, and only the organic commits feed the trigger and the ranking. Without
+  that, a review that lands twenty commits makes the next morning's review look ripe on
+  its own output.
+- **It reads a small core, then only what its findings name.** `invariantDocs` is the
+  handful of docs stating your repo's authority order and the review's own conventions,
+  read every run. Every other doc is opened whole only when a recurred key or a fired
+  ledger signal points at it (`retro-log.py view --recurred --docs` derives the list from
+  the log), at the moment it bears; a doc the window's churn points at is read as its
+  diff, and the placer is the only whole read of an edit's target.
+- **It closes with its own economics**, as questions to you: what it read against what
+  bore on a ruling, how much of the marker stream was its own weight, how many keys it
+  carried against how many recurred, and its own landing errors — and the standing
+  question, *what should the next run stop reading?* Its own misses go there, never into
+  the log it is trying to keep small.
 - **Nothing silent.** Applying anything requires recorded consent (`applyMode`,
   starting `read-only`, ratcheting by an answer to `apply-on-approval` and then to
   `apply-mechanical`, where a run nobody is answering lands wording amendments and trims
@@ -146,6 +171,7 @@ threads-plugin/
   agents/finding-placer.md        Read-only sub-agent that sites findings in your process docs (both commands)
   scripts/extract-record.py       Transcript → compact timeline (used by the fresh-context audit)
   scripts/retro-log.py            The retro log's view (state and counts per key) and compaction
+  scripts/marker-stream.py        The marker-commit stream since the mark, classified organic / review / bookkeeping
   scripts/land-process-commit.py  Land one marker commit on the default branch from a slice branch, through the repo's own hook
 ```
 

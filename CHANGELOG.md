@@ -9,6 +9,28 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.14.0] — 2026-09-09
+
+### Contract
+
+- **`invariantDocs` is the core, not the list of everything true.** The field now names the docs that state the repo's authority order and the review's own contract — read whole at step 0a, every run, and short by construction. A domain doc is a *keyed read*: opened whole at step 6 only when a *recurred* key or a *fired* ledger signal names it (`retro-log.py view --recurred --since <date> --docs` derives the list from the log, kept to `processDocs` members), and read by the placer again for the edit; a file the window's churn names is read as its diff or blamed section, never whole, and the economics block reports the keyed set's words so the bound is visible. Measured on the reference adopter: 26 docs / 75,849 prose words read at step 0, 8 docs / 26,716 words bore on any ruling; the whole since-mark keyed set would have been 11 docs / 44,678 words, twice the trimmed core, which is why the bound is recurred-and-fired only. Adopter-side edit: trim `invariantDocs` to the core (the reference adopter's went from 26 entries to 6, 21,534 words); nothing else moves.
+- **Every commit the review lands carries the trailer `Process-Review: <date>`** — candidate landings, log and ledger bookkeeping, the mark's own commit. `scripts/marker-stream.py` classifies the marker stream into *organic* (no trailer, touched something beyond `retroLogPath` / `ledgerPath` / `capabilityEvidencePath`), *review* (trailered), and *bookkeeping* (log/ledger-only); the trigger, step 1's ranking, and the tally's headline read the organic set only. Measured on the reference adopter's last window: 46 markers, 8 organic — the review was ripe on its own output every morning. Adopter-side edit: none; commits landed before this carry no trailer and stay organic in the history. The retro's ripeness nudge reads the same classification and calls a review *ripe* on a key recurred since the mark or an organic bar, never on pending captures alone.
+- **A Live ledger entry may be dormant**: one `wake: <condition>` line (a key occurrence, a path touched, a date), and the entry is re-measured — its `last checked` rewritten — only on a run where the wake holds; other runs read the wake line and nothing else of it. The `guards` `review-ledger` check's docstring names the line; its caps are unchanged. Adopter-side edit: none required; a watch that has not fired in several windows is the candidate.
+- **`/threads:retro` no longer writes `NOTED`.** A positive is reported and never appended: nothing downstream reads it, since the review ranks by recurrence and a `NOTED` key closes at write. The grammar keeps the token for existing entries. Adopter-side edit: none.
+
+### Added
+
+- **`scripts/marker-stream.py [list|count|files] [--since REV] [--head REV] [--all] [--pattern BRE]`** — the marker stream since the mark, classified; `files` ranks the organic commits per file and counts the files at `trigger.concentration`; `--all` is the tally; `--pattern` converts the config's BRE (bare parens literal) so the bootstrap proof and the script agree. `test.sh` proves the three classes, a body-only mention not counting, the file ranking, `--all`, `--since`, `--pattern`, and a missing mark refusing.
+- **`retro-log.py view --docs`** — the files the shown keys name in their detail (`Placement:`, `LANDED … — <where>`, `FILED <stub>`), `<keys naming it>\t<path>`, most-named first; composes with every filter. `test.sh` proves it under `--recurred` and whole.
+- **The review closes with a review-economics block**, questions to the maintainer: core docs read against those that bore, keyed docs likewise, markers organic / review / bookkeeping, keys read against keys recurred, the run's own landing errors, its size where the harness shows it, and *what should the next run stop reading?* An `Economics:` line rides the marker commit body beside `Tally:`. The review's own misses go there and into the commit body, never as keys into the log it maintains.
+- **`/threads:retro` has a capture bar**: a finding is appended when its cost was spent, when it matches a key already in the log, or when it is severe on its face; a nil-cost unmatched finding is listed *below the bar* with the reason and not appended (the user can override). Cost is a required field of every finding, stated in the unit it was spent in, and *nil* is a valid value. Measured on the reference adopter: 219 keys, 97 live, 3 recurred, 37 positives, 34 occurrence lines appended on one day.
+
+### Changed
+
+- **A landing is a text match, under every tier.** The placer returns the existing text as it sits on disk — `path:first-last`, verbatim, wrapped as the file wraps it — and the landing step asserts the type of any value it writes into a data literal (`[0-9]+` for a count) before the write. Both were the landing errors the reference adopter measured under `apply-on-approval` (an anchor quoted unwrapped; a parsed word written into three numeric budget rows and pushed); both were clean-judgment errors, and both are held at the write rather than by an executor sub-agent between judgment and landing. The workshop's execution-sub-agent deferral is re-deferred on that narrower signal.
+- **`land-process-commit.py`'s dirty-tree refusal** says how many files, that the rebase after the push is what needs the clean tree, that a commit the hook just refused has left its changes here with no commit to land yet, and that `--no-rebase` lands the sha and leaves the branch alone.
+- **`/threads:process-review` step 1 and the tally read `marker-stream.py`**, never a hand-rolled `git log | grep`; the silent-death check rules out the measurement with `count --all`.
+
 ## threads [0.13.0] — 2026-09-08
 
 ### Added
@@ -89,6 +111,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
+
+## guards [Unreleased]
+
+### Changed
+
+- **`review-ledger`** names the optional `wake: <condition>` line a dormant Live entry carries (threads: re-measured only on a run where the wake holds). The check's caps and findings are unchanged; the line counts toward the entry's 12.
 
 ## guards [0.7.0] — 2026-09-08
 
