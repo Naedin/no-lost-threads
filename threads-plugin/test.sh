@@ -212,6 +212,36 @@ python3 "$ms" count --root "$M" >/dev/null 2>"$M/err2" && fail "ran with no mark
 grep -q 'no such rev: process-review-mark' "$M/err2" || fail "a missing mark was not named: $(cat "$M/err2")"
 ok "marker-stream: organic / review / bookkeeping classified; files, --all, --since, --pattern; a missing mark refuses"
 
+# ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
+# the head, words added and removed, commits — so a core doc that grows unread is seen.
+cd_="$here/scripts/core-diff.py"
+CD="$tmp/cd"; mkdir -p "$CD/.claude" "$CD/docs"
+git init -q -b main "$CD"; c() { git -C "$CD" "$@"; }
+c config user.email t@t; c config user.name t
+printf '{ "markTag": "process-review-mark", "invariantDocs": ["CLAUDE.md", "docs/core.md", "docs/new.md"] }\n' > "$CD/.claude/threads.json"
+printf 'one two three\n' > "$CD/CLAUDE.md"; printf 'rule a\nrule b\n' > "$CD/docs/core.md"
+c add -A; c commit -q -m "base"; c tag process-review-mark
+printf 'rule a\nrule b\nand a worked case restating rule a in seven more words\n' > "$CD/docs/core.md"
+c add -A; c commit -q -m "feat: a squash that grew the core doc"
+printf 'rule a\nand a worked case restating rule a in seven more words\n' > "$CD/docs/core.md"
+printf 'fresh doc\n' > "$CD/docs/new.md"
+c add -A; c commit -q -m "docs: drop rule b, add a doc"
+python3 "$cd_" --root "$CD" > "$CD/sum.out" 2>"$CD/err" || fail "core-diff summary failed: $(cat "$CD/err")"
+grep -q '^core-diff process-review-mark (20[0-9-]*, [0-9a-f]*)\.\.HEAD: 3 docs, 2 with a window$' "$CD/sum.out" || fail "header wrong: $(head -1 "$CD/sum.out")"
+grep -qx 'CLAUDE.md	3	3	+0 -0	0' "$CD/sum.out" || fail "an untouched doc did not read zero: $(cat "$CD/sum.out")"
+grep -qx 'docs/core.md	4	13	+11 -2	2' "$CD/sum.out" || fail "the grown doc's words were not counted: $(cat "$CD/sum.out")"
+grep -qx 'docs/new.md	-	2	+2 -0	1' "$CD/sum.out" || fail "a doc absent at the mark did not read -: $(cat "$CD/sum.out")"
+python3 "$cd_" diff docs/core.md --root "$CD" 2>/dev/null | grep -q '^+and a worked case' || fail "diff did not print the doc's hunks"
+python3 "$cd_" diff docs/other.md --root "$CD" >/dev/null 2>"$CD/err2" && fail "diff of a non-core doc ran"
+grep -q 'not in invariantDocs' "$CD/err2" || fail "a non-core doc was not named: $(cat "$CD/err2")"
+python3 "$cd_" --since HEAD~1 --root "$CD" 2>/dev/null | grep -q '^docs/core.md	15	13	+0 -2	1$' || fail "--since did not replace the mark: $(python3 "$cd_" --since HEAD~1 --root "$CD" 2>/dev/null)"
+c tag -d process-review-mark >/dev/null
+python3 "$cd_" --root "$CD" >/dev/null 2>"$CD/err3" && fail "ran with no mark and no --since"
+grep -q 'no such rev: process-review-mark' "$CD/err3" || fail "a missing mark was not named: $(cat "$CD/err3")"
+printf '{ "markTag": "process-review-mark" }\n' > "$CD/.claude/threads.json"
+python3 "$cd_" --root "$CD" 2>/dev/null | grep -q 'no invariantDocs configured' || fail "no invariantDocs did not say so"
+ok "core-diff: per-doc words at mark and head, added/removed, commits; diff; --since; a missing mark and a non-core doc refuse"
+
 # ---- scripts/land-process-commit.py: one commit lands on the default branch through the
 # adopter's own pre-commit hook, the sha printed is the remote's, the slice branch drops
 # its duplicate, and every failure leaves nothing pushed and no worktree behind.

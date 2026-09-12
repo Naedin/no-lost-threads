@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.15.0] — 2026-09-12
+
+### Contract
+
+- **Step 0a reads each core doc's window as churn, not only the doc as authority.** `scripts/core-diff.py [summary|diff DOC] [--since REV] [--head REV]` prints, per `invariantDocs` entry over the mark's range, words at the mark and at the head, words added and removed, and commits; `diff DOC` prints the hunks for the read, each classed rule (a predicate, a scope boundary, a named exception, a decision-relevant why) or prose (narration, a symbol enumeration, a restated why, a worked case restating a present rule). A core doc whose window is prose-only, or whose prose growth outruns its rule growth, is a cull finding beside step 4's churn findings, and its trim lands only after a fresh-context read of old against new — handed both files and the exclusion list, never the trimmer's account — reports zero moved predicates. The economics block carries **core prose growth** beside "bore on a ruling", and "bore on nothing" is grounds to ask why, never to leave the core. Measured on the reference adopter: a core doc grew 4,096 → 8,653 words over eleven weeks through 54 commits, 22 of them squash-merged slice PRs, while step 0a reported it as bearing on nothing and asked whether to stop reading it; the trim that followed kept every predicate at 4,689 words, and its first two cold reads found 23 moved predicates in a cut its author judged clean; over the same window the adopter's `CLAUDE.md` read 569 → 2,841 words, measured and not yet classed. `test.sh` proves the per-doc counts, a doc absent at the mark, `diff`, `--since`, and the refusals. Adopter-side edit: a repo carrying this read as its own extension retires that text; no config changes.
+
 ## threads [0.14.0] — 2026-09-09
 
 ### Contract

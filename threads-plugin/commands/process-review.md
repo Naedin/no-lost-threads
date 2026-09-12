@@ -214,10 +214,25 @@ rebase.
    **0a — the core** (`invariantDocs`, in order). Read them whole. You are about to
    propose changes to how this repo works, and its stated invariants outrank anything
    you will derive from a commit stream. **Name what you read in the output, and which
-   of it bore on a ruling** — the economics block carries both numbers, and a core doc
-   that bore on nothing across several runs is a candidate to leave the core. Every
-   other doc this run opens is a **keyed read** (step 6): named by a finding, read at the
-   moment it bears, never here. No `invariantDocs` → narrate and skip.
+   of it bore on a ruling** — the economics block carries both numbers. Then read each
+   one's **window as churn**: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/core-diff.py` (one
+   line per doc — words at the mark and now, words added and removed, commits), and for
+   each doc with a window, `core-diff.py diff <doc>`, each hunk classed **rule** (a
+   predicate, a scope boundary, a named exception, a decision-relevant why) or **prose**
+   (narration, a symbol enumeration, a restated why, a worked case restating a rule
+   already present). A slice PR's squash lands a paragraph in a core doc and no marker
+   names it; a doc read whole every run can still double unread. A core doc whose window
+   is prose-only, or whose prose growth outruns its rule growth, is a **finding** under
+   cull, beside the churn findings of step 4: its remedy is a trim, and a trim of an
+   enforced doc lands only after a fresh-context read comparing old and new, handed both
+   files and the exclusion list (wording, order, examples restating a present rule,
+   symbols, generic rationale) and never the trimmer's account, reports zero moved
+   predicates. **A core doc that bore on nothing is grounds to ask why — a doc twice its
+   size bearing on nothing is the prose finding above — never grounds to leave the
+   core**; only a doc that has stopped stating the repo's authority order or this
+   review's contract leaves it. Every other doc this run opens is a **keyed read**
+   (step 6): named by a finding, read at the moment it bears, never here. No
+   `invariantDocs` → narrate and skip.
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
@@ -447,7 +462,8 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   store). Below 100%, the funnel's only non-doc input is short by that many findings and
   every ranking here was made without them.
 - **The reads that sized the run** — name the `invariantDocs` you actually read and what
-  in them bore on this run, plus the depth-gate decision and what triggered it. A run that
+  in them bore on this run, each doc's window from `core-diff.py` with its hunks classed
+  rule / prose, plus the depth-gate decision and what triggered it. A run that
   stopped at the gate says so plainly: that is a complete review, not a truncated one.
 - **Tier narration** — which tier this run used; what the next tier up would buy.
 - **Tally** — all-time: `marker-stream.py count --all` (derived, never stored). The
@@ -455,15 +471,19 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   the stream is the loop's own weight.
 - **Review economics** — the closing block, and the one place the review's own conduct
   goes. Numbers first, one line each, every one from a command this run already ran:
-  core docs read / core docs that bore on a ruling (count and words); keyed docs opened
+  core docs read / core docs that bore on a ruling (count and words); **core prose
+  growth** — per core doc with a window, words added classed prose / words added, from
+  `core-diff.py` and the hunk read (a doc bearing on nothing and growing in prose is a
+  cull finding, not a question); keyed docs opened
   whole / keyed docs that bore (count and words — a keyed set larger than the core is
   the bound in step 6 failing); markers read — organic / review / bookkeeping; keys read (the
   view's summary line) / keys that recurred; this run's own landing errors (a wrong
   anchor, a mistyped literal, a repaired commit — count and shas); the run's size where
   the harness shows it (tool calls, wall clock). Then **questions to the maintainer**,
-  never findings: *what should the next run stop reading?* — a core doc that bore on
-  nothing, a ledger watch that has not woken in several windows, a class of capture the
-  retro should stop appending — and any miss of this run's own, phrased as the question
+  never findings: *what should the next run stop reading?* — a ledger watch that has
+  not woken in several windows, a class of capture the retro should stop appending (a
+  core doc that bore on nothing is not on this list: 0a asks why, and the answer is a
+  trim or nothing) — and any miss of this run's own, phrased as the question
   it raises. **The review's own misses are lines here and an `Economics:` line beside
   `Tally:` in the marker commit body, never keys in the log it maintains**: keying the
   review's conduct into the stream it is trying to shrink feeds the count it measures.

@@ -126,7 +126,10 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   read every run. Every other doc is opened whole only when a recurred key or a fired
   ledger signal points at it (`retro-log.py view --recurred --docs` derives the list from
   the log), at the moment it bears; a doc the window's churn points at is read as its
-  diff, and the placer is the only whole read of an edit's target.
+  diff, and the placer is the only whole read of an edit's target. The core's own window
+  is read too (`scripts/core-diff.py`): a core doc grows through squashes no marker
+  names, and one that doubled while bearing on nothing is a trim finding, never a reason
+  to stop reading it.
 - **It closes with its own economics**, as questions to you: what it read against what
   bore on a ruling, how much of the marker stream was its own weight, how many keys it
   carried against how many recurred, and its own landing errors — and the standing
