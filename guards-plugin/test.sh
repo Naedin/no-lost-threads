@@ -79,6 +79,12 @@ for check in "$here"/checks/*/; do
     python3 "$check/check.py" --root "$tmp/empty-$id" --paths 'absent/*.md'
 done
 
+# plan-sweeps: a count finding names the stated and the measured number.
+python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fixtures/fail/count-mismatch" \
+  --paths plan.md 2>/dev/null | grep -q 'states 3 files, the sweep finds 2' \
+  || { echo "FAIL  plan-sweeps: the count finding names both numbers"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: the count finding names both numbers"
+
 # The runner: config absent, malformed, unknown id, rungs, and a refused check.
 r="$tmp/runner"
 mkdir -p "$r/.claude"

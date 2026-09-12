@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""plan-sweeps — every backticked `rg …` a plan carries runs, and a malformed one is a
-finding.
+"""plan-sweeps — every backticked `rg …` a plan carries runs, a malformed one is a finding,
+and a count the plan states beside a sweep must be the count the sweep finds.
 
   check.py --root DIR --paths PATH [--paths PATH]... [--exclude GLOB]...
 
@@ -12,14 +12,37 @@ in the checkout. Exit 0 and 1 are both sane — a sweep may match or not. Exit 2
 finding, with `rg`'s stderr on one line; a sweep that does not finish within the bound is
 a finding too, since a plan's sweep is one a reader can re-run.
 
+A number written beside a sweep is a second claim: that the sweep found that many. It is
+read when it directly follows the span — after `→`, `—`, `–`, `(`, `:`, `=`, or the word
+`returns` / `finds` / `yields` — as an integer, bold or not, with a unit: `hit(s)`,
+`match(es)`, `line(s)`, `site(s)`, `occurrence(s)`, `result(s)` count matching lines;
+`file(s)` count files with a match; one adjective may sit between (`4 code hits`, `58 call
+sites`); after `→` a bare integer, or one followed by `today`, counts lines. `≥N` and `≤N`
+are bounds. When the span is the last thing on its line, the next line is read for the
+count. A number followed by `:` is an output line (`— 173:    case started(`), one
+followed by `→` is a before/after pair (`(4 → 0)`), and neither is a count. A trailing
+`| wc -l` on the span is read as a line count of the sweep's output and the sweep runs
+without the pipe. The count is taken as the writer saw it: `--count` output summed,
+`--files-with-matches` output counted as files; otherwise the sweep is re-run with
+`--count` (`--count-matches` under `-o`) or `--files-with-matches`. A stated count the run
+does not reproduce is a finding naming both numbers. A count under a heading whose text
+begins with an entry of `targetHeadings` (default `Acceptance`) is a target — the state
+the tree will have after the change — so its sweep runs but its number is not compared;
+the heading is compared without its trailing HTML comment, case-insensitively. The key sits
+in this check's own `.claude/guards.json` entry, beside `rung`:
+
+  "plan-sweeps": { "rung": "block", "paths": ["Plans/active/*.md"],
+                   "targetHeadings": ["Acceptance", "Exit conditions"] }
+
 It executes plan text from a pre-commit hook, so it never uses a shell. A span is split
 by `shlex`, must have `rg` as argv[0], and is skipped — never run — when the shell would
-act on it: `;`, `|`, `&`, `$`, a redirect, or a glob character outside quotes (the shell
-would have expanded a glob; `rg` reads it as a path), or `$` or a backtick inside double
-quotes. Inside single quotes nothing expands, so a regex alternation runs. `--pre`,
-`--pre-glob`, and `--search-zip` (`-z`) are skipped too: they make `rg` run a program. Skipped spans are counted
-on stderr, never reported. A line carrying `<!-- guards-allow: plan-sweeps -->` is not
-read: that is how a doc shows a malformed sweep on purpose.
+act on it: `;`, `|` (other than the trailing `| wc -l`), `&`, `$`, a redirect, or a glob
+character outside quotes (the shell would have expanded a glob; `rg` reads it as a path),
+or `$` or a backtick inside double quotes. Inside single quotes nothing expands, so a regex
+alternation runs. `--pre`, `--pre-glob`, and `--search-zip` (`-z`) are skipped too: they
+make `rg` run a program. Skipped spans are counted on stderr, never reported. A line
+carrying `<!-- guards-allow: plan-sweeps -->` is not read: that is how a doc shows a
+malformed sweep on purpose.
 
 The sweeps run in the checkout, not in the tree under `--root`: the git adapter judges an
 export of the index that holds the plans and not the sources they sweep, and hands the
@@ -38,11 +61,12 @@ is normalized (`./docs/*.md` is `docs/*.md`); one outside the root refuses.
 
 Findings on stdout, one per line: `<path>:<line>: <message>`.
 Exit 0 pass; 1 findings; 2 refused (root missing, a file in scope unreadable, no
-files in scope, `rg` not on PATH).
+files in scope, `rg` not on PATH, a malformed `targetHeadings`).
 """
 import argparse
 import fnmatch
 import functools
+import json
 import os
 import pathlib
 import posixpath
@@ -60,21 +84,61 @@ UNSAFE = re.compile(r"[\n\r]")
 RUNS_A_PROGRAM = ("--pre", "--pre-glob", "--search-zip", "-z")
 TREE = os.environ.get("GUARDS_TREE")
 ALLOW = f"guards-allow: {ID}"
+HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$")
+COMMENT = re.compile(r"<!--.*?-->")
+WC = re.compile(r"\s*\|\s*wc\s+-l\s*$")
+DEFAULTS = {"targetHeadings": ["Acceptance"]}
+LINES = ("hit", "hits", "match", "matches", "line", "lines", "site", "sites",
+         "occurrence", "occurrences", "result", "results")
+FILES = ("file", "files")
+COUNT = re.compile(
+    r"^\s*(?P<lead>→|—|–|\(|:|=|returns|finds|yields)\s*\**\s*"
+    r"(?P<bound>≥|≤|>=|<=)?\s*(?P<n>\d+)\**"
+    r"(?:[ \t]+(?P<w1>[A-Za-z][A-Za-z-]*))?(?:[ \t]+(?P<w2>[A-Za-z][A-Za-z-]*))?"
+    r"\**(?P<after>.*)$")
+# short flags that take a value: the letters after one in a cluster are the value
+TAKES_VALUE = set("efgtTmABCEMrjd")
 
 
-def spans(text):
-    """(line number, span content) for every code span outside a fenced block."""
-    fence = None
-    for n, line in enumerate(text.splitlines(), 1):
+def heading_text(line):
+    """The heading's text with a trailing HTML comment removed, or None."""
+    m = HEADING.match(line)
+    if not m:
+        return None
+    return COMMENT.sub("", m.group(1)).strip()
+
+
+def spans(text, targets=()):
+    """(line number, span content, tail, target) for every code span outside a fenced
+    block: `tail` is the text after the span up to the next span on the line, or the
+    next line when nothing follows the span on its own; `target` is True under a heading
+    whose text begins with an entry of `targets`, where a count is the tree's state after
+    the change and is not compared."""
+    fence, target = None, False
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        n = i + 1
         m = FENCE.match(line)
         if fence is None:
             if m:
                 fence = m.group(1)
                 continue
+            h = heading_text(line)
+            if h is not None:
+                low = h.lower()
+                target = any(low.startswith(t.lower()) for t in targets)
+                continue
             if ALLOW in line:
                 continue
-            for s in SPAN.finditer(line):
-                yield n, s.group(2).strip()
+            found = list(SPAN.finditer(line))
+            for k, s in enumerate(found):
+                end = found[k + 1].start() if k + 1 < len(found) else len(line)
+                tail = line[s.end():end]
+                if k + 1 == len(found) and not tail.strip("* \t") and i + 1 < len(lines) \
+                        and not FENCE.match(lines[i + 1]) and heading_text(lines[i + 1]) is None:
+                    nxt = lines[i + 1]
+                    tail = nxt[:SPAN.search(nxt).start()] if SPAN.search(nxt) else nxt
+                yield n, s.group(2).strip(), tail, target
         elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
                 and line.strip() == m.group(1):
             fence = None
@@ -103,9 +167,13 @@ def shell_would_act(text):
 
 
 def argv_of(span):
-    """The argv to run, or None when the span is not a plain `rg` command."""
+    """(argv to run, via_wc), or None when the span is not a plain `rg` command. A
+    trailing `| wc -l` is stripped and remembered: the writer counted the output's lines."""
     if not span.startswith("rg "):
         return None
+    via_wc = bool(WC.search(span))
+    if via_wc:
+        span = WC.sub("", span)
     if UNSAFE.search(span) or shell_would_act(span):
         return None
     try:
@@ -117,21 +185,129 @@ def argv_of(span):
     for a in argv[1:]:
         if a in RUNS_A_PROGRAM or a.startswith(("--pre=", "--pre-glob=")):
             return None
-        if a.startswith("-") and not a.startswith("--") and "z" in a:
+        if a.startswith("-") and not a.startswith("--") and "z" in cluster(a):
             return None  # a short-flag cluster carrying -z
-    return argv
+    return argv, via_wc
+
+
+def cluster(arg):
+    """The flag letters of a short-flag cluster, stopping at one that takes a value
+    (`-nefoo` is -n, -e foo)."""
+    out = ""
+    for c in arg[1:]:
+        out += c
+        if c in TAKES_VALUE:
+            break
+    return out
+
+
+def has_flag(argv, short, longs):
+    """True when argv carries the short flag (in a cluster too) or a long spelling."""
+    for a in argv[1:]:
+        if a in longs or (short and a.startswith("-") and not a.startswith("--")
+                          and short in cluster(a)):
+            return True
+    return False
+
+
+def stated(tail):
+    """(bound, n, unit) for a count written in `tail`, or None: `unit` is "lines" or
+    "files". A number followed by `:` is an output line, one followed by `→` a
+    before/after pair; a bare number counts lines only after `→`."""
+    m = COUNT.match(tail)
+    if not m:
+        return None
+    after = m.group("after").lstrip("* \t")
+    if after.startswith((":", "→", "/", "–", "-")) and not after.startswith("--"):
+        return None
+    if after[:1].isdigit():
+        return None
+    w1 = (m.group("w1") or "").lower()
+    w2 = (m.group("w2") or "").lower()
+    if w1 in FILES or (w1 not in LINES and w2 in FILES):
+        unit = "files"
+    elif w1 in LINES or w2 in LINES:
+        unit = "lines"
+    elif w1 in ("", "today"):  # bare, or `N today`: a line count, after `→` only
+        if m.group("lead") != "→":
+            return None
+        unit = "lines"
+    else:
+        return None
+    return m.group("bound") or "=", int(m.group("n")), unit
+
+
+def sum_counts(stdout):
+    """The total of `--count` output: `path:N` per file, or a bare N for one file."""
+    total = 0
+    for line in stdout.splitlines():
+        tail = line.rsplit(":", 1)[-1].strip()
+        if tail.isdigit():
+            total += int(tail)
+    return total
+
+
+def measure(argv, via_wc, unit, stdout, cwd):
+    """(count, error) — the count the writer would have seen for `unit`, from the
+    original run's stdout when it already carries it, else from a re-run with the
+    counting flag. `error` is a message when the re-run failed."""
+    listing = has_flag(argv, "l", ("--files-with-matches",))
+    counted = has_flag(argv, "c", ("--count", "--count-matches"))
+    if via_wc or listing or (counted and unit == "files"):
+        return len(stdout.splitlines()), None
+    if counted:
+        return sum_counts(stdout), None
+    if unit == "files":
+        flag = "--files-with-matches"
+    elif has_flag(argv, "o", ("--only-matching",)):
+        flag = "--count-matches"
+    else:
+        flag = "--count"
+    code, first, out = run(argv + [flag], cwd)
+    if code not in (0, 1):
+        what = first if code == -1 else f"rg exited {code}: {first or 'no message'}"
+        return None, f"{what} on the count re-run with {flag}"
+    return len(out.splitlines()) if unit == "files" else sum_counts(out), None
+
+
+def holds(bound, n, actual):
+    return {"=": actual == n, "≥": actual >= n, ">=": actual >= n,
+            "≤": actual <= n, "<=": actual <= n}[bound]
+
+
+def config(root):
+    """This check's own entry in .claude/guards.json, defaults filled; a key that is not
+    a list of strings refuses. No config, or no entry: the defaults."""
+    out = dict(DEFAULTS)
+    path = root / ".claude" / "guards.json"
+    if not path.is_file():
+        return out
+    try:
+        spec = json.loads(path.read_text(encoding="utf-8")).get("checks", {}).get(ID, {})
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError) as e:
+        refuse(f".claude/guards.json unreadable: {e}")
+    if not isinstance(spec, dict):
+        return out
+    for key in DEFAULTS:
+        if key in spec:
+            v = spec[key]
+            if not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
+                refuse(f'.claude/guards.json: "{ID}".{key} must be a list of strings')
+            out[key] = v
+    return out
 
 
 def run(argv, cwd):
-    """(exit code, rg's stderr in one line) — exit -1 with a message when the bound passed."""
+    """(exit code, rg's stderr in one line, stdout) — exit -1 with a message when the
+    bound passed."""
     try:
         r = subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
-                           timeout=TIMEOUT, stdin=subprocess.DEVNULL)
+                           errors="replace", timeout=TIMEOUT, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        return -1, f"did not finish within {TIMEOUT}s"
+        return -1, f"did not finish within {TIMEOUT}s", ""
     lines = [l.strip() for l in r.stderr.splitlines()
              if l.strip() and set(l.strip()) != {"^"}]
-    return r.returncode, " · ".join(lines[:4])[:200]
+    return r.returncode, " · ".join(lines[:4])[:200], r.stdout
 
 
 def refuse(msg):
@@ -275,30 +451,47 @@ def main():
     if not tree.is_dir():
         refuse(f"GUARDS_TREE is not a directory: {TREE}")
 
-    findings, ran, skipped = [], 0, 0
+    targets = config(root)["targetHeadings"]
+    findings, ran, skipped, compared, uncompared = [], 0, 0, 0, 0
     for f in files:
         rel = f.relative_to(root).as_posix()
         try:
             body = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as e:
             refuse(f"unreadable: {rel}: {e}")
-        for n, span in spans(body):
+        for n, span, tail, target in spans(body, targets):
             if not span.startswith("rg "):
                 continue
-            argv = argv_of(span)
-            if argv is None:
+            parsed = argv_of(span)
+            if parsed is None:
                 skipped += 1
                 continue
+            argv, via_wc = parsed
             ran += 1
-            code, first = run(argv, tree)
-            if code in (0, 1):
+            code, first, out = run(argv, tree)
+            if code not in (0, 1):
+                what = first if code == -1 else f"rg exited {code}: {first or 'no message'}"
+                findings.append((rel, n, f"{what} — `{span}`"))
                 continue
-            what = first if code == -1 else f"rg exited {code}: {first or 'no message'}"
-            findings.append((rel, n, f"{what} — `{span}`"))
+            claim = stated(tail)
+            if claim is None:
+                continue
+            if target:
+                uncompared += 1
+                continue
+            bound, want, unit = claim
+            compared += 1
+            actual, err = measure(argv, via_wc, unit, out, tree)
+            if err:
+                findings.append((rel, n, f"{err} — `{span}`"))
+            elif not holds(bound, want, actual):
+                said = f"{bound if bound != '=' else ''}{want} {unit}"
+                findings.append((rel, n, f"states {said}, the sweep finds {actual} — `{span}`"))
 
     for rel, n, msg in findings:
         print(f"{rel}:{n}: {msg}")
     print(f"{ID}: {len(files)} files, {ran} sweeps run, {skipped} skipped, "
+          f"{compared} counts compared, {uncompared} targets not compared, "
           f"{len(findings)} findings", file=sys.stderr)
     if findings:
         sys.exit(1)

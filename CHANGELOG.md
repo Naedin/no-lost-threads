@@ -112,7 +112,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
 
-## guards [Unreleased]
+## guards [0.8.0] — 2026-09-12
+
+### Contract
+
+- **`plan-sweeps` compares a count the plan states beside a sweep with the count the sweep finds.** A number directly after the span — after `→`, `—`, `(`, `:`, `=`, or `returns` — with a unit (`hits`, `matches`, `lines`, `sites` count matching lines; `files` count files; one adjective may sit between, `4 code hits`; a bare number or `N today` after `→` counts lines; `≥N` / `≤N` are bounds), on the span's line or the next when the span ends its line, is a claim the check re-measures: `--count` output summed, `--files-with-matches` counted, otherwise a re-run with the counting flag; a trailing `| wc -l` now runs and reads as a line count. A mismatch is a finding naming both numbers at the check's rung. `173:` is an output line and `(4 → 0)` a before/after pair, neither a count. A count under a heading beginning with a `targetHeadings` entry (default `Acceptance`; the key sits in the check's own `.claude/guards.json` entry) is the tree's state after the change, so its sweep runs but the number is not compared. Measured on one adopter's 38 active plan docs: 41 sweeps run, 1 count compared, 1 finding — a doc's `14 hits` where the tree holds 16; on the drafting-time ledger of the plan whose counts were transcribed from memory, all ten stated file counts are read, the recipe rows included. Adopter-side edit: fix or drop the one stale count before the update lands, and write a target count outside an `Acceptance…` section either under a heading named in `targetHeadings` or without an adjacent integer.
 
 ### Changed
 
