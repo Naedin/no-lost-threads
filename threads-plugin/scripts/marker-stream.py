@@ -2,7 +2,7 @@
 """marker-stream — the marker-commit stream since the mark, classified.
 
   marker-stream.py [list|count|files] [--since REV] [--all] [--head REV]
-                   [--pattern BRE] [--root DIR]
+                   [--arc SLUG] [--pattern BRE] [--root DIR]
 
 A marker commit is one whose subject matches `markerPattern` in `.claude/threads.json`
 (a BRE, anchored, subject only). Not every marker is a process change the review has
@@ -24,6 +24,13 @@ Modes:
   files  the summary line, then organic commits per file, `<n>\t<path>`, most first,
          and how many files meet `trigger.concentration` — the retro's concentration read
 
+`--arc SLUG` keeps only commits carrying the trailer `Arc: SLUG` — the landings of a
+trajectory the retro log names with an `ARC SLUG` line (`retro-log.py view --arc`), which
+are commits and never keys; the range defaults to the whole history, since an arc spans
+windows, and each row carries the commit date so the two reads join on it:
+`<class>\t<sha>\t<date>\t<subject>`. The marker pattern still applies, so an arc landing is
+a marker commit with the trailer.
+
 The range is `<markTag>..HEAD` (the mark from the config, default `process-review-mark`);
 `--since REV` replaces the start, `--head REV` the end (the pre-flight reads the remote's
 default branch, not the local head), `--all` reads the whole history of the head — the
@@ -43,6 +50,7 @@ import subprocess
 import sys
 
 TRAILER = "Process-Review"
+ARC_TRAILER = "Arc"
 DEFAULT_PATTERN = "^docs(process"
 DEFAULT_MARK = "process-review-mark"
 
@@ -88,24 +96,28 @@ def config(root):
 
 
 def commits(root, rng):
-    """[(sha, short, subject, trailer, files)] newest first, one git call."""
-    fmt = "%x00%H%x1f%h%x1f%s%x1f%(trailers:key=" + TRAILER + ",valueonly)%x1e"
-    raw = git(["log", *rng, "--format=" + fmt, "--name-only"], root)
+    """[(sha, short, subject, trailer, files, date, arcs)] newest first, one git call."""
+    fmt = ("%x00%H%x1f%h%x1f%s%x1f%(trailers:key=" + TRAILER + ",valueonly)%x1f%ad%x1f"
+           "%(trailers:key=" + ARC_TRAILER + ",valueonly)%x1e")
+    raw = git(["log", *rng, "--format=" + fmt, "--date=short", "--name-only"], root)
     out = []
     for chunk in raw.split("\x00"):
         if not chunk.strip():
             continue
         head, _, rest = chunk.partition("\x1e")
-        sha, short, subject, trailer = (head.split("\x1f") + ["", "", "", ""])[:4]
+        sha, short, subject, trailer, date, arcs = (head.split("\x1f") + [""] * 6)[:6]
         files = [l.strip() for l in rest.splitlines() if l.strip()]
-        out.append((sha, short, subject, trailer.strip(), files))
+        out.append((sha, short, subject, trailer.strip(), files, date.strip(),
+                    {a.strip() for a in arcs.splitlines() if a.strip()}))
     return out
 
 
-def classify(entries, marker, bookkeeping):
+def classify(entries, marker, bookkeeping, arc=None):
     rows = []
-    for sha, short, subject, trailer, files in entries:
+    for sha, short, subject, trailer, files, date, arcs in entries:
         if not marker.search(subject):
+            continue
+        if arc and arc not in arcs:
             continue
         if trailer:
             cls = "review"
@@ -113,7 +125,7 @@ def classify(entries, marker, bookkeeping):
             cls = "bookkeeping"
         else:
             cls = "organic"
-        rows.append((cls, sha, short, subject, files))
+        rows.append((cls, sha, short, subject, files, date))
     return rows
 
 
@@ -124,6 +136,8 @@ def main():
     ap.add_argument("--since", default=None, metavar="REV", help="range start (default: the mark)")
     ap.add_argument("--head", default="HEAD", metavar="REV", help="range end (default: HEAD)")
     ap.add_argument("--all", action="store_true", help="the whole history of --head")
+    ap.add_argument("--arc", default=None, metavar="SLUG",
+                    help="only commits with the trailer `Arc: SLUG`; the range defaults to --all")
     ap.add_argument("--pattern", default=None, metavar="BRE", help="override markerPattern")
     ap.add_argument("--root", default=None, help="repo root (default: git top level)")
     a = ap.parse_args()
@@ -142,7 +156,9 @@ def main():
                    if isinstance(p, str) and p}
     concentration = int((cfg.get("trigger") or {}).get("concentration", 3))
 
-    if a.all:
+    if a.arc and not re.match(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", a.arc):
+        refuse(f"--arc takes a slug, not {a.arc}")
+    if a.all or (a.arc and not a.since):
         rng, label = [a.head], f"all of {a.head}"
     else:
         start = a.since or mark
@@ -155,18 +171,18 @@ def main():
         short = git(["rev-parse", "--short", start], root).strip()
         rng, label = [f"{start}..{a.head}"], f"{start} ({date}, {short})..{a.head}"
 
-    rows = classify(commits(root, rng), marker, bookkeeping)
+    rows = classify(commits(root, rng), marker, bookkeeping, a.arc)
     n = {c: sum(1 for r in rows if r[0] == c) for c in ("organic", "review", "bookkeeping")}
-    print(f"{len(rows)} markers since {label}: {n['organic']} organic · "
-          f"{n['review']} review · {n['bookkeeping']} bookkeeping")
+    print(f"{len(rows)} markers since {label}" + (f" on arc {a.arc}" if a.arc else "")
+          + f": {n['organic']} organic · {n['review']} review · {n['bookkeeping']} bookkeeping")
     if a.mode == "count":
         return 0
     if a.mode == "list":
-        for cls, sha, short, subject, files in rows:
-            print(f"{cls}\t{short}\t{subject}")
+        for cls, sha, short, subject, files, date in rows:
+            print(f"{cls}\t{short}\t" + (f"{date}\t" if a.arc else "") + subject)
         return 0
     per_file = {}
-    for cls, sha, short, subject, files in rows:
+    for cls, sha, short, subject, files, date in rows:
         if cls != "organic":
             continue
         for f in files:

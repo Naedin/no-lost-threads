@@ -2,7 +2,8 @@
 """retro-log — the retro log as an append-only stream, read through a view.
 
   retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--live]
-                    [--since YYYY-MM-DD] [--log PATH] [--root DIR]
+                    [--since YYYY-MM-DD] [--docs] [--arc NAME] [--arcs]
+                    [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
 
 The log is append-only so that concurrent sessions merge by union; every state
@@ -36,6 +37,16 @@ The entry grammar (the guards `retro-log` check enforces the same one):
                                                   on a key. Changes neither the key's
                                                   state nor its count; the view shows
                                                   it in detail, compaction keeps it
+    ARC <name> [<date>] — <one line>              annotation: the key rides a named
+                                                  trajectory. <name> is a slug; the date
+                                                  is when the key entered the arc, written
+                                                  when the key's own dates cannot say (a
+                                                  compacted closed key carries none).
+                                                  Changes neither state nor count;
+                                                  compaction keeps it, before or after a
+                                                  closing status, so the arc outlives
+                                                  its keys. Only ARC takes a date after
+                                                  its ref
 
 Entries sit under a `## Entries` heading; nothing follows them. The header above it is
 free prose that points here (`--help` prints this) and never copies the grammar: a copy
@@ -43,7 +54,7 @@ is a second source nothing refreshes, since `compact` keeps the header verbatim.
 log's path is `retroLogPath` in `.claude/threads.json` (default
 `.claude/threads-retro-log.md`).
 
-A key's state is its last block in stream order, ADJUDICATED blocks skipped: an
+A key's state is its last block in stream order, annotation blocks skipped: an
 occurrence, or a REOPENED, FILED, or HELD status, is live; LANDED, RETIRED, UPSTREAM,
 NOTED is closed. An occurrence appended after a closing status therefore reopens the
 key by itself — the rule landed and the shape came back — and the view says so. The
@@ -70,7 +81,20 @@ recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` p
 instead of the keys, the files the shown keys name in their detail — a `Placement:`, a
 `LANDED … — <where>`, a `FILED <stub>` — as `<keys naming it>\t<path>`, most first:
 the docs a run should read because its own findings point there, derived from the
-filtered view rather than configured.
+filtered view rather than configured. `--arc NAME` prints, instead of the view, every
+key carrying `ARC NAME` — its state and count, then its blocks as the stream holds
+them, occurrences dated and statuses one line — ordered by the date each key entered
+the arc: the ARC line's own date, else the key's first occurrence; a key with neither
+comes last in stream order and the header counts those. Stream order alone is file
+order, which compaction and re-keying have already moved relative to time. That
+output is the trajectory (attempted, landed, recurred, retired, each dated), derived
+and never edited, so a ledger watch on a trajectory cites `view --arc NAME` as its
+re-derive command; the review attaches `ARC` to the keys an arc rides with and
+retires the token when two windows of reading it changed no ruling. `--arcs` lists
+every arc in the log with its key count and live/closed split — the write-side aid,
+so attaching a key needs no sweep of the whole log. The arc's own landings are
+commits, not keys; they carry an `Arc: NAME` trailer and `marker-stream.py list --arc
+NAME` joins them.
 """
 import argparse
 import datetime
@@ -82,8 +106,10 @@ import sys
 
 KEY = re.compile(r"^([a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*)( \(uncold\))?$")
 OCCURRENCE = re.compile(r"^  (\d{4}-\d{2}-\d{2}) \| ([^|]+?) \|\s*(.*)$")
-TOKENS = ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD", "ADJUDICATED")
-STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?:\s+[—-]+\s+(.*))?$")
+TOKENS = ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD", "ADJUDICATED",
+          "ARC")
+STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?: (\d{4}-\d{2}-\d{2}))?"
+                    r"(?:\s+[—-]+\s+(.*))?$")
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DETAIL = re.compile(r"^  ")
@@ -91,7 +117,8 @@ HEADING = re.compile(r"^## ")
 PATH = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w-][\w.-]*\.(?:md|json|py|sh|ya?ml|toml|txt))"
                   r"(?![\w/])")
 CLOSED = {"LANDED", "RETIRED", "UPSTREAM", "NOTED"}
-ANNOTATION = "ADJUDICATED"
+ANNOTATIONS = {"ADJUDICATED", "ARC"}
+SLUG = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 ENTRIES = "## Entries"
 
 
@@ -137,6 +164,15 @@ class Block:
         return m.group(2) if m else None
 
     @property
+    def arc(self):
+        return self.ref if self.status == "ARC" else None
+
+    @property
+    def arc_date(self):
+        m = STATUS.match(self.lines[0]) if self.lines else None
+        return m.group(3) if m and m.group(1) == "ARC" else None
+
+    @property
     def dates(self):
         return [OCCURRENCE.match(l).group(1) for l in self.lines if OCCURRENCE.match(l)]
 
@@ -144,6 +180,8 @@ class Block:
     def touched(self):
         """Every date this block carries: occurrence dates, or a date-shaped ref."""
         if self.status:
+            if self.arc_date:
+                return [self.arc_date]
             return [self.ref] if DATE.match(self.ref or "") else []
         return self.dates
 
@@ -189,11 +227,19 @@ def parse(text):
             continue
         if not cur.lines:
             if STATUS.match(line):
-                pass
+                sm = STATUS.match(line)
+                if sm.group(1) == "ARC" and not SLUG.match(sm.group(2)):
+                    violations.append(f"line {n}: an arc name is a slug, not \"{sm.group(2)}\"")
+                if sm.group(3) and sm.group(1) != "ARC":
+                    violations.append(f"line {n}: only ARC carries a date after its ref")
             elif OCCURRENCE.match(line):
                 pass
             elif STATUS_LIKE.match(line):
                 tok = STATUS_LIKE.match(line).group(1).split()[0]
+                if tok == "ARC":
+                    violations.append(f"line {n}: an arc name is a slug: \"ARC <name> — <text>\"")
+                    cur.lines.append(line)
+                    continue
                 if tok in TOKENS:
                     violations.append(f"line {n}: status line must be \"{tok} <ref> — <text>\"")
                 else:
@@ -224,7 +270,7 @@ def keys_in_order(blocks):
 
 def deciding(blocks_for_key):
     """The blocks that carry state: everything but annotations."""
-    return [b for b in blocks_for_key if b.status != ANNOTATION]
+    return [b for b in blocks_for_key if b.status not in ANNOTATIONS]
 
 
 def state(blocks_for_key):
@@ -250,11 +296,12 @@ def one_line(block):
     m = STATUS.match("  " + text)
     if not m:
         return "  " + text
-    tail = m.group(3) or ""
+    tail = m.group(4) or ""
     cut = tail.find(". ")
     if cut != -1:
         tail = tail[:cut + 1]
-    return f"  {m.group(1)} {m.group(2)}" + (f" — {tail}" if tail else "")
+    return (f"  {m.group(1)} {m.group(2)}" + (f" {m.group(3)}" if m.group(3) else "")
+            + (f" — {tail}" if tail else ""))
 
 
 def held_marker(blocks_for_key, today):
@@ -281,6 +328,63 @@ def render_docs(shown):
                     by_path.setdefault(p, set()).add(key)
     ranked = sorted(by_path.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     return "".join(f"{len(ks)}\t{p}\n" for p, ks in ranked)
+
+
+def entered(bs, name):
+    """The date a key entered an arc: its ARC line's date, else its first occurrence."""
+    dated = [b.arc_date for b in bs if b.arc == name and b.arc_date]
+    if dated:
+        return dated[-1]
+    dates = sorted(d for b in bs for d in b.dates)
+    return dates[0] if dates else None
+
+
+def render_arcs(blocks):
+    """Every arc in the log: `<slug>\\t<keys> keys · <live> live · <closed> closed`."""
+    by_key = keys_in_order(blocks)
+    arcs = {}
+    for key, bs in by_key.items():
+        for name in dict.fromkeys(b.arc for b in bs if b.arc):
+            arcs.setdefault(name, []).append(state(bs) in CLOSED)
+    out = [f"{len(arcs)} arcs"]
+    for name, closed in sorted(arcs.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        n_closed = sum(closed)
+        out.append(f"{name}\t{len(closed)} keys · {len(closed) - n_closed} live · {n_closed} closed")
+    return "\n".join(out) + "\n"
+
+
+def render_arc(blocks, name):
+    """Every key carrying `ARC name`, by the date it entered the arc, each with its
+    blocks as the stream holds them: the trajectory, derived."""
+    by_key = keys_in_order(blocks)
+    carrying = [k for k, bs in by_key.items() if any(b.arc == name for b in bs)]
+    if not carrying:
+        refuse([f"no key carries ARC {name}"])
+    when = {k: entered(by_key[k], name) for k in carrying}
+    order = sorted(carrying, key=lambda k: (when[k] is None, when[k] or "",
+                                            min(b.line_no for b in by_key[k])))
+    undated = sum(1 for k in carrying if when[k] is None)
+    out = [f"arc {name}: {len(order)} keys, by date entered"
+           + (f" ({undated} undated, stream order last)" if undated else "")]
+    for key in order:
+        bs = by_key[key]
+        st = state(bs)
+        dates = sorted(d for b in bs for d in b.dates)
+        span = (f"{dates[0]}..{dates[-1]}" if len(dates) > 1
+                else dates[0] if dates
+                else f"{when[key]} (entered)" if when[key] else "-")
+        marker = f"  {st}" if st else ""
+        again = recurred_after(bs)
+        if again:
+            marker += f"  recurred after {again}"
+        out += ["", f"{key}  ×{len(dates)}  {span}{marker}"]
+        for b in bs:
+            out.extend(b.lines if not b.status else [one_line(b)])
+    return "\n".join(out) + "\n"
+
+
+def arc_tags(bs):
+    return "".join(f"  arc:{a}" for a in dict.fromkeys(b.arc for b in bs if b.arc))
 
 
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
@@ -340,6 +444,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         again = recurred_after(bs)
         if again:
             marker += f"  recurred after {again}"
+        marker += arc_tags(bs)
         out.append(f"{key}{flag}  ×{len(dates)}  {span}{marker}")
         if not keys_only:
             for b in bs:
@@ -349,7 +454,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         out.append(f"## Closed ({len(shown_closed)}{'' if not filtered else f' of {len(closed)}'})")
         for key, bs, st, dates in shown_closed:
             last = [b for b in deciding(bs) if b.status][-1]
-            out.append(f"{key}  ×{len(dates)}  {one_line(last).strip()}")
+            out.append(f"{key}  ×{len(dates)}  {one_line(last).strip()}{arc_tags(bs)}")
     return "\n".join(out) + "\n"
 
 
@@ -363,8 +468,11 @@ def render_compact(header, blocks):
         uncold = any(b.uncold for b in bs)
         key_line = key + (" (uncold)" if uncold else "")
         if st in CLOSED:
-            closing = max(i for i, b in enumerate(bs) if b.status != ANNOTATION)
+            closing = max(i for i, b in enumerate(bs) if b.status not in ANNOTATIONS)
             out += [key_line, one_line(bs[closing])]
+            for b in bs[:closing]:       # an arc outlives the key's closing
+                if b.status == "ARC":
+                    out += [key_line, one_line(b)]
             for b in bs[closing + 1:]:
                 out += [key_line, one_line(b)]
             continue
@@ -394,6 +502,10 @@ def main():
     ap.add_argument("--live", action="store_true", help="view: live keys only, no closed section")
     ap.add_argument("--docs", action="store_true",
                     help="view: the files the shown keys name, `<keys>\\t<path>`, instead of the keys")
+    ap.add_argument("--arc", default=None, metavar="NAME",
+                    help="view: every key carrying `ARC NAME`, by date entered, with detail")
+    ap.add_argument("--arcs", action="store_true",
+                    help="view: every arc in the log with its key count and live/closed split")
     ap.add_argument("--since", default=None, metavar="YYYY-MM-DD",
                     help="view: keys with an occurrence, status, or annotation dated on or after")
     ap.add_argument("--today", default=None, help=argparse.SUPPRESS)
@@ -413,6 +525,14 @@ def main():
     if args.mode == "view":
         for v in violations:
             print(f"retro-log: warning: {v}", file=sys.stderr)
+        if args.arcs:
+            sys.stdout.write(render_arcs(blocks))
+            return 0
+        if args.arc:
+            if not SLUG.match(args.arc):
+                refuse([f"--arc takes a slug, not {args.arc}"])
+            sys.stdout.write(render_arc(blocks, args.arc))
+            return 0
         today = datetime.date.fromisoformat(args.today) if args.today else None
         sys.stdout.write(render_view(blocks, args.keys, args.key, held=args.held,
                                      recurred=args.recurred, live_only=args.live,

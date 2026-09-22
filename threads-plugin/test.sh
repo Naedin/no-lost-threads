@@ -171,6 +171,78 @@ python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | head -1 | gr
 python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -qx '1	docs/principles.md' || fail "--docs missed the path in a LANDED line"
 ok "--docs lists the files the shown keys name, most-named first"
 
+# 10. ARC is an annotation: transparent to state and count, kept by compact on either side
+# of a closing status, refused on a non-slug name; --arc prints the carrying keys by the
+# date each entered the arc (the ARC line's date, else the first occurrence) with their
+# dated blocks — the trajectory, derived; --arcs lists the arcs.
+cat > "$tmp/arc.md" <<'EOF2'
+## Entries
+
+drift/q
+  2026-09-01 | s1 | stub field added by hand.
+drift/q
+  ARC why-not-now — the deferral moved from a stub field to a trailer to a pinned form.
+drift/q
+  LANDED abc1234 — doc.md §trailer.
+scope-leak/r
+  2026-09-03 | s2 | the form was pinned without the trailer.
+scope-leak/r
+  ARC why-not-now — the pinned form is the third carrier.
+drift/q
+  2026-09-05 | s3 | came back: a gate re-formed without the trailer.
+drift/s
+  2026-09-04 | s4 | unrelated.
+drift/s
+  ARC other-arc — not this one.
+drift/v
+  LANDED 0000000 — compacted before the arc existed: no date of its own.
+drift/v
+  ARC why-not-now 2026-08-30 — the precursor, dated by the writer.
+drift/w
+  RETIRED 1111111 — no date anywhere.
+drift/w
+  ARC why-not-now — undated: stream order, last.
+EOF2
+python3 "$check" --root "$tmp" --paths arc.md >/dev/null 2>&1 || fail "an ARC block fails the retro-log check"
+python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep -q '^drift/q  ×2  2026-09-01..2026-09-05  recurred after LANDED  arc:why-not-now$' || fail "ARC changed drift/q's state or count, or the key line lacks its arc: $(python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep '^drift/q')"
+python3 "$rl" view --arc why-not-now --root "$tmp" --log arc.md 2>/dev/null > "$tmp/arc.out" || fail "--arc refused"
+grep -q '^arc why-not-now: 4 keys, by date entered (1 undated, stream order last)$' "$tmp/arc.out" || fail "--arc header wrong: $(head -1 "$tmp/arc.out")"
+[ "$(grep -o '^[a-z-]*/[a-z]* ' "$tmp/arc.out" | tr -d ' ' | tr '\n' ' ')" = "drift/v drift/q scope-leak/r drift/w " ] || fail "--arc is not by date entered, undated last: $(grep -o '^[a-z-]*/[a-z]* ' "$tmp/arc.out" | tr '\n' ' ')"
+grep -q '^  ARC why-not-now 2026-08-30 — the precursor' "$tmp/arc.out" || fail "--arc lost the ARC line's date"
+grep -q '^drift/v  ×0  2026-08-30 (entered)  LANDED$' "$tmp/arc.out" || fail "a key sorted on its ARC date does not show it in the header: $(grep '^drift/v' "$tmp/arc.out")"
+python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep -q '^drift/v  ×0  LANDED 0000000 — compacted before the arc existed: no date of its own.  arc:why-not-now$' || fail "a closed key line lacks its arc tag"
+python3 "$rl" view --keys --since 2026-08-30 --root "$tmp" --log arc.md 2>/dev/null | grep -q '^drift/v ' || fail "--since does not read an ARC line's date"
+python3 "$rl" view --arcs --root "$tmp" --log arc.md 2>/dev/null > "$tmp/arcs.out" || fail "--arcs refused"
+grep -qx '2 arcs' "$tmp/arcs.out" || fail "--arcs miscounted: $(head -1 "$tmp/arcs.out")"
+grep -qx 'why-not-now	4 keys · 2 live · 2 closed' "$tmp/arcs.out" || fail "--arcs split wrong: $(cat "$tmp/arcs.out")"
+printf 'drift/x\n  LANDED abc1234 2026-09-09 — dated.\n' > "$tmp/dated.md"
+python3 "$check" --root "$tmp" --paths dated.md 2>/dev/null | grep -q 'only ARC carries a date' || fail "the check passed a date on LANDED"
+grep -q '^drift/q  ×2  2026-09-01..2026-09-05  recurred after LANDED$' "$tmp/arc.out" || fail "--arc key line lacks state and count"
+grep -q '  LANDED abc1234 — doc.md §trailer.' "$tmp/arc.out" || fail "--arc dropped the landing"
+grep -q '  2026-09-05 | s3 | came back' "$tmp/arc.out" || fail "--arc dropped the recurrence after the landing"
+grep -q 'drift/s\|other-arc' "$tmp/arc.out" && fail "--arc showed a key on another arc"
+python3 "$rl" view --arc no-such-arc --root "$tmp" --log arc.md >/dev/null 2>&1 && fail "--arc accepted an arc no key carries"
+python3 "$rl" view --arc Not_A_Slug --root "$tmp" --log arc.md >/dev/null 2>&1 && fail "--arc accepted a non-slug name"
+cat > "$tmp/arc2.md" <<'EOF2'
+## Entries
+
+drift/t
+  2026-09-01 | s1 | once.
+drift/t
+  ARC why-not-now — attached while live.
+drift/t
+  LANDED abc1234 — doc.md §x.
+EOF2
+python3 "$rl" compact --root "$tmp" --log arc2.md 2>/dev/null || fail "compact refused a log with ARC blocks"
+grep -q '^  ARC why-not-now' "$tmp/arc2.md" || fail "compact dropped an ARC written before the key closed"
+python3 "$rl" view --arc why-not-now --root "$tmp" --log arc2.md 2>/dev/null | grep -q '^drift/t  ×0  -  LANDED$' || fail "the compacted closed key left the arc: $(python3 "$rl" view --arc why-not-now --root "$tmp" --log arc2.md 2>/dev/null)"
+cp "$tmp/arc2.md" "$tmp/arc2.once"; python3 "$rl" compact --root "$tmp" --log arc2.md 2>/dev/null
+cmp -s "$tmp/arc2.md" "$tmp/arc2.once" || fail "compacting a canonical log with ARC changed it"
+printf 'drift/u\n  ARC Not_A_Slug — bad name.\n' >> "$tmp/arc2.md"
+python3 "$check" --root "$tmp" --paths arc2.md 2>/dev/null | grep -q 'an arc name is a slug' || fail "the check passed a non-slug arc name"
+python3 "$rl" view --keys --root "$tmp" --log arc2.md 2>"$tmp/err" >/dev/null; grep -q 'an arc name is a slug' "$tmp/err" || fail "view did not warn on a non-slug arc name"
+ok "ARC is transparent to state and count, outlives a closing status; --arc derives the trajectory by date entered; --arcs lists them"
+
 # ---- scripts/marker-stream.py: the marker stream classified — organic, review (the
 # Process-Review trailer), bookkeeping (log/ledger-only) — so the trigger and the tally
 # count what no review has adjudicated.
@@ -211,6 +283,19 @@ m tag -d process-review-mark >/dev/null
 python3 "$ms" count --root "$M" >/dev/null 2>"$M/err2" && fail "ran with no mark and no --since"
 grep -q 'no such rev: process-review-mark' "$M/err2" || fail "a missing mark was not named: $(cat "$M/err2")"
 ok "marker-stream: organic / review / bookkeeping classified; files, --all, --since, --pattern; a missing mark refuses"
+
+# --arc: the landings of a trajectory are commits carrying `Arc: <slug>`, joined by date
+printf 'rule 4\n' >> "$M/CLAUDE.md"; m add -A; m commit -q -m "docs(process/claude): the trailer form pinned" --trailer "Arc: why-not-now"
+printf 'rule 5\n' >> "$M/CLAUDE.md"; m add -A; m commit -q -m "docs(process/claude): gates re-formed" --trailer "Arc: why-not-now" --trailer "Process-Review: 2026-09-21"
+printf 'rule 6\n' >> "$M/CLAUDE.md"; m add -A; m commit -q -m "docs(process/claude): another arc" --trailer "Arc: other-arc"
+m tag -f process-review-mark HEAD~3 >/dev/null 2>&1
+python3 "$ms" list --arc why-not-now --root "$M" > "$M/arc.out" 2>"$M/err" || fail "marker-stream --arc failed: $(cat "$M/err")"
+grep -q '^2 markers since all of HEAD on arc why-not-now: 1 organic · 1 review · 0 bookkeeping$' "$M/arc.out" || fail "--arc summary wrong: $(head -1 "$M/arc.out")"
+grep -q '^organic	[0-9a-f]*	20[0-9-]*	docs(process/claude): the trailer form pinned$' "$M/arc.out" || fail "--arc row lacks its date or the commit: $(cat "$M/arc.out")"
+grep -q 'other arc' "$M/arc.out" && fail "--arc showed a commit on another arc"
+python3 "$ms" count --arc why-not-now --since process-review-mark --root "$M" 2>/dev/null | grep -q '^2 markers since process-review-mark' || fail "--arc with --since did not narrow to the range"
+python3 "$ms" count --arc Not_A_Slug --root "$M" >/dev/null 2>&1 && fail "--arc accepted a non-slug"
+ok "marker-stream --arc: commits carrying the Arc trailer, whole history by default, dated rows"
 
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.

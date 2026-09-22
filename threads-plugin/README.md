@@ -186,6 +186,12 @@ occurrence count, and its filters (`--held`, `--recurred`, `--since <date>`, `--
 the reads the review makes, so a log of a few hundred keys is never read whole; a held
 proposal shows the date it was held and its age. The review's ruling on a key — a re-rank,
 a count-only call — is an `ADJUDICATED <date>` line that changes neither state nor count.
+A trajectory — several keys that are one arc of attempts, landings, and recurrences — is
+an `ARC <name> [<date>]` line on each key it rides with, and `view --arc <name>` prints
+those keys by the date each entered, with their dated blocks: the arc's history derived
+from the log, never narrated again, and the re-derive command a ledger watch on the arc
+cites; `view --arcs` lists them. The arc's own landings are commits carrying an `Arc:
+<name>` trailer, which `marker-stream.py list --arc <name>` prints dated.
 `compact` is the review's one rewrite. The `guards` plugin's `retro-log`
 and `review-ledger` checks hold both files to their grammar.
 

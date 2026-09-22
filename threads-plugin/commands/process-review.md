@@ -588,6 +588,33 @@ as a check at the write than as an executor sub-agent between judgment and landi
     never continuation prose inside an occurrence. It changes neither the state nor the
     count, `compact` keeps it, and `view --key` shows it, so the next run reads the ruling
     where the key is instead of in a commit body.
+  - **A judgment about several keys at once** — this stub field, that trailer, and the
+    pinned form are one deferral converging; this deprecation and its reversal are one
+    spelling arc; a layer proposed "to be proved out" and its later instances — is an
+    `ARC <slug> [<date>] — <one line>` line on each key it rides with: its own entry,
+    changing neither state nor count, kept by `compact` on either side of a closing
+    status. The date is when the key entered the arc, and it is written on a key whose
+    own lines carry none — a closed key compacted to its `LANDED` line — since the writer
+    is the only party who knows it. `view --arc <slug>` then prints those keys by the date
+    each entered, with their dated occurrences and status lines, which *is* the
+    trajectory — attempted, landed, recurred, retired, each dated — derived from the log
+    rather than re-narrated in a marker body; `view --arcs` lists the arcs with their key
+    counts, the read that finds where a new key attaches. The arc's own landings are
+    commits, never keys: a commit that moves an arc carries the trailer `Arc: <slug>`
+    beside `Process-Review:`, and `marker-stream.py list --arc <slug>` prints them dated,
+    so the two reads join on the date and an `ARC` line never lists shas by hand. A
+    per-window verdict on the arc ("a fresh build converging: leave") is one
+    `ADJUDICATED` line on a key the arc carries, its text naming the arc rather than that
+    key's own shape — for an arc whose spine is maintainer-directed commits, the key may
+    be a precursor or a tangent, not a shape the arc produced — and a hypothesis about where the arc
+    goes is a Live ledger watch citing both reads as its re-derive; a direction hypothesis
+    or a positive with nothing to land gets its live home that way, on the exposure keys
+    it rides with, never as a revived `NOTED`. An arc older than the log's keys — its
+    shapes re-keyed into pointers, its carrier the marker stream alone — gets no
+    anchor-only key; its watch cites `git log --grep` and, from its next landing on, the
+    trailer. An arc name is a slug the `guards` `retro-log` check holds. Retire an arc —
+    stop writing the token, leave the lines — when two windows of reading it changed no
+    ruling.
   - **Then compact:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact` — one
     block per key, closed keys reduced to their status line. It is the only rewrite of
     the file and it is deterministic; a violation it refuses on is repaired by hand first.
@@ -619,7 +646,8 @@ as a check at the write than as an executor sub-agent between judgment and landi
     <condition>` line — a key occurrence in the since-mark view, a path in the window's
     organic stream, a date — and is re-measured, its `last checked` rewritten, only on a
     run where the wake holds; otherwise the run reads the wake line and nothing else of
-    it. The promoting signal stays as written; the wake is the one-line proxy the run
+    it. A watch on a trajectory names `retro-log.py view --arc <slug>` and
+    `marker-stream.py list --arc <slug>` as what re-measures it. The promoting signal stays as written; the wake is the one-line proxy the run
     tests first. An entry whose signal has not fired for several windows and whose
     measurement costs more than a line is the case for it.
   - **Falsifications** — kept whole; their job is stopping a repeat.

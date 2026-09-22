@@ -240,6 +240,10 @@ block is the copy that ships with the script:
   ADJUDICATED <date> — <ruling>               the review's annotation on a key — a re-rank,
                                               a count-only ruling; changes neither state
                                               nor count. The review writes it; retro never
+  ARC <slug> [<date>] — <one line>            the review's annotation naming the trajectory
+                                              a key rides with, dated when the key's own
+                                              lines are not; `view --arc <slug>` derives
+                                              the arc. The review writes it; retro never
 ```
 
 A long status line stays on one line, so a `LANDED` entry looks like this and never like

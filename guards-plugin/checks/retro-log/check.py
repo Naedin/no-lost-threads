@@ -12,9 +12,15 @@ or blank. Under `## Entries`:
     LANDED|RETIRED|UPSTREAM|FILED|NOTED|HELD|REOPENED <ref> — <text>   status: one line
     ADJUDICATED <date> — <text>               annotation: one line, the review's ruling
                                               on a key; its own entry like a status
+    ARC <name> [<date>] — <text>              annotation: the key rides the named
+                                              trajectory; <name> is a slug; the date is
+                                              when it entered. Only ARC takes a date
+                                              after its ref
 
 Findings: a line that is none of these; a first detail line that is neither an
-occurrence nor a status; an unknown status token; a status entry longer than one
+occurrence nor a status; an unknown status token; an arc name that is not a slug
+(lowercase words joined by `-`); a date after the ref on any token but `ARC`; a status
+entry longer than one
 line (the narrative belongs in the commit); a status or annotation line inside an
 occurrence entry (each is its own entry, key line repeated); a section after the
 entries.
@@ -46,8 +52,11 @@ import sys
 ID = "retro-log"
 KEY = re.compile(r"^([a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*)( \(uncold\))?$")
 OCCURRENCE = re.compile(r"^  (\d{4}-\d{2}-\d{2}) \| ([^|]+?) \|\s*(.*)$")
-TOKENS = ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD", "ADJUDICATED")
-STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?:\s+[—-]+\s+(.*))?$")
+TOKENS = ("LANDED", "RETIRED", "UPSTREAM", "REOPENED", "FILED", "NOTED", "HELD", "ADJUDICATED",
+          "ARC")
+SLUG = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?: (\d{4}-\d{2}-\d{2}))?"
+                    r"(?:\s+[—-]+\s+(.*))?$")
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DETAIL = re.compile(r"^  ")
 HEADING = re.compile(r"^## ")
@@ -212,6 +221,12 @@ def check(rel, text):
             first = False
             if STATUS.match(line):
                 status_lines = 1
+                m = STATUS.match(line)
+                if m.group(1) == "ARC" and not SLUG.match(m.group(2)):
+                    out.append((n, f"an arc name is a slug (lowercase words joined by -), "
+                                   f"not \"{m.group(2)}\" ({key})"))
+                if m.group(3) and m.group(1) != "ARC":
+                    out.append((n, f"only ARC carries a date after its ref ({key})"))
             elif OCCURRENCE.match(line):
                 pass
             elif STATUS_LIKE.match(line):

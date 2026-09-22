@@ -24,3 +24,9 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   HELD 2026-09-07 — candidate A: pre-pr §2 pins bullet rewritten tree-wide.
 mode-confusion/shared-term-covers-two-motions
   ADJUDICATED 2026-09-08 — FILED stands; the stub is build-fired at a third window.
+drift/repeated-manual-motion-never-written-down
+  ARC manual-motion-to-script — stub field, then trailer, then the form pinned.
+scope-leak/edit-landed-without-exercising-the-sibling-path
+  ARC manual-motion-to-script — the sibling path is the same motion unscripted.
+unverified-claim/count-read-off-a-truncated-listing
+  ARC manual-motion-to-script 2026-08-30 — a closed key enters the arc with the date its own lines lost.
