@@ -26,9 +26,17 @@ Work in this order:
 0. **Re-run the drafter's rows first.** When the plan's ledger carries a `drafted at`
    record with claim rows under it, run each row's command verbatim against the current
    tree and compare its output line: a row that moved is a defect, cited with both
-   outputs; a row marked `unverified` is one to settle now. Then look for the sites the
-   plan names that no row covers — a symbol, a file, a test, a precedent with no
-   generating command under it — and treat each as a claim recalled from memory.
+   outputs; a row whose claim or output line characterizes the whole set of hits — a
+   summary (`only`, `all`, `none`), a count, a list given as the hits — is confirmed by
+   reading every hit the command returns, never a sample, and a hit it does not cover
+   makes the row moved or mis-recorded, a defect either way. A sweep of hundreds of hits
+   is read by class — comment lines split from code first, then each class walked —
+   which is still every hit. The fix rewrites the output line to what the read found;
+   the command is narrowed only when the claim itself was narrower than the sweep, never
+   to make the summary true. A row marked `unverified` is one to settle now. Then look
+   for the sites the plan names that no row covers — a symbol, a file, a test, a
+   precedent with no generating command under it — and treat each as a claim recalled
+   from memory.
 1. **Re-verify every load-bearing claim.** Anything the plan asserts about the
    code — a file exists, a function behaves some way, something is absent — gets
    checked against the repo at file-and-line, with a command, not plausibility.
@@ -87,8 +95,9 @@ did not already hold unchanged, one line each —
 `<claim> — <the command you ran> — <one line of its output>` — every draft-time row whose
 output moved, with the new output, and every claim you could not check, as
 `<claim> — unverified: <what would settle it>`. These are copied into the plan's ledger
-verbatim, so write them to be re-run, not re-read. Say in one line how many draft-time
-rows you re-ran and how many held.
+verbatim, so write them to be re-run, not re-read. Say in one line, as four numbers,
+how many draft-time rows you re-ran, held, found moved or mis-recorded, and settled from
+`unverified`.
 
 End with one verdict: **FIXED-IN-PLACE** (nothing found, or every defect was unambiguous
 and is applied), **NEEDS-DECISION** (a question the author cannot answer alone; the

@@ -18,13 +18,13 @@
       "name": "slices",
       "source": "./slices-plugin",
       "description": "Day-one slice pipeline \u2014 /slices:capture files one-concern, low-trust stubs the moment work is discovered; /slices:draft promotes a stub into a plan that re-verifies the capture's claims and ends in a review digest (shape + at most five tension points); /slices:check hands the plan to a fresh-context adversary told only its path, and no plan is implement-ready until it survives. Rung-one by design: the artifacts are the contract, and later hardening only appends to them.",
-      "version": "0.3.1"
+      "version": "0.4.0"
     },
     {
       "name": "guards",
       "source": "./guards-plugin",
       "description": "Repo guardrails as scripts behind a gate \u2014 one script per check with a stable id and exit codes 0 / 1 / 2 meaning pass, findings, refused; .claude/guards.json names the enabled checks and each one's rung, warn or block; a git pre-commit adapter judges the index and is inert in a repo with no config. Checks: anchors (every in-repo section link resolves to an explicit <a id> and every relative link target exists), war-stories (narrative provenance in process docs), plan-sweeps (every backticked rg in a plan runs, without a shell; a malformed one is a finding, and so is a count stated beside it that the sweep does not find), referents (a backticked script, /command, or env knob nothing in the repo answers to), retro-log and review-ledger (the threads plugin's log and ledger grammars). Rung as config is the enforcement ladder made add-only.",
-      "version": "0.8.0"
+      "version": "0.9.0"
     }
   ]
 }

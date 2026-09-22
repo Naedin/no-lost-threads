@@ -85,6 +85,13 @@ python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fix
   || { echo "FAIL  plan-sweeps: the count finding names both numbers"; exit 1; }
 printf 'ok    %-52s\n' "plan-sweeps: the count finding names both numbers"
 
+# plan-sweeps: every head/tail stage is a finding carrying the remedy, a bare path and a
+# later stage included.
+n="$(python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fixtures/fail/truncated" \
+  --paths plan.md 2>/dev/null | grep -c 'drop the `\(head\|tail\)`, or state the count off `| wc -l`')"
+[ "$n" -eq 3 ] || { echo "FAIL  plan-sweeps: head/tail stages found $n of 3"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: a head/tail stage names the remedy"
+
 # The runner: config absent, malformed, unknown id, rungs, and a refused check.
 r="$tmp/runner"
 mkdir -p "$r/.claude"

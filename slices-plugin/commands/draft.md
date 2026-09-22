@@ -74,7 +74,11 @@ test that pins it and walk the case where the new mechanism and the old path mee
 **The site-opening pass writes the ledger.** Before the plan is written, list every
 production symbol, file, test, and site the draft will name; open each one with a command
 (`rg -n`, `git grep`, `sed -n`, a test run) and keep the command and one line of its
-output. Those pairs are the plan's **claim rows** — `<claim> — \`<generating command>\` —
+output. The kept command is the one that produced the output: a run piped through `head`
+or `tail` is re-run whole before a row is written off it. An output line that summarizes
+the hits — `doc comments only`, `all 12 sites`, `none outside Tests` — is written after
+reading every hit, never a sample; a read that contradicts the summary rewrites the
+summary, never narrows the command to fit it. Those pairs are the plan's **claim rows** — `<claim> — \`<generating command>\` —
 <one line of its output>` — and §2 writes them into the ledger under a `drafted at` record
 line. A site the pass could not open is a row marked `unverified: <what would settle it>`,
 never a sentence in the body. The rows are what `/slices:check` re-runs before it hunts,

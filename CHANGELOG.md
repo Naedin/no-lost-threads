@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [Unreleased]
+
+### Changed
+
+- **The write rule says an arc's entry commit is bookkeeping by construction**, so `marker-stream.py --arc` on a fresh arc reads zero organic until a rule commit carries the trailer. Measured on the reference adopter's first arc landing: one marker, bookkeeping, as classified.
+
 ## threads [0.16.0] — 2026-09-21
 
 ### Contract
@@ -124,6 +130,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
 
+## guards [0.9.0] — 2026-09-22
+
+### Contract
+
+- **`plan-sweeps` refuses a sweep piped through `head` or `tail`.** A backticked `rg …` whose pipeline carries a `head` or `tail` stage — any argument form, any position, a path to either — is a finding at the check's rung, whatever the plan writes beside it: a stated count or a qualitative summary read off that output is a claim about the truncation window, and the count comparison cannot see that from the numbers. The message names the remedy: drop the truncation, or state the count off `| wc -l`. Such a span was skipped before and is still never run; a `|` inside quotes stays regex alternation and `||` is not a pipe. Measured on the reference adopter: no active plan pipes a sweep through either today; the escape that prompted it was a ledger row summarizing an `rg … | head` listing as doc comments only while the stem also matched 20+ code sites. Adopter-side edit: none.
+
 ## guards [0.8.0] — 2026-09-12
 
 ### Contract
@@ -194,6 +206,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
 - **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
+
+## slices [0.4.0] — 2026-09-22
+
+### Contract
+
+- **A claim row that summarizes its hits is read against every hit.** `/slices:draft`'s site-opening pass keeps the command that produced the output — a run piped through `head` or `tail` is re-run whole before a row is written off it — and writes a summary line (`doc comments only`, `all 12 sites`, `none outside Tests`) only after reading every hit; a read that contradicts it rewrites the summary, never narrows the command. The `gap-checker`'s step 0 confirms a row whose claim or output line characterizes the whole set of hits — a summary, a count, a list given as the hits — by reading every hit its command returns (a saturated sweep by class, comment lines split from code first), and a hit it does not cover makes the row moved or mis-recorded. Its fix rewrites the output line to what the read found and narrows the command only when the claim itself was narrower than the sweep: a narrowed sweep that makes a false summary true is a defect no later check can see. The step-0 report line is four numbers — rows re-run, held, moved or mis-recorded, settled from `unverified`. A check that reads plan text cannot see a truncation that happened in the drafter's shell, and a qualitative summary has no number to compare; the cold checker already re-runs each row verbatim, so it holds the whole output. Measured on the reference adopter: a row summarized as doc comments only was read off a truncated listing while its command matched 265 lines, 88 of them code, and the written command carried no truncation; a cold checker briefed with this text flagged that row with the code sites it missed, caught two more under-recorded rows, and held a true-summary control. Adopter-side edit: none.
 
 ## slices [0.3.1] — 2026-09-09
 

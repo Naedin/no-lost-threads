@@ -602,7 +602,10 @@ as a check at the write than as an executor sub-agent between judgment and landi
     counts, the read that finds where a new key attaches. The arc's own landings are
     commits, never keys: a commit that moves an arc carries the trailer `Arc: <slug>`
     beside `Process-Review:`, and `marker-stream.py list --arc <slug>` prints them dated,
-    so the two reads join on the date and an `ARC` line never lists shas by hand. A
+    so the two reads join on the date and an `ARC` line never lists shas by hand. The
+    commit that enters an arc into the log is bookkeeping by construction — it touches the
+    log and the ledger only — so `--arc` on a fresh arc reads zero organic until a rule
+    commit carries the trailer; that zero is the arc's age, not a missing landing. A
     per-window verdict on the arc ("a fresh build converging: leave") is one
     `ADJUDICATED` line on a key the arc carries, its text naming the arc rather than that
     key's own shape — for an arc whose spine is maintainer-directed commits, the key may

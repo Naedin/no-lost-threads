@@ -34,6 +34,11 @@ in this check's own `.claude/guards.json` entry, beside `rung`:
   "plan-sweeps": { "rung": "block", "paths": ["Plans/active/*.md"],
                    "targetHeadings": ["Acceptance", "Exit conditions"] }
 
+A sweep piped through `head` or `tail` — any stage of the pipeline, any argument form —
+is a finding, whatever follows it: a count or a summary read off that output describes
+the truncation window, not the population the sweep matches. The remedy is in the
+message: drop the truncation, or state the count off `| wc -l`. The span is not run.
+
 It executes plan text from a pre-commit hook, so it never uses a shell. A span is split
 by `shlex`, must have `rg` as argv[0], and is skipped — never run — when the shell would
 act on it: `;`, `|` (other than the trailing `| wc -l`), `&`, `$`, a redirect, or a glob
@@ -164,6 +169,41 @@ def shell_would_act(text):
         elif c in ";|&<>$`*?[":
             return True
     return quote is not None  # an unclosed quote: the shell would keep reading
+
+
+def stages(text):
+    """The pipeline stages of `text`: split on each `|` outside quotes that is not half
+    of `||`."""
+    out, cur, quote, i = [], "", None, 0
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == quote:
+                quote = None
+        elif c in "'\"":
+            quote = c
+        elif c == "|":
+            if text[i + 1:i + 2] == "|":
+                cur += "||"
+                i += 2
+                continue
+            out.append(cur)
+            cur = ""
+            i += 1
+            continue
+        cur += c
+        i += 1
+    return out + [cur]
+
+
+def truncation(span):
+    """`head` or `tail` when a stage after the first runs one, else None."""
+    for stage in stages(span)[1:]:
+        word = stage.split(None, 1)[0] if stage.strip() else ""
+        name = posixpath.basename(word)
+        if name in ("head", "tail"):
+            return name
+    return None
 
 
 def argv_of(span):
@@ -461,6 +501,13 @@ def main():
             refuse(f"unreadable: {rel}: {e}")
         for n, span, tail, target in spans(body, targets):
             if not span.startswith("rg "):
+                continue
+            cut = truncation(span)
+            if cut:
+                findings.append((rel, n, f"piped through `{cut}`: a count or summary read "
+                                 f"off it measures the truncation window, not the sweep; "
+                                 f"drop the `{cut}`, or state the count off `| wc -l` — "
+                                 f"`{span}`"))
                 continue
             parsed = argv_of(span)
             if parsed is None:
