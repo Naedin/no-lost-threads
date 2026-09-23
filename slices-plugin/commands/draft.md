@@ -24,7 +24,7 @@ command carves before it promotes.
 ## 0. Config
 
 Read `.claude/slices.json` for `inboxDir` and `plansDir` (bootstrap as in
-`/slices:capture` if absent — same file, same one question), and for three optional
+`/slices:capture` if absent — same file, same one question), and for four optional
 fields. `draftDir` is where §2 writes the new plan — a repo whose drafted plans live in
 a subdirectory (`Plans/active/drafted`) sets it, and `plansDir` stays the root the §1
 sweep covers; absent, the plan is written in `plansDir`. `planTemplate` is a path to an
@@ -38,6 +38,45 @@ adopter-owned markdown file of **section-filling rules** — how this repo enume
 states, what its test plan must route through, which data types trigger a compatibility
 check. Read it before §2 and apply it when filling the template's local sections. An
 unreadable path is narrated and the sections are filled from their placeholders alone.
+The fourth, `deleteCommand`, routes every delete this command performs through an
+adopter-owned tool (below).
+
+### Every delete
+
+This command deletes docs at four sites: §1's already-closed stub and near-duplicate
+loser, §3's promoted stub, §4's MIS-CARVED plan and spin-offs. With no `deleteCommand`,
+each is a plain `git rm` (or removing the file, when it was never tracked). With one set,
+**none is ever bare**:
+
+```json
+"deleteCommand": {
+  "withTarget": "scripts/rm-doc.sh {doc} --to {target} --apply",
+  "noTarget": "scripts/rm-doc.sh {doc} --unlink --apply"
+}
+```
+
+- **The target.** Each site names the doc that absorbs the deleted one's references:
+  the plan for a promotion, the survivor for a near-duplicate, the restored stub for the
+  MIS-CARVED plan and each spin-off, and for an already-closed stub the closer's plan when
+  a plan under `plansDir` closed it — none when a commit or source did. A site with a
+  target runs `withTarget`, one without runs `noTarget`, with `{doc}` and `{target}`
+  substituted as repo-root-relative paths, run from the repo root. A site whose key is
+  absent stops there and names the missing key; a delete with a target never runs
+  `noTarget`.
+- **Stage first.** The doc and the target are `git add`ed whole before the command runs —
+  the plan once written, a survivor once the loser's content is folded in, a restored stub
+  once its reframing is folded — since a tool that repoints references reads the index.
+- **The command owns the references.** With a target it repoints every inbound reference
+  at the target, so §1's near-duplicate repoint is its job, not a hand edit. Its output is
+  carried into the run's report whatever the exit: a list of mentions it left for review
+  is walked like any other finding.
+- **Its result is honoured.** Exit 0 with `{doc}` gone from the index and the tree is the
+  delete done, its rewrites part of this change. Exit 0 with the doc still present means
+  the command did not delete — a dry-run default without its apply flag — and the run
+  stops and says so. Any other exit stops the draft at that site: surface the command's
+  output verbatim, since the references it refused on are the finding, and report the
+  state it left — what was written, what was not deleted. Never fall back to a bare
+  delete.
 
 ## 1. Audit the premise before drafting on it
 
@@ -55,11 +94,12 @@ verdicts:
 
 - **Still real** → carry on.
 - **Already closed** → report what closed it (the commit, the plan, the code that now does
-  it), delete the stub, write no plan.
+  it), delete the stub (§0, *Every delete*), write no plan.
 - **Partly closed** → draft the remaining increment only, and say which part had landed.
 - **Near-duplicate** → consolidate before drafting: pick the better-framed survivor, fold
   in anything only the loser holds, repoint every inbound link at the survivor, delete the
-  loser, then draft the survivor. Never leave the loser sitting.
+  loser (§0 — with `deleteCommand` set, its delete onto the survivor does the repoint),
+  then draft the survivor. Never leave the loser sitting.
 
 Two more axes, on the surviving claims. **Feasibility:** trace the mechanism end to end
 in the source — "X completes via Y" is a claim, walk it. **Sequencing:** do not inherit
@@ -232,7 +272,8 @@ migrates, and a draft-time row is re-run rather than re-hunted.
 
 ## 3. Promote — delete the stub
 
-The stub is deleted in the same change that creates the plan. Provenance rides in
+The stub is deleted in the same change that creates the plan, once the plan is written
+— with `deleteCommand` set, onto the plan as its target (§0). Provenance rides in
 the plan (one line naming the stub it came from); the low-trust artifact doesn't.
 Amend the stub instead only when drafting revealed the premise needs reframing —
 that's a capture update, not a promotion.
@@ -248,9 +289,10 @@ without being asked; a plan is not done drafting until a fresh context has tried
 it. Invoke it as a skill; if the harness cannot load it that way, follow
 `${CLAUDE_PLUGIN_ROOT}/commands/check.md` directly — the same plugin root this command
 runs from, never an installed copy elsewhere on disk, so the check that runs is the one
-this draft shipped with. If the check returns **MIS-CARVED**, the plan does not stand: restore the stub with
-the check's reframing folded in, delete the plan and any spin-offs that only made sense
-under the carve, and say so — the stub is the tracker again.
+this draft shipped with. If the check returns **MIS-CARVED**, the plan does not stand: restore the stub from the
+last commit that carries it, with the check's reframing folded in, delete the plan and any
+spin-offs that only made sense under the carve — each onto the restored stub (§0) — and
+say so: the stub is the tracker again.
 When a `planTemplate` was used and an invariant had to be auto-emitted, a marker was
 ignored, or a duplicate spelling was written, say so in one line each, so the adopter
 learns their template has a gap to fill.

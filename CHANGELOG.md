@@ -207,6 +207,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
 - **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
 
+## slices [0.5.0] — 2026-09-22
+
+### Contract
+
+- **`deleteCommand`** in `.claude/slices.json` is optional. It routes all four of `/slices:draft`'s deletes (the promoted stub, an already-closed stub, a near-duplicate's loser, and a MIS-CARVED plan with its spin-offs) through an adopter-owned tool. The field takes two forms: `withTarget`, run with `{doc}` and `{target}`, and `noTarget`, run with `{doc}` alone. The target is the doc that absorbs the references: the plan, the survivor, the restored stub, or the closer's plan when a shipped plan closed the stub. Both docs are staged before the command runs, and with a target the command owns the near-duplicate repoint. Exit 0 with the doc gone is the delete done. Exit 0 with the doc present stops the draft, since the command did not delete. Any other exit stops the draft at that site with the command's output verbatim. Once the field is set, nothing falls back to a bare delete, and a site whose form is missing stops. MIS-CARVED restores the stub from the last commit that carries it. Absent the field, every delete is a plain `git rm`, as before. Measured on the reference adopter: the promotion step named no delete tool and the brief could not reach it, so its wrapper carried the delete in the argument it passes `/slices:draft`, and a bare delete had left dangling links in its archive, which its link lint does not read. Adopter-side edit, on the reference adopter once its `scripts/rm-doc.sh` is on master: add `deleteCommand` (`withTarget` `scripts/rm-doc.sh {doc} --to {target} --apply`, `noTarget` `scripts/rm-doc.sh {doc} --unlink --apply`) to `.claude/slices.json`; drop the deletion clause from `/plan-draft` §3's argument and the paragraph after it; point `/plan-draft` §2's Provenance bullet at the config.
+
 ## slices [0.4.0] — 2026-09-22
 
 ### Contract

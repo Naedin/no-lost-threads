@@ -157,6 +157,30 @@ markdown file and the drafter applies it:
 A section whose placeholder names another writer, or says to omit it at draft time, is
 carried through or omitted as told.
 
+### Deleting through your own tool — `deleteCommand`
+
+`/slices:draft` deletes docs: a promoted stub, an already-closed stub, a near-duplicate's
+loser, and a MIS-CARVED plan with its spin-offs. A repo with a link-safe delete tool
+names it, in two forms: one for a delete whose references move to a doc that absorbs
+them, and one for a delete with nothing to absorb them:
+
+```json
+{ "inboxDir": "Plans/inbox", "plansDir": "Plans",
+  "deleteCommand": {
+    "withTarget": "scripts/rm-doc.sh {doc} --to {target} --apply",
+    "noTarget": "scripts/rm-doc.sh {doc} --unlink --apply" } }
+```
+
+`{doc}` and `{target}` are repo-root-relative paths. The target is the plan for a
+promotion, the survivor for a near-duplicate, the restored stub for a MIS-CARVED plan,
+and the closer's plan for a stub a shipped plan closed. Both docs are staged before the
+command runs. The command owns the inbound references, so the draft makes no hand
+repoint. Exit 0 with the doc gone is the delete done. Exit 0 with the doc still there
+means an apply flag is missing, and the draft stops. Any other exit also stops the draft
+with the command's output. Once the field is set, no delete falls back to a bare
+`git rm`, and a site whose form is missing stops. With no field set, deletes are plain
+`git rm`.
+
 ### Carrying your own gap classes — `checkBrief`
 
 A repo whose plans need checks beyond the built-in failure classes — its platform's
