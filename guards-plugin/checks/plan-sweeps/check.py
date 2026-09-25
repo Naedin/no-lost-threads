@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """plan-sweeps — every backticked `rg …` a plan carries runs, a malformed one is a finding,
-and a count the plan states beside a sweep must be the count the sweep finds.
+a count the plan states beside a sweep must be the count the sweep finds, and a listing
+under a claim that states a population must cite every hit.
 
   check.py --root DIR --paths PATH [--paths PATH]... [--exclude GLOB]...
 
@@ -38,6 +39,28 @@ in this check's own `.claude/guards.json` entry, beside `rung`:
 
   "plan-sweeps": { "rung": "block", "paths": ["Plans/active/*.md"],
                    "targetHeadings": ["Acceptance", "Exit conditions"] }
+
+Hits listed after a sweep are a third claim when the claim row states a population. A
+row reads `<claim> — `rg …` — <output>`; when the output opens, after the same leads, with
+a code span citing a file, every citation-shaped span in the rest of the block (list item,
+table row, or paragraph, up to the next `rg` span) is read: `File.ext:N` — `N` a line, an
+`N–M` range, a `,` or `/` list of either, the output line's text allowed after it — or
+`Stem:N`; `:N` or a bare `N` for lines in a file the block names; `File.ext` for the whole
+file; `Stem × N` for the whole file, stating N hits in it. The listing is compared only when
+the claim clause (the block before the sweep, back to its last `.` or `;`) or the output's
+prose (up to its first `.`) carries a quantifier or a number word — `only`, `exactly`,
+`all`, `every`, `none`, `both`, `one` … `twelve` — outside parentheses and hyphenated
+compounds: a listing under a witness row (`X exists — `rg …` — `F.swift:12``) claims one
+hit, not the population. A compared listing is read as the sweep's whole output: a line
+the sweep matches that no citation covers is a finding naming the first uncited hits, and
+so is a `Stem × N` whose file holds another number. The comparison is one-way — a range
+may span lines the sweep does not match — a hit in the plan carrying the sweep is its own
+text and is not counted, and a header hit need not be cited — a line declaring what the
+sweep matched (`func`, `var`, `let`, `case`, `struct`, `class`, `enum`, `protocol`, …
+whose name holds a match), a `///` doc comment, or a `// MARK:` line, which a census of
+callers rightly leaves out; a `Stem × N` still counts it. There is no comparison for a sweep that prints no lines
+(`--count`, `--files-with-matches`, `--files`, `-q`) or under a target heading. A count
+recalled with no sweep beside it is out of this check's reach.
 
 A sweep piped through `head` or `tail` — any stage of the pipeline, any argument form —
 is a finding, whatever follows it: a count or a summary read off that output describes
@@ -109,6 +132,29 @@ COUNT = re.compile(
     r"\**(?P<after>.*)$")
 # short flags that take a value: the letters after one in a cluster are the value
 TAKES_VALUE = set("efgtTmABCEMrjd")
+LEAD = re.compile(r"^\s*\**\s*(?:→|—|–|\(|:|=|returns|finds|yields)\s*")
+NUM = r"\d+(?:\s*[–-]\s*\d+)?"
+CITE = re.compile(rf"^(?P<name>[\w./+…-]*[\w…])?(?::(?P<spec>{NUM}(?:\s*[,/]\s*:?{NUM})*))?"
+                  r"(?::.*)?$")
+LINENO = re.compile(r"^\d+$")
+EXT = re.compile(r"\w\.[A-Za-z0-9]+$")
+STEM = re.compile(r"^[A-Za-z_]\w*$")
+TIMES = re.compile(r"^\s*[×x]\s*(\d+)\b")
+PAREN = re.compile(r"\([^()]*\)")
+ITEM = re.compile(r"^\s*(?:[-*+]\s|\d+[.)]\s|\|)")
+POPULATION = re.compile(r"(?<![\w-])(?:only|exactly|sole|solely|all|every|each|none|both|"
+                        r"no other|one|two|three|four|five|six|seven|eight|nine|ten|eleven|"
+                        r"twelve)(?![\w-])",
+                        re.IGNORECASE)
+DECL = re.compile(r"^\s*(?:@[\w.]+(?:\([^)]*\))?\s+)*(?:(?:public|private|fileprivate|internal|"
+                  r"open|package|static|class|final|override|mutating|nonmutating|"
+                  r"nonisolated|lazy|weak|unowned|indirect|convenience|required|async|"
+                  r"(?:private|public|internal|fileprivate)\(set\))\s+)*"
+                  r"(?:func|var|let|case|struct|class|enum|protocol|typealias|actor|init)\b"
+                  r"\s*(?P<name>[A-Za-z_]\w*)?")
+HEADER = re.compile(r"^\s*(?://\s*MARK:|///)")
+NO_LINES = (("c", ("--count", "--count-matches")), ("l", ("--files-with-matches",)),
+            (None, ("--files-without-match", "--files", "--json")), ("q", ("--quiet",)))
 
 
 def heading_text(line):
@@ -119,15 +165,45 @@ def heading_text(line):
     return COMMENT.sub("", m.group(1)).strip()
 
 
+def items(lines):
+    """For each line index, the (first, last) line indexes of the block it sits in — a
+    list item, a table row, or a paragraph, with its continuation lines — or None for a
+    blank, heading, or fenced line."""
+    out, fence, start = [None] * len(lines), None, None
+    for i, line in enumerate(lines):
+        m = FENCE.match(line)
+        if fence is not None:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                    and line.strip() == m.group(1):
+                fence = None
+            continue
+        if m:
+            fence, start = m.group(1), None
+        elif not line.strip() or heading_text(line) is not None:
+            start = None
+        else:
+            if start is None or ITEM.match(line):
+                start = i
+            out[i] = start
+    bounds = {}
+    for i, start in enumerate(out):
+        if start is not None:
+            bounds[start] = (start, i)
+    return [bounds[s] if s is not None else None for s in out]
+
+
 def spans(text, targets=()):
-    """(line number, span content, tail, target, following) for every code span outside
-    a fenced block: `tail` is the text after the span up to the next span on the line, or
-    the next line when nothing follows the span on its own; `following` is that next
-    span's content on the same line, else None; `target` is True under a heading
+    """(line number, span content, tail, before, rest, target, following) for every
+    code span outside a fenced block: `tail` is the text after the span up to the next
+    span on the line, or the next line when nothing follows the span on its own;
+    `following` is that next span's content on the same line, else None; `before` and
+    `rest` are the text of its block — list item, table row, or paragraph — before and
+    after the span, spans kept; `target` is True under a heading
     whose text begins with an entry of `targets`, where a count is the tree's state after
     the change and is not compared."""
     fence, target = None, False
     lines = text.splitlines()
+    block = items(lines)
     for i, line in enumerate(lines):
         n = i + 1
         m = FENCE.match(line)
@@ -142,16 +218,20 @@ def spans(text, targets=()):
                 continue
             if ALLOW in line:
                 continue
+            first, last = block[i] or (i, i)
+            after = " ".join(lines[i + 1:last + 1])
+            above = " ".join(lines[first:i] + [""])
             found = list(SPAN.finditer(line))
             for k, s in enumerate(found):
                 end = found[k + 1].start() if k + 1 < len(found) else len(line)
-                tail = line[s.end():end]
+                tail, rest = line[s.end():end], line[s.end():] + " " + after
+                before = above + line[:s.start()]
                 following = found[k + 1].group(2).strip() if k + 1 < len(found) else None
                 if k + 1 == len(found) and not tail.strip("* \t") and i + 1 < len(lines) \
                         and not FENCE.match(lines[i + 1]) and heading_text(lines[i + 1]) is None:
                     nxt = lines[i + 1]
                     tail = nxt[:SPAN.search(nxt).start()] if SPAN.search(nxt) else nxt
-                yield n, s.group(2).strip(), tail, target, following
+                yield n, s.group(2).strip(), tail, before, rest, target, following
         elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
                 and line.strip() == m.group(1):
             fence = None
@@ -294,6 +374,138 @@ def output_count(argv, via_wc, tail, following):
     if not (via_wc or has_flag(argv, "c", ("--count", "--count-matches"))):
         return None
     return "=", int(following), "lines"
+
+
+def citation(body, after):
+    """(name, ranges, count) for one citation-shaped span, or None. `File.ext:SPEC` or
+    `Stem:SPEC` names lines — SPEC a line, an `N–M` range, a `,` or `/` list of either,
+    optionally followed by the output line's text; `:SPEC` or a bare line number names
+    lines in the files the block names (name None); `File.ext` names the whole file;
+    `Stem` followed by `× N` names the whole file and states N hits in it."""
+    c = CITE.match(body)
+    if c and (c.group("spec") or (c.group("name") and EXT.search(c.group("name")))):
+        spec = c.group("spec")
+        ranges = None if spec is None else [bounds(p) for p in re.split(r"[,/]", spec)]
+        return c.group("name"), ranges, None
+    if LINENO.match(body):
+        return None, [(int(body), int(body))], None
+    n = TIMES.match(after)
+    if n and STEM.match(body):
+        return body, None, int(n.group(1))
+    return None
+
+
+def counts_a_population(before, rest):
+    """True when a claim row states a population: a quantifier or a number word in the
+    clause the sweep closes — the block's text before it, back to the last `.` or `;` —
+    or in the prose of the output after it, up to its first `.`; spans and parentheticals
+    are not read, so a word about something else in the block does not count."""
+    claim = re.split(r"[.;!?](?:\s|$)", SPAN.sub(" ", before))[-1]
+    out = re.split(r"[.!?](?:\s|$)", SPAN.sub(" ", LEAD.sub("", rest, count=1)))[0]
+    return any(POPULATION.search(PAREN.sub(" ", text)) for text in (claim, out))
+
+
+def cited(rest):
+    """The hits a sweep's block cites, [(name, ranges, count)], or [] when the text after
+    the sweep does not open with a lead and a citation naming a file. Every
+    citation-shaped span after it, up to the next `rg` span, is read."""
+    m = LEAD.match(rest)
+    if not m:
+        return []
+    text, out = rest[m.end():], []
+    for k, s in enumerate(SPAN.finditer(text)):
+        body = s.group(2).strip()
+        if body.startswith("rg "):
+            break
+        cite = citation(body, text[s.end():])
+        if k == 0 and (cite is None or cite[0] is None or s.start() != 0):
+            return []
+        if cite:
+            out.append(cite)
+    return out
+
+
+def bounds(part):
+    """(lo, hi) for `N`, `:N`, or `N–M`."""
+    ends = [int(x) for x in re.split(r"\s*[–-]\s*", part.strip().lstrip(":").strip())]
+    return ends[0], ends[-1]
+
+
+def names(path, name):
+    """True when a hit's path is the cited file: the name or a `/`-bounded suffix of the
+    path; a name without an extension is the file name without its own; an ellipsis
+    stands for any run of characters."""
+    if not EXT.search(name) and "…" not in name:
+        return posixpath.splitext(posixpath.basename(path))[0] == name
+    rx = ".*".join(re.escape(part) for part in name.split("…"))
+    return re.fullmatch(rf"(?:.*/)?{rx}", path) is not None
+
+
+def matches(stdout):
+    """(path, line, header) for each matching line in `rg --json` output. `header` is
+    True for a line that declares what the sweep matched — a declaration keyword whose
+    name holds a match (`public var minimumIsSeeded` under `IsSeeded`, never `let harvest
+    = learner.residualHarvest(`) — and for a `///` doc comment or `// MARK:` line."""
+    for raw in stdout.splitlines():
+        try:
+            event = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") != "match":
+            continue
+        data = event["data"]
+        path, text = data["path"].get("text"), data["lines"].get("text", "")
+        if path is None:
+            continue
+        header = bool(HEADER.match(text))
+        decl = DECL.match(text)
+        if decl and decl.group("name"):
+            lo = len(text[:decl.start("name")].encode())
+            hi = len(text[:decl.end("name")].encode())
+            header = header or any(m["start"] < hi and m["end"] > lo
+                                   for m in data.get("submatches", []))
+        yield posixpath.normpath(path), data["line_number"], header
+
+
+def cite_findings(argv, cites, own, cwd):
+    """(messages, error) for a sweep whose block cites hits: the hits no citation covers,
+    and each `Stem × N` whose file holds a different number. A hit in `own`, the plan
+    carrying the sweep, is its own text and is not counted. A header hit — a declaration
+    of what the sweep matched, a `///` or `// MARK:` line — need not be cited, and is
+    still counted in a `Stem × N`. No messages for a sweep that
+    prints no lines."""
+    if any(has_flag(argv, short, longs) for short, longs in NO_LINES):
+        return [], None
+    code, first, out = run(argv + ["--json"], cwd)
+    if code not in (0, 1):
+        what = first if code == -1 else f"rg exited {code}: {first or 'no message'}"
+        return [], f"{what} on the hit re-run"
+    found = {(p, n): header for p, n, header in matches(out) if p != own}
+    hits = list(found)
+    named = [name for name, _, _ in cites if name]
+
+    def covered(path, n):
+        for name, ranges, _ in cites:
+            files = [name] if name else named
+            if any(names(path, f) for f in files) and \
+                    (ranges is None or any(lo <= n <= hi for lo, hi in ranges)):
+                return True
+        return False
+    msgs = []
+    for name, _, count in cites:
+        if count is not None:
+            total = sum(1 for p, _ in hits if names(p, name))
+            if total != count:
+                msgs.append(f"states {count} in `{name}`, the sweep finds {total}")
+    missed = [h for h in hits if not found[h] and not covered(*h)]
+    if missed:
+        shown = ", ".join(f"`{p}:{k}`" for p, k in missed[:3])
+        more = f" and {len(missed) - 3} more" if len(missed) > 3 else ""
+        msgs.append(f"{len(missed)} of the {len(hits)} lines the sweep finds are not "
+                    f"cited: {shown}{more} — the block states a population, "
+                    f"so its listing is read as the whole output: cite every hit (a "
+                    f"comment with a note), or narrow the sweep to what the claim counts")
+    return msgs, None
 
 
 def sum_counts(stdout):
@@ -511,14 +723,14 @@ def main():
         refuse(f"GUARDS_TREE is not a directory: {TREE}")
 
     targets = config(root)["targetHeadings"]
-    findings, ran, skipped, compared, uncompared = [], 0, 0, 0, 0
+    findings, ran, skipped, compared, uncompared, listings = [], 0, 0, 0, 0, 0
     for f in files:
         rel = f.relative_to(root).as_posix()
         try:
             body = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as e:
             refuse(f"unreadable: {rel}: {e}")
-        for n, span, tail, target, following in spans(body, targets):
+        for n, span, tail, before, rest, target, following in spans(body, targets):
             if not span.startswith("rg "):
                 continue
             cut = truncation(span)
@@ -539,6 +751,12 @@ def main():
                 what = first if code == -1 else f"rg exited {code}: {first or 'no message'}"
                 findings.append((rel, n, f"{what} — `{span}`"))
                 continue
+            cites = [] if target or not counts_a_population(before, rest) else cited(rest)
+            if cites:
+                listings += 1
+                msgs, err = cite_findings(argv, cites, rel, tree)
+                for msg in ([err] if err else msgs):
+                    findings.append((rel, n, f"{msg} — `{span}`"))
             claim = stated(tail) or output_count(argv, via_wc, tail, following)
             if claim is None:
                 continue
@@ -557,7 +775,8 @@ def main():
     for rel, n, msg in findings:
         print(f"{rel}:{n}: {msg}")
     print(f"{ID}: {len(files)} files, {ran} sweeps run, {skipped} skipped, "
-          f"{compared} counts compared, {uncompared} targets not compared, "
+          f"{compared} counts compared, {listings} listings compared, "
+          f"{uncompared} targets not compared, "
           f"{len(findings)} findings", file=sys.stderr)
     if findings:
         sys.exit(1)

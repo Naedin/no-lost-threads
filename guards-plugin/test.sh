@@ -98,6 +98,15 @@ n="$(python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweep
 [ "$n" -eq 3 ] || { echo "FAIL  plan-sweeps: head/tail stages found $n of 3"; exit 1; }
 printf 'ok    %-52s\n' "plan-sweeps: a head/tail stage names the remedy"
 
+# plan-sweeps: a population claim's listing names its uncited hits; a `Stem × N` names
+# both numbers.
+out="$(python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fixtures/fail/cited-listing" \
+  --paths plan.md 2>/dev/null)"
+printf '%s' "$out" | grep -q '2 of the 4 lines the sweep finds are not cited: `src/a.swift:4`, `src/b.swift:1`' \
+  && printf '%s' "$out" | grep -q 'states 2 in `a`, the sweep finds 3' \
+  || { echo "FAIL  plan-sweeps: a listing finding names the uncited hits"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: a listing finding names the uncited hits"
+
 # The runner: config absent, malformed, unknown id, rungs, and a refused check.
 r="$tmp/runner"
 mkdir -p "$r/.claude"
