@@ -85,6 +85,12 @@ python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fix
   || { echo "FAIL  plan-sweeps: the count finding names both numbers"; exit 1; }
 printf 'ok    %-52s\n' "plan-sweeps: the count finding names both numbers"
 
+# plan-sweeps: a counting sweep's integer output span is the count it states.
+python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fixtures/fail/count-mismatch" \
+  --paths plan.md 2>/dev/null | grep -q "states 6 lines, the sweep finds 2 — \`rg -c 'let' src/a.swift\`" \
+  || { echo "FAIL  plan-sweeps: an output span after a counting sweep is compared"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: an output span after a counting sweep is compared"
+
 # plan-sweeps: every head/tail stage is a finding carrying the remedy, a bare path and a
 # later stage included.
 n="$(python3 "$here/checks/plan-sweeps/check.py" --root "$here/checks/plan-sweeps/fixtures/fail/truncated" \

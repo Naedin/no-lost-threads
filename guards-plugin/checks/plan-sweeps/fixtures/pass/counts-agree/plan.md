@@ -22,6 +22,11 @@
   - a line number is not a count — `rg -n 'let other' src/a.swift` — 2:let other = .fallback
   - a number with a trailing colon in prose — `rg -n 'let' src` — 9: nine is not a count either
   - a count not directly adjacent is not read — `rg -n 'let' src` finds the declarations, 40 of them
+  - a counting sweep's output span — `rg -c 'let' src/a.swift` — `2`
+  - per-file counts summed, in a span — `rg -c '\.fallback' src` — `3`
+  - through wc, in a span — `rg -n '\.fallback' src | wc -l` → `3`
+  - a listing's integer span is a line number — `rg -n 'let other' src/a.swift` — `2`
+  - output span not joined by a separator alone — `rg -c 'let' src/a.swift` gives `9` elsewhere
 
 ## Scope
 
@@ -34,3 +39,4 @@ Two spans on one line, each with its own count: `rg -n 'let' src` → 3 hits and
 
 1. Retired: `rg -n '\.fallback' src` → 0 hits, exit 1. Liveness pair: `rg -n 'let' src` → ≥1 hit.
 2. Files: `rg -ln '\.fallback' src` → 0 files.
+3. After the change: `rg -c 'let' src/a.swift` — `0`.

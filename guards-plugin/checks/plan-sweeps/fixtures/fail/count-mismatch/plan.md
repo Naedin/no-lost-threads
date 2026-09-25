@@ -8,3 +8,5 @@
 - through wc — `rg -n '\.fallback' src | wc -l` → 4
 - wrapped: `rg -n 'let' src`
   → 5 hits
+- the suite's size, read off a listing — `rg -c 'let' src/a.swift` — `6`
+- counted through wc, output in a span — `rg -n '\.fallback' src | wc -l` → `4`

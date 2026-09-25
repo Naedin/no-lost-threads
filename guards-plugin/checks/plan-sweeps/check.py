@@ -22,9 +22,14 @@ are bounds. When the span is the last thing on its line, the next line is read f
 count. A number followed by `:` is an output line (`— 173:    case started(`), one
 followed by `→` is a before/after pair (`(4 → 0)`), and neither is a count. A trailing
 `| wc -l` on the span is read as a line count of the sweep's output and the sweep runs
-without the pipe. The count is taken as the writer saw it: `--count` output summed,
-`--files-with-matches` output counted as files; otherwise the sweep is re-run with
-`--count` (`--count-matches` under `-o`) or `--files-with-matches`. A stated count the run
+without the pipe. A counting sweep — `-c`, `--count`, `--count-matches`, or through
+`| wc -l` — followed by `—`, `–`, `→`, `:`, or `=` and then a code span holding only an
+integer states that integer as its output — a ledger row's claim, command span, and
+output span — and is a line count, compared like any other. A line-listing sweep's
+integer span is an output line (a line number), never a count. The count is taken as the
+writer saw it: `--count` output summed, `--files-with-matches` output counted as files;
+otherwise the sweep is re-run with `--count` (`--count-matches` under `-o`) or
+`--files-with-matches`. A stated count the run
 does not reproduce is a finding naming both numbers. A count under a heading whose text
 begins with an entry of `targetHeadings` (default `Acceptance`) is a target — the state
 the tree will have after the change — so its sweep runs but its number is not compared;
@@ -92,6 +97,7 @@ ALLOW = f"guards-allow: {ID}"
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$")
 COMMENT = re.compile(r"<!--.*?-->")
 WC = re.compile(r"\s*\|\s*wc\s+-l\s*$")
+OUTPUT_GAP = re.compile(r"\s*[—–→:=]\s*")
 DEFAULTS = {"targetHeadings": ["Acceptance"]}
 LINES = ("hit", "hits", "match", "matches", "line", "lines", "site", "sites",
          "occurrence", "occurrences", "result", "results")
@@ -114,9 +120,10 @@ def heading_text(line):
 
 
 def spans(text, targets=()):
-    """(line number, span content, tail, target) for every code span outside a fenced
-    block: `tail` is the text after the span up to the next span on the line, or the
-    next line when nothing follows the span on its own; `target` is True under a heading
+    """(line number, span content, tail, target, following) for every code span outside
+    a fenced block: `tail` is the text after the span up to the next span on the line, or
+    the next line when nothing follows the span on its own; `following` is that next
+    span's content on the same line, else None; `target` is True under a heading
     whose text begins with an entry of `targets`, where a count is the tree's state after
     the change and is not compared."""
     fence, target = None, False
@@ -139,11 +146,12 @@ def spans(text, targets=()):
             for k, s in enumerate(found):
                 end = found[k + 1].start() if k + 1 < len(found) else len(line)
                 tail = line[s.end():end]
+                following = found[k + 1].group(2).strip() if k + 1 < len(found) else None
                 if k + 1 == len(found) and not tail.strip("* \t") and i + 1 < len(lines) \
                         and not FENCE.match(lines[i + 1]) and heading_text(lines[i + 1]) is None:
                     nxt = lines[i + 1]
                     tail = nxt[:SPAN.search(nxt).start()] if SPAN.search(nxt) else nxt
-                yield n, s.group(2).strip(), tail, target
+                yield n, s.group(2).strip(), tail, target, following
         elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
                 and line.strip() == m.group(1):
             fence = None
@@ -275,6 +283,17 @@ def stated(tail):
     else:
         return None
     return m.group("bound") or "=", int(m.group("n")), unit
+
+
+def output_count(argv, via_wc, tail, following):
+    """("=", n, "lines") when a counting sweep's next span is its integer output, joined
+    to it by a separator alone; else None. A listing's integer span is a line number."""
+    if following is None or not OUTPUT_GAP.fullmatch(tail) \
+            or not re.fullmatch(r"[0-9]+", following):
+        return None
+    if not (via_wc or has_flag(argv, "c", ("--count", "--count-matches"))):
+        return None
+    return "=", int(following), "lines"
 
 
 def sum_counts(stdout):
@@ -499,7 +518,7 @@ def main():
             body = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as e:
             refuse(f"unreadable: {rel}: {e}")
-        for n, span, tail, target in spans(body, targets):
+        for n, span, tail, target, following in spans(body, targets):
             if not span.startswith("rg "):
                 continue
             cut = truncation(span)
@@ -520,7 +539,7 @@ def main():
                 what = first if code == -1 else f"rg exited {code}: {first or 'no message'}"
                 findings.append((rel, n, f"{what} — `{span}`"))
                 continue
-            claim = stated(tail)
+            claim = stated(tail) or output_count(argv, via_wc, tail, following)
             if claim is None:
                 continue
             if target:

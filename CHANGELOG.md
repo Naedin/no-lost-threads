@@ -130,6 +130,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`/threads:retro`** hands the placer the key list from `view --keys`; the placer matches against it and greps the log only for a hit's detail. The escape hatch records a landing as a status line. The pending count greps the grammar's key shape.
 - **`/threads:process-review`** reads the log through the view, re-keys, compacts, then counts; maintains the log by appending status lines and running `compact`; bootstrap's header states the grammar and proposes `merge=union`. Both `guards` checks named as the gates.
 
+## guards [0.10.0] — 2026-09-24
+
+### Contract
+
+- **`plan-sweeps` reads a counting sweep's output span as the count it states.** A sweep that counts (`-c`, `--count`, `--count-matches`, or through `| wc -l`), followed by a separator alone (`—`, `–`, `→`, `:`, `=`) and a code span holding only an integer, is a ledger row with its output written out: the integer is compared with the count the sweep finds, and a mismatch is a finding naming both numbers. A line-listing sweep's integer span is a line number and is never read. Under a `targetHeadings` heading the number is a target, as before. The proposal to read any number in the same row or list item as a sweep is not taken. On the reference adopter's active plans, 30 of the 41 rows or list items carrying a sweep hold some number in their prose, and in 24 of those 30 no number equals the sweep's count: step numbers, line references, unrelated tallies. The output-span form compares 7 rows on the same tree with 0 findings, where 0.9.0 compared 1. The two escapes behind the proposal each stated a count taken from a listing cut off by `head`, where the plan never carried that `head` command: once as a subset count in a claim row, once in a Note with no sweep in the item at all. The second escape, written as the counting row `/slices:draft` now requires, is caught at commit: states 6, the sweep finds 21. Adopter-side edit: none.
+
 ## guards [0.9.0] — 2026-09-22
 
 ### Contract
@@ -206,6 +212,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
 - **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
+
+## slices [0.6.0] — 2026-09-24
+
+### Contract
+
+- **A count is a claim row of its own.** `/slices:draft`'s site-opening pass takes any number the plan states about a set of sites, whether in a Note, a test-plan line, an acceptance criterion's population, or a claim, from a command that counts (`rg -c`, `… | wc -l`), never from tallying a listing. The row's output is the bare number as a code span, and the prose that uses the count repeats that number. That is the form `guards` `plan-sweeps` re-measures at commit. Measured on the reference adopter: a plan's Note and test plan said "all six" tests, tallied off a listing cut off by `head`, where the suite holds 21. The plan had no row for the count, so only the cold check caught it. Adopter-side edit: none.
 
 ## slices [0.5.0] — 2026-09-22
 

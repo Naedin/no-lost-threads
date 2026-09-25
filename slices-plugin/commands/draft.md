@@ -120,7 +120,13 @@ the hits — `doc comments only`, `all 12 sites`, `none outside Tests` — is wr
 reading every hit, never a sample; a read that contradicts the summary rewrites the
 summary, never narrows the command to fit it. Those pairs are the plan's **claim rows** — `<claim> — \`<generating command>\` —
 <one line of its output>` — and §2 writes them into the ledger under a `drafted at` record
-line. A site the pass could not open is a row marked `unverified: <what would settle it>`,
+line. **A count is a row of its own.** A number the plan states about a set of sites,
+anywhere in it — a Note's "all six tests", a test plan's "the 21 existing cases", a claim's
+"two consumers" — comes from a command that counts (`rg -c`, `… | wc -l`), never from
+tallying a listing, and its row's output is the bare number as a code span:
+`<claim> — \`rg -c '@Test' <file>\` — \`21\``. The prose that uses the count repeats that
+number. A mechanical check can re-run a counting row and compare; a count tallied off a
+listing is measured by nothing but the listing that produced it. A site the pass could not open is a row marked `unverified: <what would settle it>`,
 never a sentence in the body. The rows are what `/slices:check` re-runs before it hunts,
 so write each to be re-run: the exact command, verbatim, against the current tree. The
 rule in prose failed to hold on its own; the rows are the same rule with a row to show
