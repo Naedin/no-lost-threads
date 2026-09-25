@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Gate for AC-2.
+exit 0

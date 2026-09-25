@@ -107,6 +107,26 @@ printf '%s' "$out" | grep -q '2 of the 4 lines the sweep finds are not cited: `s
   || { echo "FAIL  plan-sweeps: a listing finding names the uncited hits"; exit 1; }
 printf 'ok    %-52s\n' "plan-sweeps: a listing finding names the uncited hits"
 
+# comment-ordinals: every spelling of the three tags is one finding apiece, and a word
+# carrying the letters is none.
+co="$here/checks/comment-ordinals"
+n="$(python3 "$co/check.py" --root "$co/fixtures/fail/spellings" 2>/dev/null | grep -c 'numbered plan anchor')"
+[ "$n" -eq 6 ] || { echo "FAIL  comment-ordinals: spellings found $n of 6"; exit 1; }
+printf 'ok    %-52s\n' "comment-ordinals: each tag spelling is a finding"
+
+# comment-ordinals: a glob names each extensionless file it drops, since nothing in its
+# name says it went unread; a file another extension puts out of scope is not named.
+err="$(python3 "$co/check.py" --root "$co/fixtures/pass/glob-narrows" --paths '*' 2>&1 >/dev/null)"
+printf '%s' "$err" | grep -q '^comment-ordinals: data: not read' \
+  && ! printf '%s' "$err" | grep -q 'notes.md' \
+  || { echo "FAIL  comment-ordinals: a glob names a dropped extensionless file"; exit 1; }
+printf 'ok    %-52s\n' "comment-ordinals: a glob names a dropped extensionless file"
+
+# comment-ordinals: a literal naming a file whose comment syntax is unknown refuses,
+# where a glob reaching the same file drops it.
+says 2 "comment-ordinals: a literal it cannot read refuses" "no comment syntax known" \
+  python3 "$co/check.py" --root "$co/fixtures/pass/glob-narrows" --paths notes.md
+
 # The runner: config absent, malformed, unknown id, rungs, and a refused check.
 r="$tmp/runner"
 mkdir -p "$r/.claude"
@@ -353,6 +373,25 @@ printf '# D\n\nRun `scripts/gone.sh`; set `MYAPP_NOPE`.\n' > "$a/tree/doc.md"
 printf '# P\n' > "$a/tree/plan.md"
 git -C "$a/tree" add -A
 expect 1 "adapter: referents judges the index, not the export" hook "$a/tree"
+
+# comment-ordinals reads code the markdown export drops, so a dropped source refuses by
+# name, whether its extension or its shebang puts it in scope; exported, it is judged.
+mkrepo "$a/code"
+mkdir -p "$a/code/hooks"
+printf '// Clean.\n' > "$a/code/a.swift"
+printf '#!/usr/bin/env bash\n# Gate for AC-2.\n' > "$a/code/hooks/pre-commit"
+git -C "$a/code" add -A
+code() {  # code <config json> — stage it and run the hook
+  printf '%s' "$1" > "$a/code/.claude/guards.json"
+  git -C "$a/code" add -A
+  hook "$a/code"
+}
+says 2 "adapter: comment-ordinals refuses a dropped source" "dropped a.swift" \
+  code '{"export": ["*.md", ".claude/*"], "checks": {"comment-ordinals": {"rung": "block"}}}'
+says 2 "adapter: comment-ordinals refuses a dropped script" "dropped hooks/pre-commit" \
+  code '{"export": ["*.swift", ".claude/*"], "checks": {"comment-ordinals": {"rung": "block", "paths": ["*.swift", "hooks/*"]}}}'
+expect 1 "adapter: comment-ordinals judges an exported script" \
+  code '{"export": ["*.swift", "hooks/*", ".claude/*"], "checks": {"comment-ordinals": {"rung": "block", "paths": ["*.swift", "hooks/*"]}}}'
 
 # A linked worktree. A plain `git init` fixture cannot see either property below:
 # in one, every path collapses onto the primary, so a wrong one still resolves.

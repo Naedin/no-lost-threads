@@ -58,7 +58,7 @@ ok "view warns, compact refuses, on an unrepaired log"
 python3 "$rl" view --keys --root "$tmp" --log log.md 2>/dev/null | grep -q '^positive/c .*NOTED' || fail "NOTED key not in the closed section"
 ok "NOTED closes at write"
 
-# 6. a §4b artifact fix is a `Fixed:` continuation line: the key stays live, the check passes
+# 6. retro's own-artifact fix is a `Fixed:` continuation line: the key stays live, the check passes
 cat > "$tmp/fixed.md" <<'EOF'
 ## Entries
 
