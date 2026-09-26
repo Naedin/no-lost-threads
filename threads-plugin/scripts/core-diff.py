@@ -10,12 +10,19 @@ names the change, and eleven weeks later the doc is twice its size and bears on 
 which the economics block then reports as grounds to stop reading it, when the question
 was why. This script reads each core doc's own window, the range the marker stream reads.
 
+`windowOnlyDocs` is the second list: docs the review watches as churn but never opens
+whole at 0a — a direction or principles doc that bears on no ruling until a finding names
+it, when step 6 reads it as a keyed read. Both lists feed the summary; a path in both is a
+malformed config.
+
 Modes:
-  summary  (default) one header line, then one line per doc in `invariantDocs` order:
-             <path>\\t<words at since>\\t<words at head>\\t+<added> -<removed>\\t<commits>
+  summary  (default) one header line, then one line per doc, `invariantDocs` in order
+           and then `windowOnlyDocs` in order:
+             <path>\\t<words at since>\\t<words at head>\\t+<added> -<removed>\\t<commits>\\t<read>
            words are whitespace-split; added and removed count the words on the diff's
-           `+` and `-` lines; commits touch the doc in the range. A doc absent at the
-           range start reads `-` for its words there.
+           `+` and `-` lines; commits touch the doc in the range; read is `whole` for a
+           core doc and `window` for a window-only one. A doc absent at the range start
+           reads `-` for its words there.
   diff DOC the doc's diff over the range, as `git diff` prints it, for the hunk-by-hunk
            read: each hunk is classed rule (a predicate, a scope boundary, a named
            exception, a decision-relevant why) or prose (narration, a symbol enumeration,
@@ -27,11 +34,11 @@ The range is `<markTag>..HEAD` (`markTag` from `.claude/threads.json`, default
 pre-flight reads the remote's default branch). The header names the range and how many
 docs have a window:
 
-  core-diff process-review-mark (2026-09-08, ba7d3a35)..origin/main: 6 docs, 2 with a window
+  core-diff process-review-mark (2026-09-08, ba7d3a35)..origin/main: 6 docs (4 whole, 2 window), 2 with a window
 
-No `invariantDocs` prints one line saying so and exits 0: the command narrates and skips.
-Exit 2 when the config is malformed, the mark is missing without --since, a doc is not in
-`invariantDocs`, or git fails.
+Neither list configured prints one line saying so and exits 0: the command narrates and
+skips. Exit 2 when the config is malformed, the mark is missing without --since, a doc is
+in neither list, or git fails.
 """
 import argparse
 import json
@@ -97,11 +104,20 @@ def main():
 
     root = pathlib.Path(a.root or git(["rev-parse", "--show-toplevel"], None).strip()).resolve()
     cfg = config(root)
-    docs = cfg.get("invariantDocs") or []
-    if not isinstance(docs, list) or not all(isinstance(d, str) for d in docs):
-        refuse(".claude/threads.json: invariantDocs must be a list of paths")
+    lists = {}
+    for field in ("invariantDocs", "windowOnlyDocs"):
+        val = cfg.get(field) or []
+        if not isinstance(val, list) or not all(isinstance(d, str) for d in val):
+            refuse(f".claude/threads.json: {field} must be a list of paths")
+        lists[field] = val
+    both = [d for d in lists["windowOnlyDocs"] if d in lists["invariantDocs"]]
+    if both:
+        refuse(".claude/threads.json: in both invariantDocs and windowOnlyDocs: "
+               + ", ".join(both) + " (a doc is read whole or as its window, not both)")
+    core, window = lists["invariantDocs"], lists["windowOnlyDocs"]
+    docs = core + window
     if not docs:
-        print("core-diff: no invariantDocs configured — nothing to read as churn")
+        print("core-diff: no invariantDocs or windowOnlyDocs configured — nothing to read as churn")
         return
     since = a.since or cfg.get("markTag") or DEFAULT_MARK
     if subprocess.run(["git", "rev-parse", "--verify", "-q", f"{since}^{{commit}}"],
@@ -111,7 +127,7 @@ def main():
         if not a.doc:
             refuse("diff needs the doc's path")
         if a.doc not in docs:
-            refuse(f"{a.doc} is not in invariantDocs")
+            refuse(f"{a.doc} is not in invariantDocs or windowOnlyDocs")
         sys.stdout.write(git(["diff", f"{since}..{a.head}", "--", a.doc], root))
         return
 
@@ -125,9 +141,9 @@ def main():
         if diff.strip():
             windowed += 1
         rows.append(f"{d}\t{'-' if before is None else before}\t{'-' if after is None else after}"
-                    f"\t+{added} -{removed}\t{commits}")
-    print(f"core-diff {since} ({date}, {short})..{a.head}: {len(docs)} docs, "
-          f"{windowed} with a window")
+                    f"\t+{added} -{removed}\t{commits}\t{'whole' if d in core else 'window'}")
+    print(f"core-diff {since} ({date}, {short})..{a.head}: {len(docs)} docs "
+          f"({len(core)} whole, {len(window)} window), {windowed} with a window")
     print("\n".join(rows))
 
 

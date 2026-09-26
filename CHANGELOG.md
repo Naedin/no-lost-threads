@@ -9,7 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## threads [Unreleased]
+## threads [0.17.0] — 2026-09-26
+
+### Contract
+
+- **`windowOnlyDocs`** — a second ordered list in `.claude/threads.json`: docs the review reads as their window every run and never opens whole at step 0a; a finding that names one opens it at step 6. `core-diff.py` reads both lists, its rows carry a `whole` / `window` column and its header counts each, and a path in both lists refuses. The rule-only window of a direction doc is what the run needs from it; the whole read was the cost.
+- **`Caught: <gate> — <where the rule is>`**, a continuation line retro writes under an occurrence when the placer reports the rule present and the finding's whole cost was the gate's own catch; any cost past the gate leaves it untagged. `retro-log.py view --reached` is the ranking read: `--recurred` over the occurrences no gate caught, plus any key whose untagged occurrence follows a tagged one (`escaped <gate>` on its line). The count survives, the review stops writing an `ADJUDICATED` count-only line per window to say what the tag says, and the shape reaching implementation ranks regardless of count. The retro's ripeness nudge and the review's depth gate read `--reached`.
 
 ### Changed
 

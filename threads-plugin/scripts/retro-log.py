@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """retro-log — the retro log as an append-only stream, read through a view.
 
-  retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--live]
+  retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--live]
                     [--since YYYY-MM-DD] [--docs] [--arc NAME] [--arcs]
                     [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
@@ -18,6 +18,12 @@ The entry grammar (the guards `retro-log` check enforces the same one):
   <class>/<shape>[ (uncold)]                      key line, column 0
     YYYY-MM-DD | <source> | <text>                occurrence; continuation lines
       ...more text, any indent of two or more     follow it freely
+      Caught: <gate> — <where the rule is>        continuation the view reads: a gate
+                                                  caught this occurrence before it
+                                                  reached implementation, with its rule
+                                                  already present at the named place.
+                                                  Retro writes it; `--reached` drops such
+                                                  occurrences from the recurrence test
     LANDED <sha> — <where it landed, one line>    status line — one physical line,
                                                   however long; a wrapped one reads as
                                                   continuation prose
@@ -73,7 +79,11 @@ gate.
 The view's filters are the reads the review makes, so a large log is never read
 whole: `--held` (the last run's unanswered proposals), `--recurred` (two or more
 occurrences, or an occurrence after a closing status — the shape came back with its
-rule present, which ranks with the repeats), `--since DATE` (keys with an occurrence,
+rule present, which ranks with the repeats), `--reached` (the ranking read: `--recurred`
+counted over the occurrences no gate caught, so a shape a check keeps catching with its
+rule present is counted and never ranked — plus any key with a `Caught:` occurrence and
+one without, which reached past the gate that had caught it and ranks regardless of
+count; the key line says `escaped <gate>`), `--since DATE` (keys with an occurrence,
 status, or annotation dated on or after DATE), `--live` (no closed section). Filters
 compose; the summary line counts the whole log and names how many keys the filter
 shows. Without `--keys` a filtered view carries each shown key's detail, so the
@@ -113,6 +123,7 @@ STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?: (\d{4}
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DETAIL = re.compile(r"^  ")
+CAUGHT = re.compile(r"^\s{2,}Caught: (\S.*?)(?:\s+[—-]+\s.*)?$")
 HEADING = re.compile(r"^## ")
 PATH = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w-][\w.-]*\.(?:md|json|py|sh|ya?ml|toml|txt))"
                   r"(?![\w/])")
@@ -175,6 +186,21 @@ class Block:
     @property
     def dates(self):
         return [OCCURRENCE.match(l).group(1) for l in self.lines if OCCURRENCE.match(l)]
+
+    @property
+    def occurrences(self):
+        """(date, gate-or-None) per dated line; a `Caught:` continuation binds to the
+        dated line above it."""
+        out = []
+        for l in self.lines:
+            m = OCCURRENCE.match(l)
+            if m:
+                out.append([m.group(1), None])
+                continue
+            c = CAUGHT.match(l)
+            if c and out:
+                out[-1][1] = c.group(1).strip()
+        return [tuple(o) for o in out]
 
     @property
     def touched(self):
@@ -279,15 +305,43 @@ def state(blocks_for_key):
     return bs[-1].status if bs else None
 
 
-def recurred_after(blocks_for_key):
-    """The closing status an occurrence came after, or None."""
+def recurred_after(blocks_for_key, uncaught=False):
+    """The closing status an occurrence came after, or None. With `uncaught`, only an
+    occurrence no gate caught reopens."""
     closed = None
     for b in deciding(blocks_for_key):
         if b.status in CLOSED:
             closed = b.status
         elif not b.status and closed:
-            return closed
+            if not uncaught or any(g is None for _, g in b.occurrences):
+                return closed
     return None
+
+
+def caught_split(blocks_for_key):
+    """(uncaught dates, caught (date, gate)) across the key's occurrence blocks."""
+    free, caught = [], []
+    for b in blocks_for_key:
+        for d, g in b.occurrences:
+            (caught if g else free).append((d, g) if g else d)
+    return sorted(free), caught
+
+
+def reached(blocks_for_key):
+    """Under --reached: the key ranks when its uncaught occurrences recur, an uncaught
+    one follows a closing status, or an uncaught one follows a caught one in the stream
+    (it escaped the gate). Returns the escaped gate, True, or False."""
+    gate = None
+    for b in blocks_for_key:
+        for _, g in b.occurrences:
+            if g:
+                gate = g
+            elif gate:
+                return gate
+    free, _ = caught_split(blocks_for_key)
+    if len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True):
+        return True
+    return False
 
 
 def one_line(block):
@@ -388,7 +442,7 @@ def arc_tags(bs):
 
 
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
-                live_only=False, since=None, today=None, docs=False):
+                live_only=False, since=None, today=None, docs=False, past_gate=False):
     today = today or datetime.date.today()
     by_key = keys_in_order(blocks)
     if only:
@@ -404,6 +458,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         (closed if st in CLOSED else live).append(rec)
     live.sort(key=lambda r: (r[2] != "HELD", -len(r[3]), r[3][0] if r[3] else ""))
     n_recurred = sum(1 for r in live + closed if len(r[3]) >= 2)
+    n_gated = sum(1 for r in live + closed if len(r[3]) >= 2 and not reached(r[1]))
     n_closed = {s: sum(1 for r in closed if r[2] == s) for s in sorted(CLOSED)}
     n_held = sum(1 for r in live if r[2] == "HELD")
 
@@ -411,12 +466,16 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         key, bs, st, dates = rec
         if held and st != "HELD":
             return False
-        if recurred and len(dates) < 2 and not recurred_after(bs):
+        if past_gate:
+            if not reached(bs):
+                return False
+        elif recurred and len(dates) < 2 and not recurred_after(bs):
             return False
         if since and not any(d >= since for b in bs for d in b.touched):
             return False
         return True
 
+    recurred = recurred or past_gate
     filtered = held or recurred or since
     shown_live = [r for r in live if keep(r)]
     shown_closed = [] if (live_only or held) else [r for r in closed if keep(r)]
@@ -424,9 +483,11 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         return render_docs(shown_live + shown_closed)
     out = [f"{len(by_key)} keys · {len(live)} live · {n_held} held · "
            + " · ".join(f"{v} {k.lower()}" for k, v in n_closed.items())
-           + f" · {n_recurred} recurred (two or more occurrences)"]
+           + f" · {n_recurred} recurred (two or more occurrences"
+           + (f", {n_gated} only at a gate" if n_gated else "") + ")"]
     if filtered:
         crit = " ".join(f for f, on in (("--held", held), ("--recurred", recurred),
+                                        ("--reached", past_gate),
                                         (f"--since {since}", since)) if on)
         out.append(f"showing {len(shown_live) + len(shown_closed)} of {len(by_key)} keys ({crit})")
     out.append("")
@@ -444,8 +505,13 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         again = recurred_after(bs)
         if again:
             marker += f"  recurred after {again}"
+        free, caught = caught_split(bs)
+        count = f"×{len(dates)}" + (f" ({len(caught)} caught)" if caught else "")
+        esc = reached(bs)
+        if isinstance(esc, str):
+            marker += f"  escaped {esc}"
         marker += arc_tags(bs)
-        out.append(f"{key}{flag}  ×{len(dates)}  {span}{marker}")
+        out.append(f"{key}{flag}  {count}  {span}{marker}")
         if not keys_only:
             for b in bs:
                 out.extend(b.lines if not b.status else [one_line(b)])
@@ -499,6 +565,9 @@ def main():
     ap.add_argument("--held", action="store_true", help="view: HELD keys only, with their age")
     ap.add_argument("--recurred", action="store_true",
                     help="view: keys with two or more occurrences, or one after a closing status")
+    ap.add_argument("--reached", action="store_true",
+                    help="view: --recurred over the occurrences no gate caught (a `Caught:` line "
+                         "drops one), plus any key that escaped a gate that had caught it")
     ap.add_argument("--live", action="store_true", help="view: live keys only, no closed section")
     ap.add_argument("--docs", action="store_true",
                     help="view: the files the shown keys name, `<keys>\\t<path>`, instead of the keys")
@@ -536,7 +605,8 @@ def main():
         today = datetime.date.fromisoformat(args.today) if args.today else None
         sys.stdout.write(render_view(blocks, args.keys, args.key, held=args.held,
                                      recurred=args.recurred, live_only=args.live,
-                                     since=args.since, today=today, docs=args.docs))
+                                     since=args.since, today=today, docs=args.docs,
+                                     past_gate=args.reached))
         return 0
     if violations:
         refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])

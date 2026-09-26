@@ -128,6 +128,11 @@ It also reports whether that key **already exists in the log**. Act on that:
 A reported match is a **fact**, not the placer overruling you — it never touches the
 disposition itself. You revise your own call on new evidence.
 
+It also reports, per placement, whether the existing text **already states the rule** the
+finding violated (`rule present`). That, with your own knowledge of which gate caught the
+finding, is what licenses the `Caught:` line in §4a; the placer knows the doc and not the
+session, so it never writes the tag.
+
 Retro runs often, so the placer is deliberately speed-biased: it places against the homes
 you name, and flags `add (unconsolidated)` rather than proving no home exists anywhere.
 Carry that flag into the output — `/threads:process-review` is where those reconcile
@@ -258,6 +263,16 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   most**: the cited moment, the cost, the placement (`Placement: file §section — amend
   "…"`). What does not fit goes where the placement points; the `guards`
   `retro-log-size` check holds the cap.
+- **A finding a gate caught with its rule already present** → the ordinary key +
+  occurrence, with one continuation line `Caught: <gate> — <where the rule is>` (the
+  gate that stopped it: `/slices:check`, the guards, a review round; the rule's file and
+  section as the placer quoted it). Written only when both hold: the placer reports the
+  rule **present** at the placement (§3b), and the finding's whole cost was the gate's
+  own catch. Any cost spent past the gate — a maintainer question the finding raised, a
+  fix batch, a revision, code that ran — is the shape reaching implementation, and the
+  occurrence goes untagged so it ranks. The view counts the occurrence and `--reached` does not rank it, so the
+  review reads the count without re-ruling the doctrine each window; the next occurrence
+  no gate catches ranks the key regardless of count. It counts against the eight.
 - **A finding whose artifact was fixed under §4b** → the ordinary key + occurrence, with
   one continuation line `Fixed: <artifact> — <sha>`. It counts against the eight, so
   compress the moment or the cost to make room — never the placement. No status line:
@@ -369,9 +384,9 @@ Measure — three commands, all local:
   **Never count the whole file** — a whole-file count is the lifetime total, and reporting
   it as pending calls a clean review a backlog.
 - **Recurred since the mark** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view
-  --keys --recurred --since <the mark's date>` (`git log -1 --format=%ad --date=short
-  <markTag>`). A key at two or more occurrences, or back after its rule landed, is what
-  opens the review's depth gate.
+  --keys --reached --since <the mark's date>` (`git log -1 --format=%ad --date=short
+  <markTag>`). A key at two or more occurrences no gate caught, back after its rule
+  landed, or past a gate that had caught it, is what opens the review's depth gate.
 - **Volume and concentration** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py
   files`: the **organic** markers since the mark and how many files `trigger.concentration`
   or more of them touched. The review's own landings (the `Process-Review:` trailer) and

@@ -123,7 +123,8 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   its own output.
 - **It reads a small core, then only what its findings name.** `invariantDocs` is the
   handful of docs stating your repo's authority order and the review's own conventions,
-  read every run. Every other doc is opened whole only when a recurred key or a fired
+  read every run; `windowOnlyDocs` are the docs it watches as churn and opens only when a
+  finding names them. Every other doc is opened whole only when a recurred key or a fired
   ledger signal points at it (`retro-log.py view --recurred --docs` derives the list from
   the log), at the moment it bears; a doc the window's churn points at is read as its
   diff, and the placer is the only whole read of an edit's target. The core's own window

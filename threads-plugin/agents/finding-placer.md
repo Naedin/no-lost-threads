@@ -78,6 +78,10 @@ have, place it and name what's missing. The rule's content belongs to your calle
   the lines verbatim, a sentence the file wraps quoted wrapped. The landing is a text
   match against this quote; an unwrapped join or a paraphrase is the anchor that fails
   to match at landing time, which is the error this line exists to prevent
+- **`rule present`** when that text already states the rule the finding violated — the
+  finding is then an application failure, and your caller tags it so the log counts it
+  without ranking it. Say `rule absent` otherwise; a passage that is near the rule is
+  absent, and the placement says what it lacks
 - **the edit**, concrete enough to apply without re-deriving it
 - **the alternative rejected**, when you weighed one — a line, not a survey
 - **the key and any match**, when a retro log was named (§6)

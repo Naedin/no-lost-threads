@@ -81,6 +81,14 @@ convention in the moment. Fields:
   **keyed read**, derived per run from the findings themselves), and the placer reads it
   again for the edit; listing it here reads it once for nothing. Absent → the review has
   no input above the commit stream and says so.
+- `windowOnlyDocs` — optional, ordered: the docs the review watches as **churn and never
+  opens whole** at 0a — a product-direction or design-principles doc that outranks the
+  commit stream on the questions it states, and bears on none of this review's rulings
+  until a finding names it. `core-diff.py` reads both lists; step 0a reads these as their
+  window only, and a finding that names one opens it at step 6 as a keyed read. A path in
+  both lists is a malformed config. The move from `invariantDocs` to here is the answer
+  to a core doc that bore on nothing for two runs and is not the authority order or this
+  review's contract; it is never the answer for a doc that is.
 - `capabilityEvidencePath` — optional: a log of findings about *capabilities* — contracts
   and rungs rather than doc sections. Only relevant where the repo builds tooling it also
   uses. It is the one input that can yield a non-doc proposal; without it the funnel is
@@ -230,9 +238,14 @@ rebase.
    predicates. **A core doc that bore on nothing is grounds to ask why — a doc twice its
    size bearing on nothing is the prose finding above — never grounds to leave the
    core**; only a doc that has stopped stating the repo's authority order or this
-   review's contract leaves it. Every other doc this run opens is a **keyed read**
-   (step 6): named by a finding, read at the moment it bears, never here. No
-   `invariantDocs` → narrate and skip.
+   review's contract leaves it — to `windowOnlyDocs` when its churn still needs
+   watching, out of the config when it does not. A `windowOnlyDocs` entry is read here
+   **as its `core-diff.py` row and, when the row shows a window, its diff**, classed
+   the same way; a row at `+0 -0` has no diff to read, and opening the doc whole here is
+   the read the field exists to drop. Every other doc this run opens is a
+   **keyed read** (step 6): named by a finding, read at the moment it bears, never here.
+   **The output names each doc opened whole and each read as its window.** Neither list
+   → narrate and skip.
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
@@ -242,7 +255,16 @@ rebase.
      run's unanswered proposals, each with the date it was held and its age in days. This
      run reports them before anything new, oldest first.
    - `view --keys --recurred` — every key at two or more occurrences, the promotion the
-     log exists to make visible.
+     log exists to make visible. **Rank from `view --keys --reached`**: the same set with
+     the occurrences retro tagged `Caught:` (a gate caught the shape with its rule
+     present) left out of the test, so a shape a check keeps catching is counted and not
+     re-ruled, and any key whose untagged occurrence follows a tagged one ranks
+     regardless of count — the key line says `escaped <gate>`, and that is the shape
+     reaching implementation. The summary line carries both counts. The tag is retro's
+     and the stream takes no continuation under an entry already there, so an occurrence
+     written before retro wrote tags carries none: a gate-caught occurrence among those
+     is ruled count-only by one `ADJUDICATED` line, as before, and `--reached` reads only
+     the tags. Until the first retro that writes one, `--reached` equals `--recurred`.
    - `view --keys --since <the mark's date>` — what this window touched; the re-key sweep
      reads these plus the `(uncold)` ones.
    - `view --key <key>` — one key's detail, for the keys the reads above surfaced.
@@ -260,7 +282,9 @@ rebase.
      first, but the sweep is over all of them.
    - **Count occurrences per key** from the view. A key with two or more occurrences is
      the promotion the log exists to make visible — rank those first and carry the count
-     as the evidence.
+     as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
+     count-only: the `Caught:` tags are the ruling, and the count they build is the
+     evidence a rule is cited past, read when the key escapes.
    - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
      view, which is strictly better standing for ranking than the single session that set
      it — so re-rank freely, in either direction. Record the re-rank and the reason as an
@@ -293,7 +317,7 @@ rebase.
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
 expensive path and they are *conditional*, not automatic:
 
-- **Nothing recurred** in 0b or 0c (no key above one occurrence after re-keying), and no
+- **Nothing recurred** in 0b or 0c (no key `--reached` shows after re-keying), and no
   ledger signal fired → **stop and say so.** Report the pending captures, the tier, and
   the tally. A repo with no recurrence has bought the complete answer for the price of two
   greps; running the full funnel against it burns wall-clock and tokens to rediscover
@@ -462,8 +486,9 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   store). Below 100%, the funnel's only non-doc input is short by that many findings and
   every ranking here was made without them.
 - **The reads that sized the run** — name the `invariantDocs` you actually read and what
-  in them bore on this run, each doc's window from `core-diff.py` with its hunks classed
-  rule / prose, plus the depth-gate decision and what triggered it. A run that
+  in them bore on this run, the `windowOnlyDocs` read as their window, each doc's window
+  from `core-diff.py` with its hunks classed rule / prose, plus the depth-gate decision
+  and what triggered it. A run that
   stopped at the gate says so plainly: that is a complete review, not a truncated one.
 - **Tier narration** — which tier this run used; what the next tier up would buy.
 - **Tally** — all-time: `marker-stream.py count --all` (derived, never stored). The
@@ -587,7 +612,9 @@ as a check at the write than as an executor sub-agent between judgment and landi
     `ADJUDICATED <today's date> — <the ruling in one line>` on the key: its own entry,
     never continuation prose inside an occurrence. It changes neither the state nor the
     count, `compact` keeps it, and `view --key` shows it, so the next run reads the ruling
-    where the key is instead of in a commit body.
+    where the key is instead of in a commit body. A count-only ruling on a key whose
+    every occurrence carries `Caught:` is already written: `--reached` does not show it,
+    and an `ADJUDICATED` line restating that is the re-ruling the tag exists to stop.
   - **A judgment about several keys at once** — this stub field, that trailer, and the
     pinned form are one deferral converging; this deprecation and its reversal are one
     spelling arc; a layer proposed "to be proved out" and its later instances — is an

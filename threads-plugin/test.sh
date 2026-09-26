@@ -109,6 +109,47 @@ printf 'drift/i\n  2026-09-08 | s1 | once.\n  ADJUDICATED 2026-09-08 — inside 
 python3 "$check" --root "$tmp" --paths adj.md 2>/dev/null | grep -q 'status line inside an occurrence entry' || fail "an ADJUDICATED line inside an occurrence passed the check"
 ok "ADJUDICATED is transparent to state and count, kept by compact, refused inside an occurrence"
 
+# 3b. a `Caught:` continuation drops its occurrence from --reached; an uncaught occurrence after a caught one escapes
+cat > "$tmp/caught.md" <<'EOF3'
+## Entries
+
+unverified-claims/i
+  2026-09-23 | self | five defects at check. Cost: five defects.
+    Caught: /slices:check — draft-brief.md §Implementation Notes states the rule.
+unverified-claims/i
+  2026-09-24 | self | three more at check.
+    Placement: draft-brief.md §Acceptance Criteria — amend.
+    Caught: /slices:check — draft-brief.md §Acceptance Criteria states the rule.
+drift/j
+  2026-09-20 | self | caught once.
+    Caught: /pre-pr — land.md §4.
+drift/j
+  2026-09-25 | self | reached implementation this time.
+scope-leak/k
+  2026-09-01 | s1 | one.
+scope-leak/k
+  LANDED abc1234 — doc.md.
+scope-leak/k
+  2026-09-05 | s2 | back, but caught.
+    Caught: guards — doc.md §x.
+scope-leak/l
+  2026-09-01 | s1 | one.
+scope-leak/l
+  2026-09-02 | s2 | two.
+EOF3
+python3 "$check" --root "$tmp" --paths caught.md >/dev/null 2>&1 || fail "a Caught: continuation fails the retro-log check"
+python3 "$rl" view --keys --recurred --root "$tmp" --log caught.md 2>/dev/null > "$tmp/rec.out"
+grep -q '4 recurred (two or more occurrences, 2 only at a gate)' "$tmp/rec.out" || fail "summary does not count gate-only recurrences: $(head -1 "$tmp/rec.out")"
+grep -q '^unverified-claims/i  ×2 (2 caught)  2026-09-23..2026-09-24$' "$tmp/rec.out" || fail "--recurred dropped or mislabeled a caught key: $(cat "$tmp/rec.out")"
+python3 "$rl" view --keys --reached --root "$tmp" --log caught.md 2>/dev/null > "$tmp/rch.out"
+grep -q 'showing 2 of 4 keys (--recurred --reached)' "$tmp/rch.out" || fail "--reached did not hide the gate-only keys: $(cat "$tmp/rch.out")"
+grep -q '^drift/j  ×2 (1 caught)  2026-09-20..2026-09-25  escaped /pre-pr$' "$tmp/rch.out" || fail "an uncaught occurrence after a caught one is not marked escaped: $(cat "$tmp/rch.out")"
+grep -q '^scope-leak/l  ×2  ' "$tmp/rch.out" || fail "--reached dropped a plain recurrence"
+grep -q '^scope-leak/k' "$tmp/rch.out" && fail "a caught occurrence after LANDED ranked under --reached"
+python3 "$rl" compact --root "$tmp" --log caught.md 2>/dev/null || fail "compact refused a log with Caught: lines"
+python3 "$rl" view --keys --reached --root "$tmp" --log caught.md 2>/dev/null | grep -q 'showing 2 of 4 keys' || fail "compaction changed what --reached shows"
+ok "Caught: is a continuation the check accepts; --reached counts it and does not rank it; an escape ranks regardless of count"
+
 # 8. HELD keys carry their date and age; the filters are the review's reads
 cat > "$tmp/held.md" <<'EOF2'
 ## Entries
@@ -303,7 +344,7 @@ cd_="$here/scripts/core-diff.py"
 CD="$tmp/cd"; mkdir -p "$CD/.claude" "$CD/docs"
 git init -q -b main "$CD"; c() { git -C "$CD" "$@"; }
 c config user.email t@t; c config user.name t
-printf '{ "markTag": "process-review-mark", "invariantDocs": ["CLAUDE.md", "docs/core.md", "docs/new.md"] }\n' > "$CD/.claude/threads.json"
+printf '{ "markTag": "process-review-mark", "invariantDocs": ["CLAUDE.md", "docs/core.md"], "windowOnlyDocs": ["docs/new.md"] }\n' > "$CD/.claude/threads.json"
 printf 'one two three\n' > "$CD/CLAUDE.md"; printf 'rule a\nrule b\n' > "$CD/docs/core.md"
 c add -A; c commit -q -m "base"; c tag process-review-mark
 printf 'rule a\nrule b\nand a worked case restating rule a in seven more words\n' > "$CD/docs/core.md"
@@ -312,20 +353,23 @@ printf 'rule a\nand a worked case restating rule a in seven more words\n' > "$CD
 printf 'fresh doc\n' > "$CD/docs/new.md"
 c add -A; c commit -q -m "docs: drop rule b, add a doc"
 python3 "$cd_" --root "$CD" > "$CD/sum.out" 2>"$CD/err" || fail "core-diff summary failed: $(cat "$CD/err")"
-grep -q '^core-diff process-review-mark (20[0-9-]*, [0-9a-f]*)\.\.HEAD: 3 docs, 2 with a window$' "$CD/sum.out" || fail "header wrong: $(head -1 "$CD/sum.out")"
-grep -qx 'CLAUDE.md	3	3	+0 -0	0' "$CD/sum.out" || fail "an untouched doc did not read zero: $(cat "$CD/sum.out")"
-grep -qx 'docs/core.md	4	13	+11 -2	2' "$CD/sum.out" || fail "the grown doc's words were not counted: $(cat "$CD/sum.out")"
-grep -qx 'docs/new.md	-	2	+2 -0	1' "$CD/sum.out" || fail "a doc absent at the mark did not read -: $(cat "$CD/sum.out")"
+grep -q '^core-diff process-review-mark (20[0-9-]*, [0-9a-f]*)\.\.HEAD: 3 docs (2 whole, 1 window), 2 with a window$' "$CD/sum.out" || fail "header wrong: $(head -1 "$CD/sum.out")"
+grep -qx 'CLAUDE.md	3	3	+0 -0	0	whole' "$CD/sum.out" || fail "an untouched doc did not read zero: $(cat "$CD/sum.out")"
+grep -qx 'docs/core.md	4	13	+11 -2	2	whole' "$CD/sum.out" || fail "the grown doc's words were not counted: $(cat "$CD/sum.out")"
+grep -qx 'docs/new.md	-	2	+2 -0	1	window' "$CD/sum.out" || fail "a window-only doc absent at the mark did not read - and window: $(cat "$CD/sum.out")"
 python3 "$cd_" diff docs/core.md --root "$CD" 2>/dev/null | grep -q '^+and a worked case' || fail "diff did not print the doc's hunks"
 python3 "$cd_" diff docs/other.md --root "$CD" >/dev/null 2>"$CD/err2" && fail "diff of a non-core doc ran"
-grep -q 'not in invariantDocs' "$CD/err2" || fail "a non-core doc was not named: $(cat "$CD/err2")"
-python3 "$cd_" --since HEAD~1 --root "$CD" 2>/dev/null | grep -q '^docs/core.md	15	13	+0 -2	1$' || fail "--since did not replace the mark: $(python3 "$cd_" --since HEAD~1 --root "$CD" 2>/dev/null)"
+grep -q 'not in invariantDocs or windowOnlyDocs' "$CD/err2" || fail "a non-core doc was not named: $(cat "$CD/err2")"
+python3 "$cd_" --since HEAD~1 --root "$CD" 2>/dev/null | grep -q '^docs/core.md	15	13	+0 -2	1	whole$' || fail "--since did not replace the mark: $(python3 "$cd_" --since HEAD~1 --root "$CD" 2>/dev/null)"
 c tag -d process-review-mark >/dev/null
 python3 "$cd_" --root "$CD" >/dev/null 2>"$CD/err3" && fail "ran with no mark and no --since"
 grep -q 'no such rev: process-review-mark' "$CD/err3" || fail "a missing mark was not named: $(cat "$CD/err3")"
+printf '{ "markTag": "process-review-mark", "invariantDocs": ["CLAUDE.md"], "windowOnlyDocs": ["CLAUDE.md"] }\n' > "$CD/.claude/threads.json"
+python3 "$cd_" --since HEAD~1 --root "$CD" >/dev/null 2>"$CD/err4" && fail "ran with a doc in both lists"
+grep -q 'in both invariantDocs and windowOnlyDocs: CLAUDE.md' "$CD/err4" || fail "a doc in both lists was not named: $(cat "$CD/err4")"
 printf '{ "markTag": "process-review-mark" }\n' > "$CD/.claude/threads.json"
-python3 "$cd_" --root "$CD" 2>/dev/null | grep -q 'no invariantDocs configured' || fail "no invariantDocs did not say so"
-ok "core-diff: per-doc words at mark and head, added/removed, commits; diff; --since; a missing mark and a non-core doc refuse"
+python3 "$cd_" --root "$CD" 2>/dev/null | grep -q 'no invariantDocs or windowOnlyDocs configured' || fail "no invariantDocs did not say so"
+ok "core-diff: per-doc words at mark and head, added/removed, commits, whole/window; diff; --since; a missing mark, a doc in neither list, and one in both refuse"
 
 # ---- scripts/land-process-commit.py: one commit lands on the default branch through the
 # adopter's own pre-commit hook, the sha printed is the remote's, the slice branch drops
