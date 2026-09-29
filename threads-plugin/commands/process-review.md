@@ -1,7 +1,7 @@
 ---
 description: Cross-session process review — reads accumulated process-change commits (and, as a fallback, process-doc churn) across sessions to surface reconciliation / structural opportunities the per-session retro structurally can't see, and sweeps stable process/workflow docs for negative-space drift the churn signal can't. First run bootstraps read-only; never auto-fires.
 argument-hint: "(no args; bootstraps on first run, else reviews since the process-review-mark tag)"
-allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent
+allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent, SendMessage
 ---
 
 # /threads:process-review — the cross-session process review
@@ -98,6 +98,10 @@ convention in the moment. Fields:
   a question the review asks **once**: set the path, or record `null` here to decline, and
   the question is not asked again. Unset in such a repo, the review's only non-doc input is
   missing and every upstream-bound finding has no store.
+- `adherenceRules` — optional: prose rules sampled every run (step 0d), each an `id`, a
+  whole-tree `population` command emitting `path:line:` hits, the adopter's `judgePrompt`
+  path, a draw size `n`, and a `weighting` (`window` or `uniform`); the schema is
+  [`commands/adherence.md`](adherence.md). Absent → step 0d narrates and skips.
 - `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
   short name passed through as given. Absent, the agent file's own pin applies.
 - `markTag` — default `process-review-mark`.
@@ -216,8 +220,8 @@ rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a r
 conflict or a red gate; a run that has spent its budget is not thrown away for a clean
 rebase.
 
-0. **Free — the reads that size the run.** All three are cheap; none is optional where
-   configured. Do them before looking at a single commit.
+0. **Free — the reads that size the run.** 0a–0c are cheap; none is optional where
+   configured. Do them before looking at a single commit; 0d, the one paid step, follows.
 
    **0a — the core** (`invariantDocs`, in order). Read them whole. You are about to
    propose changes to how this repo works, and its stated invariants outrank anything
@@ -314,14 +318,25 @@ rebase.
    0c's key counts look complete whether or not the placements arrived, so a review that
    reads only 0c reports a healthy log and a short one identically.
 
+   **0d — adherence sample** (`adherenceRules`). Not free: two sub-agent passes per rule.
+   It runs before the gate anyway, every run, because its line is a per-window trend and a
+   window skipped is a point lost for good. Per rule, run the procedure in
+   `${CLAUDE_PLUGIN_ROOT}/commands/adherence.md` §Procedure — draw over this run's window
+   (`--head` the default branch the checkout now sits at), one judge checked by `flags`,
+   one refuter over its flags, `verdicts`, `tally`, `recur`; an agent whose output is
+   refused twice fails that rule's run and records no line. Carry the `Adherence:` line to the record and
+   the marker commit body; a shape `recur` calls **routed** (two or more windows) is a
+   recurrence for the gate below and a candidate like any other, classed `tooling` for a
+   lint class or `amend` for a review-prompt line. Absent → narrate and skip.
+
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
 expensive path and they are *conditional*, not automatic:
 
-- **Nothing recurred** in 0b or 0c (no key `--reached` shows after re-keying), and no
-  ledger signal fired → **stop and say so.** Report the pending captures, the tier, and
-  the tally. A repo with no recurrence has bought the complete answer for the price of two
-  greps; running the full funnel against it burns wall-clock and tokens to rediscover
-  that. This is the expected outcome in a young or healthy repo, not a failed run.
+- **Nothing recurred** in 0b, 0c, or 0d (no key `--reached` shows after re-keying, no
+  shape routed), and no ledger signal fired → **stop and say so.** Report the pending
+  captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
+  the complete answer for the price of step 0; running the full funnel against it burns
+  wall-clock and tokens to rediscover that. This is the expected outcome in a young or healthy repo, not a failed run.
 - **Something recurred, or a ledger signal fired** → run the funnel, scoped to what fired.
 - **A bare `deep` argument** overrides the gate: the maintainer asked for the sweep.
 
@@ -490,6 +505,13 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   from `core-diff.py` with its hunks classed rule / prose, plus the depth-gate decision
   and what triggered it. A run that
   stopped at the gate says so plainly: that is a complete review, not a truncated one.
+- **Adherence** (where `adherenceRules` exists) — per rule, the `Adherence:` line, every
+  block's judge and final verdict with its citation, and `recur`'s routed and recorded
+  shapes. The line rides the marker commit body beside `Tally:` and `Economics:`, where
+  `git log --format=%b --grep '^Process-Review: ' | grep '^Adherence: <id>'` reads the
+  trend; it is per-window state, so never the ledger. **The rate is a lower bound** —
+  only non-TRUE verdicts are re-checked — and a flat trend reads "no more drift the judge
+  can see", never "no drift".
 - **Tier narration** — which tier this run used; what the next tier up would buy.
 - **Tally** — all-time: `marker-stream.py count --all` (derived, never stored). The
   organic figure is the headline; the review and bookkeeping figures say how much of

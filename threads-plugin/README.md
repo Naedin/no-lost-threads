@@ -131,6 +131,16 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   is read too (`scripts/core-diff.py`): a core doc grows through squashes no marker
   names, and one that doubled while bearing on nothing is a trim finding, never a reason
   to stop reading it.
+- **It samples whether a prose rule holds.** A lint proves itself at its gate; a rule an
+  agent is supposed to apply — *a comment states only what the code makes true* — has no
+  gate. A rule declared under `adherenceRules` (a whole-tree population command, your judge
+  prompt, a draw size, `window` or `uniform` weighting) is sampled every review: a seeded
+  draw of distinct blocks, one fresh-context judge ruling each TRUE / DRIFTED / HISTORY
+  against the tree, one refuter re-checking every flag (the script checks each agent's
+  output; nothing is hand-assembled), and an `Adherence:` line in the marker commit — a
+  trend one `git log` reads, a lower bound since only flags are re-checked. A drift shape seen in two windows becomes a review candidate.
+  **`/threads:adherence`** runs the same sample standalone, landing nothing: a baseline
+  over one window, or a calibration over a fixed block list in a tree pinned to a commit.
 - **It closes with its own economics**, as questions to you: what it read against what
   bore on a ruling, how much of the marker stream was its own weight, how many keys it
   carried against how many recurred, and its own landing errors — and the standing
@@ -173,6 +183,10 @@ threads-plugin/
   commands/process-review.md      The /threads:process-review command — bootstrap, funnel, output
   agents/retro-auditor.md         Read-only sub-agent for the fresh-context audit (its brief)
   agents/finding-placer.md        Read-only sub-agent that sites findings in your process docs (both commands)
+  commands/adherence.md           The /threads:adherence command — a declared rule's sample (a review phase, or standalone)
+  agents/adherence-judge.md       Read-only sub-agent that rules each drawn block against the tree
+  agents/adherence-refuter.md     Read-only sub-agent that tries to show each flagged block true
+  scripts/adherence.py            The sample's draw, its agents' output checked, its tally line, each shape's windows
   scripts/extract-record.py       Transcript → compact timeline (used by the fresh-context audit)
   scripts/retro-log.py            The retro log's view (state and counts per key) and compaction
   scripts/marker-stream.py        The marker-commit stream since the mark, classified organic / review / bookkeeping

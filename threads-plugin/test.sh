@@ -371,6 +371,134 @@ printf '{ "markTag": "process-review-mark" }\n' > "$CD/.claude/threads.json"
 python3 "$cd_" --root "$CD" 2>/dev/null | grep -q 'no invariantDocs or windowOnlyDocs configured' || fail "no invariantDocs did not say so"
 ok "core-diff: per-doc words at mark and head, added/removed, commits, whole/window; diff; --since; a missing mark, a doc in neither list, and one in both refuse"
 
+# ---- scripts/adherence.py: a declared rule's seeded draw of distinct blocks, the window as
+# the weighting, the tally's line with judge FPs, and a shape's windows read by the trailer.
+ad="$here/scripts/adherence.py"
+AD="$tmp/ad"; mkdir -p "$AD/.claude" "$AD/src"
+printf '# judge\n' > "$AD/judge.md"
+git init -q -b main "$AD"; a_() { git -C "$AD" "$@"; }
+a_ config user.email t@t; a_ config user.name t
+cat > "$AD/.claude/threads.json" <<'EOF4'
+{ "markTag": "process-review-mark", "adherenceRules": [
+  { "id": "comment-truth", "population": "grep -rnE '^[[:space:]]*//' src", "judgePrompt": "judge.md", "n": 20, "weighting": "uniform" },
+  { "id": "windowed", "population": "grep -rnE '^[[:space:]]*//' src", "judgePrompt": "judge.md", "n": 20, "weighting": "window" },
+  { "id": "two", "population": "grep -rnE '^[[:space:]]*//' src", "judgePrompt": "judge.md", "n": 2, "weighting": "uniform" },
+  { "id": "reversed", "population": "grep -rnE '^[[:space:]]*//' src | sort -r", "judgePrompt": "judge.md", "n": 2, "weighting": "uniform" },
+  { "id": "pathless", "population": "grep -nE '^[[:space:]]*//' src/b.c", "judgePrompt": "judge.md", "n": 2, "weighting": "uniform" } ] }
+EOF4
+printf '// one\n// two\n// three\nint a;\n\n// four\n// five\nint b;\n' > "$AD/src/a.c"
+printf 'int c;\n// six\nint d;\n' > "$AD/src/b.c"
+a_ add -A; a_ commit -q -m base; a_ tag process-review-mark
+printf 'int c;\n// six, changed\nint d;\n' > "$AD/src/b.c"; a_ add -A; a_ commit -q -m "feat: touch b"
+python3 "$ad" draw --rule comment-truth --seed 7 --root "$AD" > "$AD/m1" 2>"$AD/err" || fail "adherence draw failed: $(cat "$AD/err")"
+head -1 "$AD/m1" | grep -qx 'adherence comment-truth: uniform · pop 2f/6l · n 3 · seed 7' || fail "a population under n was not sampled whole: $(head -1 "$AD/m1")"
+grep -qx '== src/a.c:1-3' "$AD/m1" && grep -qx '== src/a.c:6-7' "$AD/m1" && grep -qx '== src/b.c:2-2' "$AD/m1" || fail "blocks not expanded to their spans: $(grep '^==' "$AD/m1")"
+python3 "$ad" draw --rule two --seed 7 --root "$AD" 2>/dev/null > "$AD/m2"; python3 "$ad" draw --rule two --seed 7 --root "$AD" 2>/dev/null > "$AD/m3"
+cmp -s "$AD/m2" "$AD/m3" || fail "one seed drew two manifests"
+[ "$(grep -c '^== ' "$AD/m2")" -eq 2 ] || fail "n 2 did not draw two distinct blocks from six hits in three blocks: $(grep '^==' "$AD/m2")"
+[ "$(grep '^== ' "$AD/m2" | sort -u | wc -l | tr -d ' ')" -eq 2 ] || fail "a block was drawn twice"
+python3 "$ad" draw --rule reversed --seed 7 --root "$AD" 2>/dev/null | grep '^== ' | cmp -s - <(grep '^== ' "$AD/m2") || fail "the draw depends on the population's output order (rg's is not stable)"
+python3 "$ad" draw --rule windowed --seed 7 --root "$AD" > "$AD/m4" 2>"$AD/err" || fail "windowed draw failed: $(cat "$AD/err")"
+head -1 "$AD/m4" | grep -q '^adherence windowed: window process-review-mark (20[0-9-]*, [0-9a-f]*)\.\.HEAD · pop 1f/1l · n 1 · seed 7$' || fail "window weighting kept files outside the window: $(head -1 "$AD/m4")"
+mkdir -p "$tmp/adplain"; cp -R "$AD/src" "$AD/.claude" "$AD/judge.md" "$tmp/adplain/"
+GIT_CEILING_DIRECTORIES="$tmp" python3 "$ad" draw --rule windowed --seed 7 --root "$tmp/adplain" >/dev/null 2>"$AD/err" && fail "a window drew from a tree that is not a checkout"
+grep -q 'not a git checkout.*--repo' "$AD/err" || fail "a window over a plain tree did not name --repo: $(cat "$AD/err")"
+python3 "$ad" draw --rule windowed --seed 7 --root "$tmp/adplain" --repo "$AD" 2>"$AD/err" | cmp -s - "$AD/m4" || fail "--repo did not read the window from the repository and the files from --root: $(cat "$AD/err")"
+printf 'src/a.c:2\nsrc/a.c:3\nsrc/b.c:2-2\n' > "$AD/list"
+python3 "$ad" draw --rule comment-truth --blocks "$AD/list" --root "$AD" > "$AD/m5" 2>"$AD/err" || fail "--blocks draw failed: $(cat "$AD/err")"
+head -1 "$AD/m5" | grep -q ' · n 2 · seed -$' || fail "a fixed list did not dedupe to distinct blocks: $(head -1 "$AD/m5")"
+python3 "$ad" draw --rule pathless --root "$AD" >/dev/null 2>"$AD/err" && fail "a path-less population was accepted"
+grep -q 'not `path:line:`' "$AD/err" || fail "a path-less population was not named: $(cat "$AD/err")"
+python3 "$ad" draw --root "$AD" >/dev/null 2>"$AD/err" && fail "drew with five rules and no --rule"
+mv "$AD/judge.md" "$AD/judge.away"
+python3 "$ad" draw --rule comment-truth --seed 7 --root "$AD" >/dev/null 2>"$AD/err" && fail "drew with no judge prompt on disk"
+grep -q 'judge prompt .*judge.md: no such file' "$AD/err" || fail "a missing judge prompt was not named: $(cat "$AD/err")"
+python3 "$ad" draw --rule comment-truth --seed 7 --root "$AD" --judge-prompt "$AD/judge.away" 2>"$AD/err" | cmp -s - "$AD/m1" || fail "--judge-prompt did not stand in for a missing judgePrompt: $(cat "$AD/err")"
+grep -q "adherence: judge prompt $AD/judge.away" "$AD/err" || grep -q 'adherence: judge prompt .*judge.away$' "$AD/err" || fail "draw did not name the judge prompt it checked: $(cat "$AD/err")"
+mv "$AD/judge.away" "$AD/judge.md"
+ok "adherence draw: seeded and reproducible, distinct blocks, a small population whole, window weighting, --repo for a plain tree, a fixed list, a path-less population and a missing judge prompt refuse"
+
+printf 'src/a.c:1-3 DRIFTED DRIFTED count-over-hand-list\nsrc/a.c:6-7 HISTORY TRUE -\nsrc/b.c:2-2 TRUE TRUE -\n' > "$AD/v1"
+python3 "$ad" tally "$AD/m1" "$AD/v1" > "$AD/t1" 2>"$AD/err" || fail "tally failed: $(cat "$AD/err")"
+grep -qx 'Adherence: comment-truth 2/3 true · 1 drifted · 0 history · 1 judge FP · pop 2f/6l · seed 7 — shapes: count-over-hand-list src/a.c:1' "$AD/t1" || fail "tally line wrong: $(cat "$AD/t1")"
+head -2 "$AD/v1" > "$AD/v2"
+python3 "$ad" tally "$AD/m1" "$AD/v2" >/dev/null 2>"$AD/err" && fail "tally accepted a verdicts file missing a block"
+printf 'src/a.c:1-3 TRUE DRIFTED x\nsrc/a.c:6-7 TRUE TRUE -\nsrc/b.c:2-2 TRUE TRUE -\n' > "$AD/v3"
+python3 "$ad" tally "$AD/m1" "$AD/v3" >/dev/null 2>&1 && fail "tally accepted a TRUE verdict re-checked into a drift"
+printf 'src/a.c:1-3 DRIFTED DRIFTED -\nsrc/a.c:6-7 TRUE TRUE -\nsrc/b.c:2-2 TRUE TRUE -\n' > "$AD/v4"
+python3 "$ad" tally "$AD/m1" "$AD/v4" >/dev/null 2>&1 && fail "tally accepted a drift with no shape"
+ok "adherence tally: the line, an overturn as a judge FP, a missing block, a re-checked TRUE, and a shapeless drift refuse"
+
+# flags/verdicts: the agents' output is a checked input — one form, every block once, every
+# defect named in one refusal — and verdicts emits the file tally reads.
+cat > "$AD/j1" <<'EOF5'
+```text
+src/a.c:1-3  DRIFTED  count-over-hand-list  — "three backends": src/x.c:4 registers four
+  src/a.c:6-7	HISTORY	narrates-a-change  — "used to retry": no retry exists in src/a.c
+
+src/b.c:2-2  TRUE  -  — "six, changed": names nothing checkable
+```
+ruled 3: 1 TRUE, 1 DRIFTED, 1 HISTORY
+EOF5
+python3 "$ad" flags "$AD/m1" "$AD/j1" > "$AD/f1" 2>"$AD/err" || fail "flags refused a well-formed judge output: $(cat "$AD/err")"
+printf '%s\n' 'src/a.c:1-3  DRIFTED  count-over-hand-list  — "three backends": src/x.c:4 registers four' 'src/a.c:6-7	HISTORY	narrates-a-change  — "used to retry": no retry exists in src/a.c' | cmp -s - <(sort "$AD/f1") || fail "flags did not print exactly the non-TRUE lines: $(cat "$AD/f1")"
+printf 'src/a.c:1-3 TRUE - — holds\nsrc/a.c:6-7 TRUE - — holds\nsrc/b.c:2-2 TRUE - — holds\n' > "$AD/j0"
+[ -z "$(python3 "$ad" flags "$AD/m1" "$AD/j0")" ] || fail "flags printed a line when every block is TRUE, or refused a summary-less output"
+sed '1s/ TRUE - / TRUE holds-fine /' "$AD/j0" > "$AD/j3"
+python3 "$ad" flags "$AD/m1" "$AD/j3" 2>&1 >/dev/null | grep -q 'line 1 .*a TRUE verdict takes `-` as its shape, got `holds-fine`' || fail "flags accepted a TRUE verdict with a shape"
+cat > "$AD/j2" <<'EOF5'
+TRUE src/a.c:1-3
+TRUE · src/a.c:6-7 · - — holds
+DRIFTED  src/b.c:2-2  x  — reason
+src/a.c:6-7  DRIFTED  -  — claims four
+src/a.c:6-7  TRUE  -  — again
+Sources/a.c:1-3  TRUE  -  — holds
+src/b.c:2-2  TRUE  -  —
+ruled 3: 3 TRUE, 0 DRIFTED, 0 HISTORY
+EOF5
+python3 "$ad" flags "$AD/m1" "$AD/j2" >/dev/null 2>"$AD/err"; [ $? -eq 2 ] || fail "flags did not exit 2 on a drifted judge output"
+for want in 'line 1 `TRUE src/a.c:1-3`: no em dash' 'line 2 .*`·` is not a separator' 'line 3 .*starts with the verdict' 'line 4 .*a DRIFTED verdict names its shape as a kebab-case slug, got `-`' 'line 5 .*already ruled at line 4' 'line 6 .*`Sources/a.c:1-3` is not a manifest block — copy the key exactly: `src/a.c:1-3`' 'line 7 .*empty reason' 'missing `src/a.c:1-3`' 'line 8 .*disagrees with the lines' '9 defect(s)'; do
+  grep -q -- "$want" "$AD/err" || fail "flags refusal did not name: $want — got: $(cat "$AD/err")"
+done
+cat > "$AD/rf1" <<'EOF5'
+src/a.c:1-3  CONFIRMED  — src/x.c:4 registers four, re-read
+src/a.c:6-7  OVERTURNED  — states the present contract
+re-checked 2: 1 CONFIRMED, 1 OVERTURNED
+EOF5
+python3 "$ad" verdicts "$AD/m1" "$AD/j1" "$AD/rf1" > "$AD/vd1" 2>"$AD/err" || fail "verdicts refused well-formed output: $(cat "$AD/err")"
+grep '^== ' "$AD/m1" | cut -c4- > "$AD/order"
+printf 'src/a.c:1-3 DRIFTED DRIFTED count-over-hand-list\nsrc/a.c:6-7 HISTORY TRUE narrates-a-change\nsrc/b.c:2-2 TRUE TRUE -\n' | cmp -s - <(sort "$AD/vd1") && cut -d' ' -f1 "$AD/vd1" | cmp -s - "$AD/order" || fail "verdicts file wrong: $(cat "$AD/vd1")"
+python3 "$ad" tally "$AD/m1" "$AD/vd1" | cmp -s - "$AD/t1" || fail "tally over verdicts' file did not print the expected line"
+printf 'src/a.c:1-3  UPHELD  — r\nsrc/b.c:2-2  CONFIRMED  — r\n' > "$AD/rf2"
+python3 "$ad" verdicts "$AD/m1" "$AD/j1" "$AD/rf2" >/dev/null 2>"$AD/err" && fail "verdicts accepted UPHELD, an unflagged block, and a missing one"
+for want in 'verdict `UPHELD` is not one of CONFIRMED, OVERTURNED' '`src/b.c:2-2` is not a flagged block' 'missing `src/a.c:6-7`'; do
+  grep -q -- "$want" "$AD/err" || fail "verdicts refusal did not name: $want — got: $(cat "$AD/err")"
+done
+printf 'src/a.c:1-3  CONFIRMED  — r\nsrc/a.c:6-7  REFUTED  — r\nsrc/a.c:6-7  CONFIRMED  narrates-a-change  — r\n' > "$AD/rf3"
+python3 "$ad" verdicts "$AD/m1" "$AD/j1" "$AD/rf3" >/dev/null 2>"$AD/err" && fail "verdicts accepted REFUTED, a shape column, and a block re-checked twice"
+for want in 'verdict `REFUTED` is not one of' '3 field(s) before the em dash, want 2' 'already ruled at line 2'; do
+  grep -q -- "$want" "$AD/err" || fail "verdicts refusal did not name: $want — got: $(cat "$AD/err")"
+done
+python3 "$ad" verdicts "$AD/m1" "$AD/j1" >/dev/null 2>"$AD/err" && fail "verdicts ran with flags and no refuter output"
+grep -q 'no REFUTER_OUT' "$AD/err" || fail "a missing refuter output was not named: $(cat "$AD/err")"
+python3 "$ad" verdicts "$AD/m1" "$AD/j0" "$AD/rf1" >/dev/null 2>&1 && fail "verdicts read a refuter output with nothing flagged"
+python3 "$ad" verdicts "$AD/m1" "$AD/j0" | grep -c ' TRUE TRUE -$' | grep -qx 3 || fail "an all-TRUE judge output did not make an all-TRUE verdicts file"
+ok "adherence flags/verdicts: one form held, only flags passed on, every defect named in one refusal (bare, ·, verdict-first, missing, twice, undrawn, shapeless, reasonless, summary; a shaped TRUE), UPHELD/REFUTED and an unflagged or missing re-check refuse, the file tally reads"
+
+a_ commit -q --allow-empty -m "docs(process/review): 09-01" -m "Adherence: comment-truth 9/10 true · 1 drifted · 0 history · 0 judge FP · pop 3f/40l · seed 1 — shapes: count-over-hand-list src/x.c:4" --trailer "Process-Review: 2026-09-01"
+a_ commit -q --allow-empty -m "feat: quotes the line, no trailer" -m "Adherence: comment-truth 9/10 true · 1 drifted · 0 history · 0 judge FP · pop 3f/40l · seed 1 — shapes: premise-elsewhere src/y.c:4"
+python3 "$ad" recur --rule comment-truth --current "$AD/t1" --root "$AD" > "$AD/r1" 2>"$AD/err" || fail "recur failed: $(cat "$AD/err")"
+grep -qx '2	count-over-hand-list	2026-09-01,current	routed' "$AD/r1" || fail "a shape in two windows was not routed: $(cat "$AD/r1")"
+grep -q 'premise-elsewhere' "$AD/r1" && fail "a commit with no Process-Review trailer counted as a window"
+a_ commit -q --allow-empty -m "docs(process/review): 09-02" -m "Adherence: comment-truth 10/10 true · 0 drifted · 0 history · 0 judge FP · pop 3f/40l · seed 2 — shapes: none" --trailer "Process-Review: 2026-09-02"
+python3 "$ad" recur --rule comment-truth --root "$AD" 2>/dev/null | grep -qx '1	count-over-hand-list	2026-09-01	recorded' || fail "a one-window shape was not recorded: $(python3 "$ad" recur --rule comment-truth --root "$AD")"
+python3 "$ad" tally "$AD/m1" "$AD/vd1" --control all-true > "$AD/tc" 2>"$AD/err" || fail "tally --control failed: $(cat "$AD/err")"
+grep -qx 'Adherence-control: comment-truth 2/3 true · 1 drifted · 0 history · 1 judge FP · pop 2f/6l · seed 7 — shapes: count-over-hand-list src/a.c:1 · control all-true' "$AD/tc" || fail "tally --control line wrong: $(cat "$AD/tc")"
+a_ commit -q --allow-empty -m "docs(process/review): 09-03" -m "$(sed 's/count-over-hand-list/control-only-shape/' "$AD/tc")" --trailer "Process-Review: 2026-09-03"
+python3 "$ad" recur --rule comment-truth --current "$AD/tc" --root "$AD" > "$AD/r2" 2>"$AD/err" || fail "recur failed: $(cat "$AD/err")"
+grep -qx '1	count-over-hand-list	2026-09-01	recorded' "$AD/r2" && ! grep -q 'control-only-shape' "$AD/r2" || fail "recur counted a control line as a window: $(cat "$AD/r2")"
+ok "adherence recur: windows by trailer date, routed at two, recorded at one, a quoting commit and a control line ignored"
+
 # ---- scripts/land-process-commit.py: one commit lands on the default branch through the
 # adopter's own pre-commit hook, the sha printed is the remote's, the slice branch drops
 # its duplicate, and every failure leaves nothing pushed and no worktree behind.
