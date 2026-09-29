@@ -107,6 +107,49 @@ printf '%s' "$out" | grep -q '2 of the 4 lines the sweep finds are not cited: `s
   || { echo "FAIL  plan-sweeps: a listing finding names the uncited hits"; exit 1; }
 printf 'ok    %-52s\n' "plan-sweeps: a listing finding names the uncited hits"
 
+# plan-sweeps: under GUARDS_DIFF a sweep is judged only when the diff adds or changes a
+# line it is read from — its block, or the next line holding its count; the rest are
+# counted untouched. The diff is written as git writes it: a tab after a path holding a
+# space, a C-quoted path with non-ASCII left raw, and an added line reading `++ …` that
+# prints as `+++ …` inside a hunk.
+cm="$here/checks/plan-sweeps/fixtures/fail/count-mismatch"
+diffed() {  # diffed <root> <plan> <diff text> — the check over <root> with that staged diff
+  printf '%b' "$3" > "$tmp/diff"
+  GUARDS_DIFF="$tmp/diff" python3 "$here/checks/plan-sweeps/check.py" --root "$1" --paths "$2"
+}
+hunk() {  # hunk <path header> <line> — a diff adding one line at <line>
+  printf 'diff --git a/x b/x\n--- a/x\n+++ %s\n@@ -0,0 +%s @@\n+x\n' "$1" "$2"
+}
+: > "$tmp/diff-empty"
+says 0 "plan-sweeps: an empty diff judges no sweep" "7 untouched by the commit" \
+  env GUARDS_DIFF="$tmp/diff-empty" python3 "$here/checks/plan-sweeps/check.py" --root "$cm" --paths plan.md
+says 0 "plan-sweeps: a diff to another file judges no sweep" "7 untouched by the commit" \
+  diffed "$cm" plan.md "$(hunk b/src/a.swift 1)"
+says 0 "plan-sweeps: a diff touching no sweep's line judges none" "7 untouched by the commit" \
+  diffed "$cm" plan.md "$(hunk b/plan.md 1)"
+out="$(diffed "$cm" plan.md "$(hunk b/plan.md 6)" 2>/dev/null)"
+[ "$out" = "plan.md:6: states 3 files, the sweep finds 2 — \`rg -ln '\\.fallback' src\`" ] \
+  || { echo "FAIL  plan-sweeps: a changed row alone is judged"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: a changed row alone is judged"
+out="$(diffed "$cm" plan.md "$(hunk b/plan.md 10)" 2>/dev/null)"
+[ "$(printf '%s\n' "$out" | cut -d: -f1-2)" = "plan.md:9" ] \
+  || { echo "FAIL  plan-sweeps: a changed count line judges its sweep"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: a changed count line judges its sweep"
+mkdir -p "$tmp/named"
+cp -R "$cm/src" "$tmp/named/"
+cp "$cm/plan.md" "$tmp/named/my plan.md"
+cp "$cm/plan.md" "$tmp/named/plän \"q\".md"
+out="$(diffed "$tmp/named" 'my plan.md' "$(hunk 'b/my plan.md\t' 6)" 2>/dev/null)"
+[ "$(printf '%s\n' "$out" | cut -d: -f1-2)" = "my plan.md:6" ] \
+  || { echo "FAIL  plan-sweeps: a tab-suffixed diff path is read"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: a tab-suffixed diff path is read"
+out="$(diffed "$tmp/named" 'plän "q".md' "$(hunk '"b/plän \\"q\\".md"\t' 6)" 2>/dev/null)"
+[ "$(printf '%s\n' "$out" | cut -d: -f1-2)" = "plän \"q\".md:6" ] \
+  || { echo "FAIL  plan-sweeps: a C-quoted diff path is read"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "plan-sweeps: a C-quoted diff path is read"
+says 0 "plan-sweeps: an added \`++\` line is not a diff header" "7 untouched by the commit" \
+  diffed "$cm" plan.md 'diff --git a/n.md b/n.md\n--- a/n.md\n+++ b/n.md\n@@ -0,0 +1 @@\n+++ b/plan.md\n@@ -0,0 +6 @@\n+x\n'
+
 # comment-ordinals: every spelling of the three tags is one finding apiece, and a word
 # carrying the letters is none.
 co="$here/checks/comment-ordinals"
@@ -373,6 +416,43 @@ printf '# D\n\nRun `scripts/gone.sh`; set `MYAPP_NOPE`.\n' > "$a/tree/doc.md"
 printf '# P\n' > "$a/tree/plan.md"
 git -C "$a/tree" add -A
 expect 1 "adapter: referents judges the index, not the export" hook "$a/tree"
+
+# A sweep is judged at the commit that writes it. A ledger row counted right, then the
+# tree drifting under it: a commit that leaves the row untouched passes, and so does
+# moving the plan; editing the row, or adding one, judges it against the tree now.
+mkrepo "$a/written"
+mkdir -p "$a/written/Sources"
+printf 'let a = 1\nlet b = 2\n' > "$a/written/Sources/a.swift"
+printf "# P\n\n## Claim ledger\n\n- drafted at abc1234, 2026-09-21\n- lets — \`rg -n 'let' Sources | wc -l\` — \`2\`\n" \
+  > "$a/written/plan.md"
+printf '{"export": ["*.md", ".claude/*"], "checks": {"plan-sweeps": {"rung": "block", "paths": ["*.md"]}}}' \
+  > "$a/written/.claude/guards.json"
+git -C "$a/written" add -A
+expect 0 "adapter: a row counted right is committed" git -C "$a/written" commit -q -m base
+printf 'let c = 3\n' >> "$a/written/Sources/a.swift"
+git -C "$a/written" add -A
+expect 0 "adapter: the tree drifting under an untouched row passes" hook "$a/written"
+git -C "$a/written" commit -q -m drift 2>/dev/null || { echo "FAIL  adapter: drift commit"; exit 1; }
+printf "\n- lets in a — \`rg -n 'let' Sources/a.swift | wc -l\` — \`9\`\n" >> "$a/written/plan.md"
+git -C "$a/written" add -A
+out="$(hook "$a/written" 2>/dev/null)"
+[ "$(printf '%s\n' "$out" | cut -d: -f2-3)" = " plan.md:8" ] \
+  || { echo "FAIL  adapter: a row added with a wrong count is judged alone"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "adapter: a row added with a wrong count is judged alone"
+git -C "$a/written" reset -q && git -C "$a/written" checkout -q -- plan.md
+sed -i.bak 's/^- lets —/- let lines —/' "$a/written/plan.md" && rm "$a/written/plan.md.bak"
+git -C "$a/written" add -A
+expect 1 "adapter: editing a stale row judges it" hook "$a/written"
+hook "$a/written" 2>/dev/null | grep -q '^plan-sweeps: plan.md:6: states 2 lines, the sweep finds 3' \
+  || { echo "FAIL  adapter: the edited row's finding names both numbers"; exit 1; }
+printf 'ok    %-52s\n' "adapter: the edited row's finding names both numbers"
+git -C "$a/written" reset -q && git -C "$a/written" checkout -q -- plan.md
+git -C "$a/written" mv plan.md moved.md
+expect 0 "adapter: moving a plan judges none of its rows" hook "$a/written"
+git -C "$a/written" commit -q -m moved 2>/dev/null || { echo "FAIL  adapter: move commit"; exit 1; }
+printf "# Q\n\n- lets — \`rg -n 'let' Sources | wc -l\` — \`5\`\n" > "$a/written/new.md"
+git -C "$a/written" add -A
+expect 1 "adapter: a plan added with a wrong count is judged" hook "$a/written"
 
 # comment-ordinals reads code the markdown export drops, so a dropped source refuses by
 # name, whether its extension or its shebang puts it in scope; exported, it is judged.

@@ -82,6 +82,17 @@ export of the index that holds the plans and not the sources they sweep, and han
 checkout's top level over as `GUARDS_TREE`; absent that, `--root` is the checkout. `rg`
 must be on `PATH`, or the check refuses.
 
+A sweep is judged when it is written. Every claim here — the sweep runs, its count, its
+listing — is the writer's about the tree they measured, and a plan keeps its rows after
+that tree moves: a ledger row stays under its `drafted at <sha>` record until the plan
+is finalized. So under the git adapter, which hands the staged diff over as
+`GUARDS_DIFF`, a sweep is judged only when a line of its block — or the next line, where
+its count sits — is one the commit adds or changes; one the commit leaves untouched is
+not run and not compared, and the stderr summary counts it. A plan added, or a row
+edited, is judged in full; a commit that only moves the tree under a plan, or moves the
+plan itself (the diff reads renames), judges none of it. Without `GUARDS_DIFF` — `run.py`
+by hand — every sweep is judged, which is the audit read of a plan's standing claims.
+
 Scope: the universe is `--paths` — each entry a root-relative file, or an fnmatch glob
 where `*` crosses `/` as in a git pathspec; a literal is tried first, so a name
 carrying glob characters still selects the file bearing it, and an entry naming no
@@ -117,6 +128,8 @@ UNSAFE = re.compile(r"[\n\r]")
 RUNS_A_PROGRAM = ("--pre", "--pre-glob", "--search-zip", "-z")
 TREE = os.environ.get("GUARDS_TREE")
 ALLOW = f"guards-allow: {ID}"
+DIFF = os.environ.get("GUARDS_DIFF")
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$")
 COMMENT = re.compile(r"<!--.*?-->")
 WC = re.compile(r"\s*\|\s*wc\s+-l\s*$")
@@ -193,14 +206,15 @@ def items(lines):
 
 
 def spans(text, targets=()):
-    """(line number, span content, tail, before, rest, target, following) for every
+    """(line number, span content, tail, before, rest, target, following, reads) for every
     code span outside a fenced block: `tail` is the text after the span up to the next
     span on the line, or the next line when nothing follows the span on its own;
     `following` is that next span's content on the same line, else None; `before` and
     `rest` are the text of its block — list item, table row, or paragraph — before and
     after the span, spans kept; `target` is True under a heading
     whose text begins with an entry of `targets`, where a count is the tree's state after
-    the change and is not compared."""
+    the change and is not compared. `reads` is the set of line numbers the claim is
+    read from: its block, and the next line when the count is read there."""
     fence, target = None, False
     lines = text.splitlines()
     block = items(lines)
@@ -227,11 +241,13 @@ def spans(text, targets=()):
                 tail, rest = line[s.end():end], line[s.end():] + " " + after
                 before = above + line[:s.start()]
                 following = found[k + 1].group(2).strip() if k + 1 < len(found) else None
+                reads = set(range(first + 1, last + 2)) | {n}
                 if k + 1 == len(found) and not tail.strip("* \t") and i + 1 < len(lines) \
                         and not FENCE.match(lines[i + 1]) and heading_text(lines[i + 1]) is None:
                     nxt = lines[i + 1]
                     tail = nxt[:SPAN.search(nxt).start()] if SPAN.search(nxt) else nxt
-                yield n, s.group(2).strip(), tail, before, rest, target, following
+                    reads.add(n + 1)
+                yield n, s.group(2).strip(), tail, before, rest, target, following, reads
         elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
                 and line.strip() == m.group(1):
             fence = None
@@ -581,6 +597,50 @@ def run(argv, cwd):
     return r.returncode, " · ".join(lines[:4])[:200], r.stdout
 
 
+def diff_path(header):
+    """The new-side path of a `+++ ` header line, or None for `/dev/null`: git adds a tab
+    after a path holding a space and C-quotes one holding a quote, backslash, or control
+    byte — octal escapes for the bytes, and a non-ASCII byte left raw under
+    `core.quotePath=false`, so the escapes are undone over the path's UTF-8 bytes."""
+    raw = header[4:].rstrip("\n").rstrip("\t")
+    if raw == "/dev/null":
+        return None
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1].encode("utf-8").decode("unicode_escape") \
+            .encode("latin-1").decode("utf-8", "replace")
+    return raw[2:] if raw.startswith("b/") else raw
+
+
+@functools.lru_cache(maxsize=None)
+def changed():
+    """{path: line numbers the commit adds or changes} from the staged diff the adapter
+    hands over as GUARDS_DIFF, or None when there is none and every line is judged."""
+    if not DIFF:
+        return None
+    try:
+        text = pathlib.Path(DIFF).read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        refuse(f"GUARDS_DIFF unreadable: {e}")
+    # A `+++ ` line is a header only between `diff --git` and the first hunk: inside a
+    # hunk it is an added line reading `++ …`. A body line never begins `diff` or `@@`.
+    # Split on newlines alone: splitlines() also breaks a body line at a form feed.
+    out, path, header = {}, None, False
+    for line in text.split("\n"):
+        if line.startswith("diff --git "):
+            path, header = None, True
+        elif header and line.startswith("+++ "):
+            path = diff_path(line)
+            if path is not None:
+                out.setdefault(path, set())
+        elif path is not None and line.startswith("@@"):
+            header = False
+            m = HUNK.match(line)
+            if m:
+                start, size = int(m.group(1)), int(m.group(2) or 1)
+                out[path].update(range(start, start + size))
+    return out
+
+
 def refuse(msg):
     print(f"{ID}: {msg}", file=sys.stderr)
     sys.exit(2)
@@ -723,15 +783,20 @@ def main():
         refuse(f"GUARDS_TREE is not a directory: {TREE}")
 
     targets = config(root)["targetHeadings"]
-    findings, ran, skipped, compared, uncompared, listings = [], 0, 0, 0, 0, 0
+    findings, ran, skipped, compared, uncompared, listings, untouched = [], 0, 0, 0, 0, 0, 0
+    written = changed()
     for f in files:
         rel = f.relative_to(root).as_posix()
         try:
             body = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as e:
             refuse(f"unreadable: {rel}: {e}")
-        for n, span, tail, before, rest, target, following in spans(body, targets):
+        mine = None if written is None else written.get(rel, set())
+        for n, span, tail, before, rest, target, following, reads in spans(body, targets):
             if not span.startswith("rg "):
+                continue
+            if mine is not None and not reads & mine:
+                untouched += 1
                 continue
             cut = truncation(span)
             if cut:
@@ -776,7 +841,7 @@ def main():
         print(f"{rel}:{n}: {msg}")
     print(f"{ID}: {len(files)} files, {ran} sweeps run, {skipped} skipped, "
           f"{compared} counts compared, {listings} listings compared, "
-          f"{uncompared} targets not compared, "
+          f"{uncompared} targets not compared, {untouched} untouched by the commit, "
           f"{len(findings)} findings", file=sys.stderr)
     if findings:
         sys.exit(1)

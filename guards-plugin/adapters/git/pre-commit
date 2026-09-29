@@ -13,6 +13,7 @@
 # of git pathspecs naming what the enabled checks read (e.g. ["*.md", ".claude/*"]).
 # The export is never a scope: the checks are handed the index listing (GUARDS_INDEX)
 # and the checkout's top level (GUARDS_TREE) and take their universe from the listing,
+# and the staged diff (GUARDS_DIFF) for a check that judges a claim when it is written,
 # so an export that drops a file a check reads refuses, naming the file — widen the
 # list, or narrow the check with "paths" or "exclude". An export that drops a config the gate steers by — .claude/guards.json,
 # or .claude/threads.json where the logs live — refuses before any check runs,
@@ -45,6 +46,13 @@ export GUARDS_INDEX="$tmp/index"
 # env knob. Git runs a hook at the working tree's top level.
 GUARDS_TREE="$(git rev-parse --show-toplevel)" || refuse "could not find the working tree"
 export GUARDS_TREE
+# The staged diff, for a check that judges a claim at the commit that writes it —
+# plan-sweeps runs a sweep only when the commit adds or changes its lines. -M reads a
+# moved file as moved, not as every line added; the prefixes are pinned against
+# diff.noprefix and diff.mnemonicPrefix; quotePath=false leaves a non-ASCII path raw.
+git -c core.quotePath=false diff --cached -U0 -M --no-color --no-ext-diff --no-textconv \
+  --src-prefix=a/ --dst-prefix=b/ > "$tmp/diff" || refuse "could not diff the index"
+export GUARDS_DIFF="$tmp/diff"
 
 export_specs="$(git show :.claude/guards.json | python3 -c '
 import json, sys
