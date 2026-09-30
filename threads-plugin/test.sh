@@ -203,14 +203,18 @@ drift/o
     Placement: Plans/active/pre-pr.md §2.
 drift/p
   LANDED abc1234 — docs/principles.md §measure.
+drift/q
+  2026-09-03 | s1 | no home.
+    Placement: none
 EOF2
 python3 "$rl" view --recurred --docs --root "$tmp" --log docs.md 2>/dev/null > "$tmp/docs.out" || fail "--docs refused"
 grep -qx '1	Plans/active/pre-pr.md' "$tmp/docs.out" || fail "--docs under --recurred did not count pre-pr.md once: $(cat "$tmp/docs.out")"
 grep -qx '1	.claude/commands/closeout.md' "$tmp/docs.out" || fail "--docs missed a dotted-directory path with a :line suffix"
 grep -q 'principles' "$tmp/docs.out" && fail "--docs under --recurred showed a path from an unshown key"
+python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -q 'none' && fail "--docs listed a Placement: none as a path"
 python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | head -1 | grep -qx '2	Plans/active/pre-pr.md' || fail "--docs over the whole log did not rank pre-pr.md first at 2 keys"
 python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -qx '1	docs/principles.md' || fail "--docs missed the path in a LANDED line"
-ok "--docs lists the files the shown keys name, most-named first"
+ok "--docs lists the files the shown keys name, most-named first; a bare §-pointer counts, Placement: none does not"
 
 # 10. ARC is an annotation: transparent to state and count, kept by compact on either side
 # of a closing status, refused on a non-slug name; --arc prints the carrying keys by the

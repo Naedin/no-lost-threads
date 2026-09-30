@@ -104,6 +104,10 @@ convention in the moment. Fields:
   [`commands/adherence.md`](adherence.md). Absent → step 0d narrates and skips.
 - `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
   short name passed through as given. Absent, the agent file's own pin applies.
+- `retroPlacement` — optional: `"full"` (default) or `"keys"`. `/threads:retro` under
+  `"keys"` keys findings without placing them and records a bare `Placement: file
+  §section` pointer (retro §3c); step 7's placer writes the edit. This command's own
+  placement is unchanged.
 - `markTag` — default `process-review-mark`.
 
 **The two files are separate on purpose.** The ledger holds decisions *not* to act and is

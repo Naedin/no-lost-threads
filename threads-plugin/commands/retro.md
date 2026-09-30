@@ -1,5 +1,5 @@
 ---
-description: Retrospective pass — review the work in this conversation as process telemetry (drift, scope leak, ignored user signals, unverified claims, premature lock-in, mode confusion, stale habits). By default a fresh-context sub-agent audits the observable session record cold; a second one places the findings against this repo's process docs and keys them against the retro log, so a recurrence is detected rather than assumed. Findings are captured to that log for `/threads:process-review` to adjudicate, not applied here — except a defect the audit finds in an artifact this session itself wrote or landed, which the retro fixes while the context that can fix it cheaply still exists. `quick` skips the audit, not the placement. Explicit-only; never auto-fires.
+description: Retrospective pass — review the work in this conversation as process telemetry (drift, scope leak, ignored user signals, unverified claims, premature lock-in, mode confusion, stale habits). By default a fresh-context sub-agent audits the observable session record cold; a second one places the findings against this repo's process docs and keys them against the retro log, so a recurrence is detected rather than assumed. Findings are captured to that log for `/threads:process-review` to adjudicate, not applied here — except a defect the audit finds in an artifact this session itself wrote or landed, which the retro fixes while the context that can fix it cheaply still exists. `quick` skips the audit, not the placement; `retroPlacement: "keys"` keys findings without placing them. Explicit-only; never auto-fires.
 argument-hint: "[quick] [optional scope note]"
 allowed-tools: Bash, Read, Grep, Glob, Agent
 ---
@@ -12,7 +12,8 @@ whether the code is correct.
 **Args (`$ARGUMENTS`):**
 - no args → self-pass (§1) + fresh-context audit (§2).
 - leading `quick` → skip §2's audit. The self-pass still runs, and its findings are
-  still placed (§3) and captured (§4a) — `quick` is not "no sub-agents."
+  still placed (§3) and captured (§4a) — `quick` is not "no sub-agents." How deep the
+  placement goes is `retroPlacement` (§3c), whatever the mode.
 - remaining text → optional **scope note** narrowing focus (e.g. `/threads:retro the
   dedup decision`, `/threads:retro quick this planning thread`). Default scope is the
   full session.
@@ -139,6 +140,32 @@ Carry that flag into the output — `/threads:process-review` is where those rec
 across sessions. An add that should have been an amend is recoverable there; a retro too
 slow to run isn't.
 
+### 3c. Key-only — `retroPlacement: "keys"`
+
+`retroPlacement` in `.claude/threads.json` sets how deep the spawn goes: `"full"`
+(default) is everything above; `"keys"` keys and matches and places nothing. It is its
+own axis: `quick` picks the detection source, `retroPlacement` picks placement depth, and
+neither implies the other. The review re-places every candidate that survives against the
+docs it reads that run, so a retro-side placement is a second read of the same target;
+the key is the part only a cold reader at capture time produces.
+
+Under `"keys"`:
+
+- **The spawn** is the same `finding-placer`, once, all findings, `placerModel` as above,
+  with the key list and the word **key-only** in the brief — and no doc map, since it
+  opens no process doc. It returns §3b's key and match per finding, and nothing else: no
+  placement, no quote, no `rule present`. The agent is already pinned to the smaller
+  model, so `placerModel` is not what saves the cost here; the unread docs are.
+- **You write the pointer**, `Placement: <file> §<section>` — the home you would name,
+  no quote and no edit. It routes the review's keyed read (`retro-log.py view --docs`),
+  and the review's placer writes the edit. No home you can name → `Placement: none`.
+- **`Caught:`** needs the rule present at the placement, and nobody read it. Write it only
+  when the gate's own output cited the rule by file and section — that citation is the
+  read; a numbered class or item in a doc `processDocs` covers counts as its section
+  (`check-brief.md class 2`). Otherwise the occurrence goes untagged and ranks.
+- **The escape hatch** needs an edit this run never specified: spawn the full placer
+  over the accepted findings first, then apply what it returns.
+
 Skip only when there's nothing to place. If the agent or the `Agent` tool is
 unavailable, place and key them here but **narrate the tier** — say the placements were
 made in the context that did the work, so the amend-before-add bar went unpaid, and mark
@@ -163,7 +190,7 @@ Two outcomes, **both first-class**:
 
 Each finding: **`[source]` `key` issue → evidence (cite the event) → cost → placement**,
 where placement is `finding-placer`'s proposal — target section, the existing text it was
-judged against, and the edit. **Cost is what was spent**, in the unit it was spent in — a
+judged against, and the edit — or, key-only (§3c), your `file §section` pointer. **Cost is what was spent**, in the unit it was spent in — a
 gate run, a round trip, a wrong artifact on the default branch, a reversed decision,
 minutes — and *nil* is a valid answer: the capture bar (§4a) reads it. Any rejected alternative and any `add (unconsolidated)` flag
 ride with it, as does any recurrence match from §3b. Under `quick` there's one source, so
@@ -261,14 +288,14 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
 
 - **A new finding** → key line + one occurrence line, continuations to **eight lines at
   most**: the cited moment, the cost, the placement (`Placement: file §section — amend
-  "…"`). What does not fit goes where the placement points; the `guards`
+  "…"`, or key-only the bare `Placement: file §section`). What does not fit goes where the placement points; the `guards`
   `retro-log-size` check holds the cap.
 - **A finding a gate caught with its rule already present** → the ordinary key +
   occurrence, with one continuation line `Caught: <gate> — <where the rule is>` (the
   gate that stopped it: `/slices:check`, the guards, a review round; the rule's file and
   section as the placer quoted it). Written only when both hold: the placer reports the
-  rule **present** at the placement (§3b), and the finding's whole cost was the gate's
-  own catch. Any cost spent past the gate — a maintainer question the finding raised, a
+  rule **present** at the placement (§3b; key-only, the gate's output cited it, §3c), and
+  the finding's whole cost was the gate's own catch. Any cost spent past the gate — a maintainer question the finding raised, a
   fix batch, a revision, code that ran — is the shape reaching implementation, and the
   occurrence goes untagged so it ranks. The view counts the occurrence and `--reached` does not rank it, so the
   review reads the count without re-ruling the doctrine each window; the next occurrence
@@ -298,8 +325,8 @@ single-session by requirement. Carry any `key (uncold)` flag from §3 into the k
 ### The escape hatch — landing straight from retro
 
 If the user accepts findings **and explicitly asks you to apply them now**, do it; the
-cost is theirs to spend. The edit is already specified (§3): **apply it, don't re-derive
-it.** If applying reveals the placement was wrong, stop and say so;
+cost is theirs to spend. The edit is already specified (§3; key-only, §3c specifies it
+first): **apply it, don't re-derive it.** If applying reveals the placement was wrong, stop and say so;
 don't quietly substitute a different edit. Then check `.claude/threads.json`:
 
 - `retroTelemetry: true` → land each applied process change as its own commit matching

@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.19.0] — 2026-09-30
+
+### Contract
+
+- **`retroPlacement`** in `.claude/threads.json` — `"full"` (default) or `"keys"`. Under `"keys"`, `/threads:retro`'s `finding-placer` spawn is told *key-only*: it writes each finding's key and reports any match against `view --keys`, opens no process doc, quotes nothing, and reports no `rule present`. The retro writes a bare `Placement: <file> §<section>` pointer itself, which still routes the review's keyed read (`view --docs`); `Caught:` is written only when the gate's own output cited the rule by file and section, a numbered class or item in a `processDocs` doc counting as its section; the escape hatch spawns the full placer over the accepted findings before applying. It is independent of `quick`, which still selects only the detection source. The review re-places every surviving candidate against the docs it reads, so a retro-side placement is that read paid twice; the key is the part only a cold reader at capture time produces. Measured on the reference adopter: one review-side placer spawn was 113 s, 40 tool calls, ~74k tokens for 9 candidates, the retro-side spawns cost the same shape two to three times per PR, and the review re-homed 3 of the 5 retro placements it landed. `test.sh` case 9 proves `view --docs` reads a bare `§` pointer and drops `Placement: none`. Adopter-side edit: set the field; nothing else moves.
+
 ## threads [0.18.0] — 2026-09-28
 
 ### Contract

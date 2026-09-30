@@ -81,6 +81,11 @@ on another model, set `placerModel` in `.claude/threads.json` (a harness short n
 as `"opus"`); both commands pass it to the placer spawn. Never edit the installed agent
 file — it lives in the plugin cache and `/plugin update` overwrites it.
 
+`retroPlacement: "keys"` in `.claude/threads.json` makes retro's placer key the findings
+against the log and read no process doc; the retro records a `file §section` pointer, and
+`/threads:process-review` places the findings that survive it. Under either mode `quick`
+still only skips the audit.
+
 ## `/threads:process-review` — the cross-session review
 
 One altitude up from retro. Six sessions can each add a slightly-different local rule
