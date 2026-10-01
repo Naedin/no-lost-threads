@@ -33,7 +33,7 @@ EOF
 # 1. compact keeps a recurrence after a closing status, and the view says so
 python3 "$rl" compact --root "$tmp" --log log.md 2>/dev/null || fail "compact refused a valid log"
 grep -q 'came back after the landing' "$tmp/log.md" || fail "compact dropped an occurrence appended after LANDED"
-python3 "$rl" view --keys --root "$tmp" --log log.md | grep -q 'scope-leak/a .*recurred after LANDED' || fail "view does not mark a recurrence after LANDED"
+python3 "$rl" view --keys --root "$tmp" --log log.md | grep -q 'scope-leak/a .*recurred after LANDED abc1234 — somewhere\.$' || fail "view does not mark a recurrence after LANDED with the landed status line"
 ok "recurrence after a closing status survives and is marked"
 
 # 2. a status block keeps its own key line; the compacted log passes the grammar check
@@ -249,7 +249,7 @@ drift/w
   ARC why-not-now — undated: stream order, last.
 EOF2
 python3 "$check" --root "$tmp" --paths arc.md >/dev/null 2>&1 || fail "an ARC block fails the retro-log check"
-python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep -q '^drift/q  ×2  2026-09-01..2026-09-05  recurred after LANDED  arc:why-not-now$' || fail "ARC changed drift/q's state or count, or the key line lacks its arc: $(python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep '^drift/q')"
+python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep -q '^drift/q  ×2  2026-09-01..2026-09-05  recurred after LANDED abc1234 — doc\.md §trailer\.  arc:why-not-now$' || fail "ARC changed drift/q's state or count, or the key line lacks its arc: $(python3 "$rl" view --keys --root "$tmp" --log arc.md 2>/dev/null | grep '^drift/q')"
 python3 "$rl" view --arc why-not-now --root "$tmp" --log arc.md 2>/dev/null > "$tmp/arc.out" || fail "--arc refused"
 grep -q '^arc why-not-now: 4 keys, by date entered (1 undated, stream order last)$' "$tmp/arc.out" || fail "--arc header wrong: $(head -1 "$tmp/arc.out")"
 [ "$(grep -o '^[a-z-]*/[a-z]* ' "$tmp/arc.out" | tr -d ' ' | tr '\n' ' ')" = "drift/v drift/q scope-leak/r drift/w " ] || fail "--arc is not by date entered, undated last: $(grep -o '^[a-z-]*/[a-z]* ' "$tmp/arc.out" | tr '\n' ' ')"
@@ -389,7 +389,18 @@ PATH="$C/bin:$PATH" python3 "$rl" view --chain --prs --key k/a --root "$C" > "$C
 grep -q '^  open PR #7  fix a  (docs/a.md)$' "$C/out4" && grep -q '^  chain: .*in flight: #7$' "$C/out4" || fail "an open PR on the placement was not named in flight: $(cat "$C/out4")"
 printf '#!/bin/sh\necho "no remote" >&2; exit 1\n' > "$C/bin/gh"
 PATH="$C/bin:$PATH" python3 "$rl" view --chain --prs --key k/a --root "$C" 2>&1 | head -1 | grep -q 'open PRs not read (no remote)' || fail "a failing gh was not narrated"
-ok "view --chain: occurrences and the placement's organic markers on one clock, in order; a same-day pair one burst; a broad marker bracketed; an open PR in flight; the window's unkeyed patch named; an uncommitted line dated by its own"
+# --since REV: keys with a detail line the log at REV did not hold — to the commit, not the
+# day; a re-key and a compaction move nothing into it
+c_ add -A; at "2026-09-11T09:00:00+00:00" "settle"; c_ tag mid
+printf 'k/c\n  2026-09-06 | z | the same day as k/b, written after the mark.\n' >> "$C/.claude/log.md"; c_ add -A; at "2026-09-11T10:00:00+00:00" "capture c"
+sed -i.bak 's#^k/a$#k/renamed#' "$C/.claude/log.md" && rm -f "$C/.claude/log.md.bak"
+python3 "$rl" compact --root "$C" 2>/dev/null
+python3 "$rl" view --keys --since mid --root "$C" > "$C/s1" 2>&1 || fail "--since REV failed: $(cat "$C/s1")"
+grep -q '^showing 1 of 3 keys (--since mid)$' "$C/s1" && grep -q '^k/c ' "$C/s1" || fail "--since REV did not read only what the mark lacked (a re-key and a compaction count as new?): $(cat "$C/s1")"
+python3 "$rl" view --keys --since 2026-09-06 --root "$C" 2>/dev/null | grep -q '^k/b ' || fail "--since DATE stopped reading by date"
+python3 "$rl" view --keys --since no-such-rev --root "$C" >/dev/null 2>"$C/err" && fail "--since took a rev that does not exist"
+grep -q 'takes YYYY-MM-DD or a commit' "$C/err" || fail "a bad --since was not named: $(cat "$C/err")"
+ok "view --chain: occurrences and the placement's organic markers on one clock, in order; a same-day pair one burst; a broad marker bracketed; an open PR in flight; the window's unkeyed patch named; an uncommitted line dated by its own; --since REV to the commit, a re-key and a compaction not new"
 
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.

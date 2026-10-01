@@ -2,7 +2,7 @@
 """retro-log — the retro log as an append-only stream, read through a view.
 
   retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--live]
-                    [--since YYYY-MM-DD] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
+                    [--since DATE|REV] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
                     [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
 
@@ -70,7 +70,9 @@ under one key line; a status or annotation block keeps its own key line, since a
 status inside an occurrence entry is invisible to the grammar. A closed key keeps its
 closing status line and any annotation after it. Compacting a canonical log changes
 nothing. A key's occurrence count is its dated occurrence lines across every block
-that carries the key; an annotation never counts. `view` reads a stream that breaks
+that carries the key; an annotation never counts. A live key that recurred after a closing
+status shows that status line on its row — `recurred after LANDED <sha> — <where>` — since
+it is the landed rule the new occurrence came back past. `view` reads a stream that breaks
 the grammar, naming each violation on stderr and reading the offending line as plain
 detail; `compact` refuses on one (exit 2), because a rewrite of a stream it cannot
 read loses lines. The grammar is the contract; the guards `retro-log` check is its
@@ -84,8 +86,10 @@ counted over the occurrences no gate caught, so a shape a check keeps catching w
 rule present is counted and never ranked — plus any key with a `Caught:` occurrence and
 one without, which reached past the gate that had caught it and ranks regardless of
 count; the key line says `escaped <gate>`), `--since DATE` (keys with an occurrence,
-status, or annotation dated on or after DATE), `--live` (no closed section). Filters
-compose; the summary line counts the whole log and names how many keys the filter
+status, or annotation dated on or after DATE), `--since REV` (keys with a detail line the
+log at REV did not hold — what was appended after that commit, to the commit and not to
+the day; compaction and re-keying move no line into it: the read for "since the mark"),
+`--live` (no closed section). Filters compose; the summary line counts the whole log and names how many keys the filter
 shows. Without `--keys` a filtered view carries each shown key's detail, so the
 recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` prints,
 instead of the keys, the files the shown keys name in their detail — a `Placement:`, a
@@ -343,6 +347,18 @@ def recurred_after(blocks_for_key, uncaught=False):
     return None
 
 
+def reopened_by(blocks_for_key):
+    """The closing status block an occurrence came after, or None: the landed rule a
+    reopened key's line must show, since its row sits in Live and carries no status."""
+    closed = None
+    for b in deciding(blocks_for_key):
+        if b.status in CLOSED:
+            closed = b
+        elif not b.status and closed:
+            return closed
+    return None
+
+
 def caught_split(blocks_for_key):
     """(uncaught dates, caught (date, gate)) across the key's occurrence blocks."""
     free, caught = [], []
@@ -453,6 +469,20 @@ def capture_times(root, log):
         short = dict(l.split() for l in r.stdout.splitlines()) if r.returncode == 0 else {}
         out = {n: (short.get(sha, sha[:8]), t) for n, (sha, t) in out.items()}
     return out
+
+
+def lines_at(root, log, rev):
+    """The stripped detail lines the log held at `rev`: what `--since REV` reads as old.
+    Compaction moves lines and re-keying edits key lines, neither of which makes a detail
+    line new; a log absent at `rev` holds none."""
+    if subprocess.run(["git", "rev-parse", "--verify", "-q", rev + "^{commit}"], cwd=root,
+                      capture_output=True).returncode != 0:
+        refuse([f"--since takes YYYY-MM-DD or a commit, not {rev}"])
+    r = subprocess.run(["git", "show", f"{rev}:{log.relative_to(root).as_posix()}"], cwd=root,
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return set()
+    return {l.strip() for b in parse(r.stdout)[1] for l in b.lines}
 
 
 def placed_paths(bs):
@@ -683,7 +713,7 @@ def arc_tags(bs):
 
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
                 live_only=False, since=None, today=None, docs=False, past_gate=False,
-                chain=None):
+                chain=None, since_old=None):
     today = today or datetime.date.today()
     by_key = keys_in_order(blocks)
     if only:
@@ -712,7 +742,10 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
                 return False
         elif recurred and len(dates) < 2 and not recurred_after(bs):
             return False
-        if since and not any(d >= since for b in bs for d in b.touched):
+        if since_old is not None:
+            if all(l.strip() in since_old for b in bs for l in b.lines):
+                return False
+        elif since and not any(d >= since for b in bs for d in b.touched):
             return False
         return True
 
@@ -745,9 +778,9 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
             marker = f"  {st}"
         else:
             marker = ""
-        again = recurred_after(bs)
+        again = reopened_by(bs)
         if again:
-            marker += f"  recurred after {again}"
+            marker += f"  recurred after {one_line(again).strip()}"
         free, caught = caught_split(bs)
         count = f"×{len(dates)}" + (f" ({len(caught)} caught)" if caught else "")
         esc = reached(bs)
@@ -823,20 +856,23 @@ def main():
                     help="view: every key carrying `ARC NAME`, by date entered, with detail")
     ap.add_argument("--arcs", action="store_true",
                     help="view: every arc in the log with its key count and live/closed split")
-    ap.add_argument("--since", default=None, metavar="YYYY-MM-DD",
-                    help="view: keys with an occurrence, status, or annotation dated on or after")
+    ap.add_argument("--since", default=None, metavar="DATE|REV",
+                    help="view: keys with an occurrence, status, or annotation dated on or after "
+                         "DATE, or with a detail line the log at REV did not hold")
     ap.add_argument("--today", default=None, help=argparse.SUPPRESS)
     ap.add_argument("--dry-run", action="store_true", help="compact: report, write nothing")
     ap.add_argument("--log", default=None, help="log path, root-relative (default: retroLogPath)")
     ap.add_argument("--root", default=None, help="repo root (default: git top level)")
     args = ap.parse_args()
-    for flag, val in (("--since", args.since), ("--today", args.today)):
-        if val and not DATE.match(val):
-            refuse([f"{flag} takes YYYY-MM-DD, not {val}"])
+    if args.today and not DATE.match(args.today):
+        refuse([f"--today takes YYYY-MM-DD, not {args.today}"])
     root = pathlib.Path(args.root or git_toplevel()).resolve()
     path = locate(root, args.log)
     if not path.is_file():
         refuse([f"no log at {path}"])
+    since_old = None
+    if args.since and not DATE.match(args.since):
+        since_old = lines_at(root, path, args.since)
     text = path.read_text(encoding="utf-8")
     header, blocks, violations = parse(text)
     if args.mode == "view":
@@ -855,7 +891,8 @@ def main():
                                      recurred=args.recurred, live_only=args.live,
                                      since=args.since, today=today, docs=args.docs,
                                      past_gate=args.reached,
-                                     chain=(root, path, args.prs) if args.chain else None))
+                                     chain=(root, path, args.prs) if args.chain else None,
+                                     since_old=since_old))
         return 0
     if violations:
         refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])

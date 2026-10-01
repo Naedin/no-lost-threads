@@ -9,6 +9,14 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.20.1] — 2026-10-01
+
+### Changed
+
+- **"Since the mark" is read to the commit.** `retro-log.py view --since` takes a commit as well as a date: `--since REV` shows the keys with a detail line the log at REV did not hold, so a compaction or a re-key moves nothing into it, and a status or `ARC` line with no date of its own is seen. `/threads:retro`'s ripeness check and `/threads:process-review`'s window, chain, and keyed-docs reads pass `--since <markTag>`. A date reads every capture of the mark's own day as new, so a review on day D left the next retro reading it ripe on keys the review had just ruled. Measured on the reference adopter right after its review advanced the mark: `--reached --since <the date>` showed 7 keys, `--since <the mark>` 0, with no occurrence line appended since. `test.sh` proves a same-day capture after the mark shown alone, a re-key and a compaction not new, the date read unchanged, and a bad rev refused.
+- **A match on a landed key must say how its rule would have fired.** A landed key is a closed one or a live one already reopened, and `view --keys` now prints the landed status line on a reopened key's row — `recurred after LANDED <sha> — <where>` — where it used to print the token alone, so the rule is in the list the placer reads. `finding-placer` matches a landed key only when that rule would have fired on the new finding's case, says how in one clause (on topic is not enough), and otherwise keys it fresh as a sibling naming the key it resembles; key-only, it judges from the status line and no-matches when that says too little. `/threads:retro` carries the clause into the occurrence, and `/threads:process-review` reads a key reopened on one occurrence against its landed rule before ranking it. On the reference adopter a key-only placer matched a finding to a key whose row was already in Live, reopened, with no status text, and reopened it further on shape alone. `test.sh` proves the reopened row carries the status line.
+- **The review reads what landed behind its window before advancing the mark.** Read to the commit, a capture appended between the review's window read and the tag moves behind the mark unread; the review now lists `view --keys --since <the commit 0b read the log at>` before tagging and gives any key with a line it did not write the re-key sweep.
+
 ## slices [0.7.1] — 2026-10-01
 
 ### Changed

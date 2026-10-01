@@ -213,7 +213,7 @@ threads-plugin/
 recurrence is the same key with a new dated line, a landing is the key with one `LANDED
 <sha>` line, and `.gitattributes` merges the file by union so concurrent sessions never
 conflict. `python3 <plugin>/scripts/retro-log.py view --keys` derives each key's state and
-occurrence count, and its filters (`--held`, `--recurred`, `--since <date>`, `--live`) are
+occurrence count, and its filters (`--held`, `--recurred`, `--since <date or the mark>`, `--live`) are
 the reads the review makes, so a log of a few hundred keys is never read whole; a held
 proposal shows the date it was held and its age. The review's ruling on a key — a re-rank,
 a count-only call — is an `ADJUDICATED <date>` line that changes neither state nor count.

@@ -259,7 +259,8 @@ rebase.
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
    the view's filters, never whole — the reads below are the run's reads, in order, and
-   each is one tool result at any log size:
+   each is one tool result at any log size. Note the commit they read the log at (`git
+   rev-parse HEAD`); the mark's advance reads what landed after it:
    - `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys --held` — the last
      run's unanswered proposals, each with the date it was held and its age in days. This
      run reports them before anything new, oldest first.
@@ -274,8 +275,9 @@ rebase.
      written before retro wrote tags carries none: a gate-caught occurrence among those
      is ruled count-only by one `ADJUDICATED` line, as before, and `--reached` reads only
      the tags. Until the first retro that writes one, `--reached` equals `--recurred`.
-   - `view --keys --since <the mark's date>` — what this window touched; the re-key sweep
-     reads these plus the `(uncold)` ones.
+   - `view --keys --since <markTag>` — what this window touched, to the commit: a line
+     the log at the mark did not hold. A date would read the mark's whole day, the last
+     run's own rulings included. The re-key sweep reads these plus the `(uncold)` ones.
    - `view --key <key>` — one key's detail, for the keys the reads above surfaced.
    `view --keys` alone is every key on one line each and is the read for a small log; past
    a hundred keys it outgrows a tool result, and `view` with detail is the read to avoid at
@@ -292,7 +294,7 @@ rebase.
    - **Read each key's chain before counting it.** Occurrences are not independent: a
      session patches what it hit in the lag before a review, often in part, and parallel
      sessions hit one condition at once. `retro-log.py view --chain --prs --reached
-     --since <the mark's date>` (`--key` for any other key this run rules on) orders each
+     --since <markTag>` (`--key` for any other key this run rules on) orders each
      key's occurrences with the organic markers that touched its placement since the
      first, all on author time — what the session knew when it wrote — and names the open
      PRs touching the placement (without `gh`, the header says it could not, and the run
@@ -319,6 +321,10 @@ rebase.
      is named in the record, since its problem never entered the log and nothing counts
      its recurrence; one that answers a key the ranking read did not show gets that key's
      status line the same way.
+   - **A key reopened on one occurrence** — recurred after LANDED, its row showing the
+     landed status line — is read against that rule before it ranks: an occurrence the rule
+     would not have fired on is a sibling matched on shape alone, re-keyed, not a failed
+     landing.
    - **Count occurrences per key** from the view, read by the chain. A key with two or
      more occurrences is the promotion the log exists to make visible — rank those first,
      a burst as one incident, and carry the count as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
@@ -431,7 +437,7 @@ as its yield thins. The gate is what keeps the review affordable at scale.
    `workflowDocs` → narrate and skip, like any detected input.
 6. **Expensive — hot clusters and staleness survivors only.** **Keyed reads first**: the
    docs this run must open whole are the ones its own findings name, derived, never
-   configured, and **bounded** — `retro-log.py view --recurred --since <the mark's date>
+   configured, and **bounded** — `retro-log.py view --recurred --since <markTag>
    --docs` (the docs the *recurred* keys' placements, landings, and stubs point at;
    never the whole since-mark set, which on a busy repo outweighs the core), each path
    resolved by basename against the `processDocs` trees — a placement writes
@@ -639,7 +645,13 @@ as a check at the write than as an executor sub-agent between judgment and landi
   re-read from the remote — the one to cite; the slice branch is rebased so the
   duplicate drops.
 - Advance the mark: `git tag -f <markTag> <commit>` — where `<commit>` is an
-  **ancestor of the default branch**, after any approved edits have landed there. `HEAD`
+  **ancestor of the default branch**, after any approved edits have landed there. **First
+  read what landed behind the window**: `retro-log.py view --keys --since <the commit 0b
+  read the log at>` lists every key with a line appended since, this run's own status
+  lines among them; the list is per key, so a key carrying both is read with `view --key`
+  to tell this run's lines from the rest. A line this run did not write was captured after
+  the window was read — give its key the re-key sweep, and name it in the record. The tag moves it behind the
+  mark, and `--since <markTag>` never shows it again unless it recurs. `HEAD`
   is only right when that's where you are; a branch tip that a squash or rebase later
   orphans takes the mark with it, and the next window re-reads everything this one
   covered as new.

@@ -139,6 +139,17 @@ and dates — and reuse that exact key rather than minting a near-duplicate.
 to *adopt now* and lands a rule that never needed to exist. Same asymmetry as `add
 (unconsolidated)`.
 
+**A match on a landed key claims more than its shape.** A landed key is a closed one —
+listed with its status line, `LANDED <sha> — <where, and the rule>` — or a live one listed
+`recurred after LANDED <sha> — <…>`, already reopened. Matching a new finding to either
+says that rule was in place and failed to catch this case: the view reads the key as
+recurred after its landing, which ranks it at one occurrence and makes a review due on its
+own. Match a landed key only when the rule its status line names would have fired on this
+finding's case, and say in one clause how it would have fired — on topic is not enough. A finding of the same shape that rule could not
+have caught is a sibling — key it fresh, and name the closed key it resembles so the
+caller can see the near miss. With docs to read, open the rule where it landed before
+matching; key-only, judge from the status line, and when it does not say enough, no-match.
+
 A match is a **fact you report**, not a disposition you change. Your caller revises its own
 call on the evidence — that fence from §4 holds here exactly as it does everywhere else.
 
@@ -160,3 +171,6 @@ call on the evidence — that fence from §4 holds here exactly as it does every
   undedupable, and the one thing only you can prevent.
 - **Minting a near-duplicate of a key you just read**, or talking yourself into a match
   you aren't sure about.
+- **Reopening a landed key on shape alone** — a match on a closed key, or one listed
+  recurred after LANDED, is a claim that its landed rule would have fired on this case
+  and failed; without that, the finding is a sibling.

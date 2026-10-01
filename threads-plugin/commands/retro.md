@@ -127,7 +127,12 @@ It also reports whether that key **already exists in the log**. Act on that:
   needed. Don't second-guess a no-match into a match.
 
 A reported match is a **fact**, not the placer overruling you — it never touches the
-disposition itself. You revise your own call on new evidence.
+disposition itself. You revise your own call on new evidence. A match on a **landed** key —
+closed, or listed recurred after LANDED — reopens it or adds to its reopening, ranking at
+once, so it comes with the placer's clause saying how the landed rule would have fired on
+this case; carry that
+clause into the occurrence's text. A sibling it names instead is a fresh key, the
+resemblance noted in the evidence.
 
 It also reports, per placement, whether the existing text **already states the rule** the
 finding violated (`rule present`). That, with your own knowledge of which gate caught the
@@ -411,9 +416,11 @@ Measure — three commands, all local:
   **Never count the whole file** — a whole-file count is the lifetime total, and reporting
   it as pending calls a clean review a backlog.
 - **Recurred since the mark** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view
-  --keys --reached --since <the mark's date>` (`git log -1 --format=%ad --date=short
-  <markTag>`). A key at two or more occurrences no gate caught, back after its rule
-  landed, or past a gate that had caught it, is what opens the review's depth gate.
+  --keys --reached --since <markTag>`: the keys with a line the log at the mark did not
+  hold, to the commit — a date reads every capture of the mark's own day, the ones the
+  review just ruled on included, as new. A key at two or more occurrences no gate caught,
+  back after its rule landed, or past a gate that had caught it, is what opens the
+  review's depth gate.
 - **Volume and concentration** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py
   files`: the **organic** markers since the mark and how many files `trigger.concentration`
   or more of them touched. The review's own landings (the `Process-Review:` trailer) and
