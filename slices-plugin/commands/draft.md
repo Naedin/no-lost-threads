@@ -1,5 +1,5 @@
 ---
-description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code first, carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus at most five tension points). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
+description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code and size its frame first, carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus at most five tension points). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
 argument-hint: "<stub path, or the concern to promote>"
 allowed-tools: Bash, Read, Grep, Glob, Write, Edit
 ---
@@ -105,6 +105,35 @@ Two more axes, on the surviving claims. **Feasibility:** trace the mechanism end
 in the source — "X completes via Y" is a claim, walk it. **Sequencing:** do not inherit
 the stub's order; a capability this slice consumes makes its producer an upstream
 prerequisite, drafted first, never folded in or deferred downstream.
+
+**Size the frame before the precision work.** Everything after this — the ledger, the
+criteria, the cold check — certifies the frame it is handed, and none of it asks whether
+that frame is the right size. A stub records the one case someone noticed; its shape is a
+claim like any other, settled here by measurement:
+
+- **The value, in one sentence from the user's seat** — who meets this state, what it
+  costs them now, what they get. A sentence that needs the stub's vocabulary to make sense
+  is not one yet. It is the Shape paragraph's spine.
+- **The harm, sized.** A stub's *may*, *can*, or *sometimes* is measured before anything
+  is designed against it: how often the state arises and what it costs, by running the
+  mechanism over the inputs that vary (a throwaway probe, deleted before the plan is
+  written) or by counting in the repo's own data — a `draftBrief` names where that lives.
+  The measurement is a claim row like any other; a harm that cannot be sized is an
+  `unverified:` row naming what would size it, never a premise.
+- **The neighbouring states.** Walk outward from the stub's case: each surface the change
+  touches shown alone, beside the others, and not at all; every legitimate answer the user
+  has to what the change asks of them — accept, decline, put off, ignore — and who is right
+  to give each, which sizes how many users the stub's case leaves out; what undoes the
+  trigger a week on. A design that is right only in the stub's case is wrong.
+- **Two cheaper deliveries.** Name at least two ways to deliver as much value with less
+  surface — doing less is always one — and what the chosen shape buys over each.
+
+**One shape left standing** → it is the plan's frame, written as its first tension
+(§2): the shape taken over the cheaper deliveries, the states it covers and the ones it
+leaves out, the harm cited by its row. **More than one, or a walk that overturns the
+stub's shape on a product call** → present the shapes, each with its user outcome, and
+stop before the ledger: the frame's measurements go into the stub as a capture update
+(§3), and no plan is written until the maintainer picks one.
 
 **Every artifact the draft names is opened at draft time** — a symbol, a file, a test, a
 precedent ("as Y does"), a rule — and cited at file-and-line or section. A claim recalled
@@ -274,7 +303,7 @@ a negative criterion ("output contains no X") pairs with a liveness condition �
 code or a positive line proving the command ran — or an aborted command satisfies it by
 printing nothing. A tension entry states the call taken, the pull each way, and the
 lever: what overriding it costs. Tensions are decided, never open; anything unresolved
-is a question for the check, not a tension. The `Verification ledger` section holds the
+is a question for the check, not a tension. The Tensions section opens with the frame (§1). The `Verification ledger` section holds the
 site-opening pass's rows under a `drafted at` record when the plan is written: the gap
 check *appends* to it — its own record line and rows — so the plan format never
 migrates, and a draft-time row is re-run rather than re-hunted.
@@ -311,6 +340,8 @@ check exists precisely because this context just wrote the plan.
 ## Anti-patterns
 
 - **Drafting on unverified stub claims.** The audit (§1) is the point.
+- **Designing inside the stub's one case.** The frame is sized (§1) before the ledger is
+  spent on it; a cold check that finds it too narrow has thrown that ledger away.
 - **A plan with no tensions.** Zero contestable decisions means either the slice
   is trivial or the contestable calls were made silently. Say which.
 - **More than five tensions in the digest** — that's the whole plan re-litigated in

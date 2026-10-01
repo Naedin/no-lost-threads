@@ -44,9 +44,10 @@ to break the slice plan at `<path>`."* — and, when `checkBrief` is set, one mo
 sentence: *"Also run the local gap classes in `<checkBrief path>`."* No background, no
 rationale, no summary of the drafting conversation, no note about what you're unsure
 of. Its brief lives in the agent definition, and the plan's own ledger tells it where to
-start: the claim rows under a `drafted at` record are re-run verbatim before anything is
-hunted, so a claim the drafter measured is checked by its command and not by a second
-cold read, and the hunt goes to the sites the rows do not cover. **The checker edits the
+start: once the frame is read — a frame narrower than the problem ends the check
+MIS-CARVED before any precision is spent — the claim rows under a `drafted at` record are
+re-run verbatim before anything is hunted, so a claim the drafter measured is checked by
+its command and not by a second cold read, and the hunt goes to the sites the rows do not cover. **The checker edits the
 plan.** Every defect whose fix is unambiguous is applied in place before the report is
 written — the checker holds the freshest adversarial read, and a hand-off would discard
 it — so the report that comes back names fixes already landed, and only a product or
@@ -88,9 +89,9 @@ would answer.
   believe wrong is surfaced as a question with your reasoning, never reverted on your
   own — your context is the one being audited.
 - **MIS-CARVED** — the checker reports that the findings are a shape problem, not
-  gaps: the premise is wrong, the slice has grown past one coherent change, or it is
-  superseded. It applied nothing; do not force in-place repairs onto a bad shape. Record
-  the check (§3), say so, and stop; the plan goes back to a stub with the reframing
+  gaps: the premise is wrong, its frame is narrower than the problem, the slice has grown
+  past one coherent change, or it is superseded. It applied nothing; do not force
+  in-place repairs onto a bad shape. Record the check (§3), say so, and stop; the plan goes back to a stub with the reframing
   folded in, which is `/slices:draft`'s to do or the user's to decline.
 - **Questions** (the verdict is **NEEDS-DECISION**) — anything hinging on a product or
   priority call. Surface these to

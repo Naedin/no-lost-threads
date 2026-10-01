@@ -98,9 +98,10 @@ convention in the moment. Fields:
   a question the review asks **once**: set the path, or record `null` here to decline, and
   the question is not asked again. Unset in such a repo, the review's only non-doc input is
   missing and every upstream-bound finding has no store.
-- `adherenceRules` — optional: prose rules sampled every run (step 0d), each an `id`, a
+- `adherenceRules` — optional: prose rules sampled at step 0d, each an `id`, a
   whole-tree `population` command emitting `path:line:` hits, the adopter's `judgePrompt`
-  path, a draw size `n`, and a `weighting` (`window` or `uniform`); the schema is
+  path, a draw size `n`, a `weighting` (`window` or `uniform`), and an optional `floor`
+  of change below which the rule is not sampled; the schema is
   [`commands/adherence.md`](adherence.md). Absent → step 0d narrates and skips.
 - `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
   short name passed through as given. Absent, the agent file's own pin applies.
@@ -288,9 +289,39 @@ rebase.
      line wherever it appears, the one edit the stream permits, and only this command
      makes it — then `compact`, *then* count from the view. Keys flagged `(uncold)` come
      first, but the sweep is over all of them.
-   - **Count occurrences per key** from the view. A key with two or more occurrences is
-     the promotion the log exists to make visible — rank those first and carry the count
-     as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
+   - **Read each key's chain before counting it.** Occurrences are not independent: a
+     session patches what it hit in the lag before a review, often in part, and parallel
+     sessions hit one condition at once. `retro-log.py view --chain --prs --reached
+     --since <the mark's date>` (`--key` for any other key this run rules on) orders each
+     key's occurrences with the organic markers that touched its placement since the
+     first, all on author time — what the session knew when it wrote — and names the open
+     PRs touching the placement (without `gh`, the header says it could not, and the run
+     narrates the tier drop). Read it **before this run appends a status line or
+     compacts**: `compact` reduces a landed key to its status line, and the chain it was
+     ruled on cannot be re-derived after. A marker wider than 30 files is bracketed as
+     broad — a relink touches every chain — and its placement hunk is read before it is
+     ruled anyone's patch. Every ruling names which of three the chain is:
+     - **burst** — near-simultaneous occurrences, nothing landed between: one incident
+       for ranking, the count kept — `ADJUDICATED <date> — burst: <n> occurrences, <dates>,
+       one incident`.
+     - **patched** — a marker between or after the occurrences answers the key. Judge
+       the patch: **structural** → `LANDED <its sha> — <where>`, so a later occurrence
+       reads recurred after LANDED; **partial** → `ADJUDICATED <date> — patched in part by
+       <sha>; open: <the half still open>`, and the key ranks on the open half. An
+       occurrence after a patch is evidence that patch did not hold, and outranks the same
+       count with nothing between. A marker that touched the file and does not answer the
+       key is not its patch; the ruling says so.
+     - **unpatched** — nothing answered it: the count ranks as it stands. An open PR on
+       the placement that answers it is a fix in flight: `FILED #<n> — <the PR>`, so a
+       row proposes nothing over it.
+     The chain's closing section is the reverse read: an organic marker in the window
+     that answers no key — at zero and zero, or not answering the keys named under it —
+     is named in the record, since its problem never entered the log and nothing counts
+     its recurrence; one that answers a key the ranking read did not show gets that key's
+     status line the same way.
+   - **Count occurrences per key** from the view, read by the chain. A key with two or
+     more occurrences is the promotion the log exists to make visible — rank those first,
+     a burst as one incident, and carry the count as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
      count-only: the `Caught:` tags are the ruling, and the count they build is the
      evidence a rule is cited past, read when the key escapes.
    - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
@@ -323,10 +354,13 @@ rebase.
    reads only 0c reports a healthy log and a short one identically.
 
    **0d — adherence sample** (`adherenceRules`). Not free: two sub-agent passes per rule.
-   It runs before the gate anyway, every run, because its line is a per-window trend and a
-   window skipped is a point lost for good. Per rule, run the procedure in
-   `${CLAUDE_PLUGIN_ROOT}/commands/adherence.md` §Procedure — draw over this run's window
-   (`--head` the default branch the checkout now sits at), one judge checked by `flags`,
+   It runs before the gate, every run whose range reaches the rule's `floor`. The draw's
+   range starts at the rule's **last sample** — the newest review commit carrying its
+   `Adherence:` line — so a run below the floor, a failed run, or a review that never
+   reached 0d leaves no range unsampled: the next draw covers it. A draw below the floor
+   prints its header at `n 0`; name it in the record and record no line. Per rule, run the
+   procedure in `${CLAUDE_PLUGIN_ROOT}/commands/adherence.md` §Procedure — draw over its
+   default range (`--head` the default branch the checkout now sits at), one judge checked by `flags`,
    one refuter over its flags, `verdicts`, `tally`, `recur`; an agent whose output is
    refused twice fails that rule's run and records no line. Carry the `Adherence:` line to the record and
    the marker commit body; a shape `recur` calls **routed** (two or more windows) is a
@@ -439,9 +473,10 @@ marker commit body can stand on it. The maintainer reads none of it to decide. W
 read is the **decision block**, which opens the output, and **nothing else sits above it** —
 no evidence, no placements, no tier narration, no tally.
 
-**Before a row is written, re-measure its premise against the default branch, now.** A
-candidate can have landed since it was held, or gone moot on a decision the maintainer took
-elsewhere; a row whose premise is stale spends the one attention budget the block exists to
+**Before a row is written, re-measure its premise against the default branch, now, and
+against the open PRs** (`--chain --prs`, where `gh` reads them). A candidate can have
+landed since it was held, be building on an unmerged branch, or have gone moot on a
+decision the maintainer took elsewhere; a row whose premise is stale spends the one attention budget the block exists to
 protect. Re-measured and gone → `RETIRED` or `LANDED` in the log, not a row.
 
 The block, in this order:
@@ -528,14 +563,21 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   cull finding, not a question); keyed docs opened
   whole / keyed docs that bore (count and words — a keyed set larger than the core is
   the bound in step 6 failing); markers read — organic / review / bookkeeping; keys read (the
-  view's summary line) / keys that recurred; this run's own landing errors (a wrong
+  view's summary line) / keys that recurred; keys ruled burst / patched / unpatched, and
+  organic markers answering no key; this run's own landing errors (a wrong
   anchor, a mistyped literal, a repaired commit — count and shas); the run's size where
   the harness shows it (tool calls, wall clock). Then **questions to the maintainer**,
   never findings: *what should the next run stop reading?* — a ledger watch that has
   not woken in several windows, a class of capture the retro should stop appending (a
   core doc that bore on nothing is not on this list: 0a asks why, and the answer is a
   trim or nothing) — and any miss of this run's own, phrased as the question
-  it raises. **The review's own misses are lines here and an `Economics:` line beside
+  it raises. **Each goes out answered**: the review's recommendation and the default it
+  acts on absent a reply — one this run applies, or records where the next run reads it
+  (a `HELD` line, a ledger watch) — or the one clause saying why only the maintainer can
+  answer it. **A question whose answer could move a row is worked before the table is
+  written**: its premise measured against the files it names, its answer drawn from this
+  run's record, landing as that row's evidence or a changed row; one only the maintainer
+  can answer is that row's Why, never a question under the economics. **The review's own misses are lines here and an `Economics:` line beside
   `Tally:` in the marker commit body, never keys in the log it maintains**: keying the
   review's conduct into the stream it is trying to shrink feeds the count it measures.
   The maintainer answers in the thread; an answer that changes a config field or a doc
@@ -634,8 +676,9 @@ as a check at the write than as an executor sub-agent between judgment and landi
     *promoting signal: approval*. Approved → `LANDED`; declined → `RETIRED` with the
     reason. A held proposal that lives only in a commit body is lost to the next run.
   - **A ruling on a key that moves nothing** — a re-rank, a count-only call at a key whose
-    rule is present, a build trigger on a filed stub, a re-rank withdrawn — is
-    `ADJUDICATED <today's date> — <the ruling in one line>` on the key: its own entry,
+    rule is present, a build trigger on a filed stub, a burst, a partial patch, a re-rank
+    withdrawn — is `ADJUDICATED <today's date> — <the ruling in one line>` on the key, its
+    reason measured like a row's premise before it is written: its own entry,
     never continuation prose inside an occurrence. It changes neither the state nor the
     count, `compact` keeps it, and `view --key` shows it, so the next run reads the ruling
     where the key is instead of in a commit body. A count-only ruling on a key whose
@@ -770,3 +813,9 @@ as a check at the write than as an executor sub-agent between judgment and landi
 - **Keying the review's own conduct into the log.** It goes in the economics block and
   the commit body, as a question to the maintainer; the log is the substrate this
   command is trying to keep small.
+- **A bare question to the maintainer**, or one that could move a row asked after the
+  table — the question carries the review's answer and its default, or why it is the
+  maintainer's alone, and a row is written after the questions that could move it.
+- **Counting a key's occurrences as independent and unpatched** — a burst is one
+  incident, a landed patch gets its status line, and an organic marker that answers no
+  key is named, since nothing else will count its recurrence.

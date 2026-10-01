@@ -95,26 +95,42 @@ def config(root):
         refuse(f"{cfg}: malformed ({e})")
 
 
+def stream_config(root, pattern=None):
+    """(config, compiled marker, mark tag, bookkeeping paths) — what classifying needs."""
+    cfg = config(root)
+    pattern = pattern or cfg.get("markerPattern") or DEFAULT_PATTERN
+    try:
+        marker = re.compile(bre_to_python(pattern))
+    except re.error as e:
+        refuse(f"markerPattern {pattern!r} does not compile: {e}")
+    bookkeeping = {p for p in (cfg.get("retroLogPath", ".claude/threads-retro-log.md"),
+                               cfg.get("ledgerPath", ".claude/threads-review-ledger.md"),
+                               cfg.get("capabilityEvidencePath"))
+                   if isinstance(p, str) and p}
+    return cfg, marker, cfg.get("markTag") or DEFAULT_MARK, bookkeeping
+
+
 def commits(root, rng):
-    """[(sha, short, subject, trailer, files, date, arcs)] newest first, one git call."""
+    """[(sha, short, subject, trailer, files, date, arcs, time)] newest first, one git
+    call; `time` is the author date, ISO 8601."""
     fmt = ("%x00%H%x1f%h%x1f%s%x1f%(trailers:key=" + TRAILER + ",valueonly)%x1f%ad%x1f"
-           "%(trailers:key=" + ARC_TRAILER + ",valueonly)%x1e")
+           "%(trailers:key=" + ARC_TRAILER + ",valueonly)%x1f%aI%x1e")
     raw = git(["log", *rng, "--format=" + fmt, "--date=short", "--name-only"], root)
     out = []
     for chunk in raw.split("\x00"):
         if not chunk.strip():
             continue
         head, _, rest = chunk.partition("\x1e")
-        sha, short, subject, trailer, date, arcs = (head.split("\x1f") + [""] * 6)[:6]
+        sha, short, subject, trailer, date, arcs, time = (head.split("\x1f") + [""] * 7)[:7]
         files = [l.strip() for l in rest.splitlines() if l.strip()]
         out.append((sha, short, subject, trailer.strip(), files, date.strip(),
-                    {a.strip() for a in arcs.splitlines() if a.strip()}))
+                    {a.strip() for a in arcs.splitlines() if a.strip()}, time.strip()))
     return out
 
 
 def classify(entries, marker, bookkeeping, arc=None):
     rows = []
-    for sha, short, subject, trailer, files, date, arcs in entries:
+    for sha, short, subject, trailer, files, date, arcs, time in entries:
         if not marker.search(subject):
             continue
         if arc and arc not in arcs:
@@ -125,7 +141,7 @@ def classify(entries, marker, bookkeeping, arc=None):
             cls = "bookkeeping"
         else:
             cls = "organic"
-        rows.append((cls, sha, short, subject, files, date))
+        rows.append((cls, sha, short, subject, files, date, time))
     return rows
 
 
@@ -143,17 +159,7 @@ def main():
     a = ap.parse_args()
 
     root = pathlib.Path(a.root or git(["rev-parse", "--show-toplevel"], None).strip()).resolve()
-    cfg = config(root)
-    pattern = a.pattern or cfg.get("markerPattern") or DEFAULT_PATTERN
-    try:
-        marker = re.compile(bre_to_python(pattern))
-    except re.error as e:
-        refuse(f"markerPattern {pattern!r} does not compile: {e}")
-    mark = cfg.get("markTag") or DEFAULT_MARK
-    bookkeeping = {p for p in (cfg.get("retroLogPath", ".claude/threads-retro-log.md"),
-                               cfg.get("ledgerPath", ".claude/threads-review-ledger.md"),
-                               cfg.get("capabilityEvidencePath"))
-                   if isinstance(p, str) and p}
+    cfg, marker, mark, bookkeeping = stream_config(root, a.pattern)
     concentration = int((cfg.get("trigger") or {}).get("concentration", 3))
 
     if a.arc and not re.match(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", a.arc):
@@ -178,11 +184,11 @@ def main():
     if a.mode == "count":
         return 0
     if a.mode == "list":
-        for cls, sha, short, subject, files, date in rows:
+        for cls, sha, short, subject, files, date, _ in rows:
             print(f"{cls}\t{short}\t" + (f"{date}\t" if a.arc else "") + subject)
         return 0
     per_file = {}
-    for cls, sha, short, subject, files, date in rows:
+    for cls, sha, short, subject, files, date, _ in rows:
         if cls != "organic":
             continue
         for f in files:

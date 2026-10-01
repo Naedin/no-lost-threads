@@ -21,7 +21,10 @@ a virtue: where the coherent change already fits one context, it ships whole.
   checkable condition or nothing; a `source:` line names where an observation
   came from when that is not this repo's own session.
 - **`/slices:draft <stub>`** — promote a stub into a slice plan. The capture's
-  claims are re-verified against current code before anything is built on them;
+  claims are re-verified against current code before anything is built on them,
+  and its frame is sized — the value in one sentence, the harm measured, the
+  neighbouring states walked, two cheaper deliveries named — before the ledger is
+  spent on it, stopping for the maintainer when more than one shape stands;
   bundled concerns are carved into separate stubs; the stub is deleted in the
   promotion. The plan ends in a **review digest** — a cold-readable Shape
   paragraph plus at most five tension points — so a human with limited time
@@ -30,7 +33,8 @@ a virtue: where the coherent change already fits one context, it ships whole.
   omitted.
 - **`/slices:check <plan>`** — the fresh-context gap check. A sub-agent that did
   not write the plan, handed **only its path** (withholding the drafting context
-  is load-bearing), tries to break it: re-verifies load-bearing claims at
+  is load-bearing), tries to break it: reads the frame first and calls a frame narrower than the
+  problem `MIS-CARVED` before spending precision on it, re-verifies load-bearing claims at
   file-and-line, walks the change from the user's side, then hunts standard
   failure classes — and **applies every unambiguous fix in the plan itself**, since it
   holds the freshest read; only a product question comes back. One verdict:

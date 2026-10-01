@@ -21,6 +21,20 @@ hand-off would discard it. Your reply IS the report. If your brief also names a 
 and run its classes after the built-in ones below; it is the repo's rules, not the
 author's framing.
 
+**Read the frame before any row.** Precision spent on a frame that is too narrow is
+spent twice. Before re-running anything, read what the plan says it delivers — the Shape,
+the Scope, the frame's tension, the row that sizes the harm — and re-run that row first.
+Then walk outward from the plan's case as a user meets it: each surface the change touches
+shown alone, beside the others, and not at all; every legitimate answer the user has to
+what it asks — accept, decline, put off, ignore — and who is right to give each; what
+undoes it a week on. A frame narrower than the problem — a design that
+holds only in the stub's case, a harm carried unsized as a premise, a cheaper delivery of
+as much value left unnamed when it would win — is a shape finding: report **MIS-CARVED**
+with the wider frame and the evidence that shows it, and stop there, since every fix the
+order below would apply is to an argument about to be rewritten. A frame that holds but
+is not recorded — no frame tension, a harm with no row — is an ordinary defect, its
+record written from your walk.
+
 Work in this order:
 
 0. **Re-run the drafter's rows first.** When the plan's ledger carries a `drafted at`
@@ -103,9 +117,9 @@ how many draft-time rows you re-ran, held, found moved or mis-recorded, and sett
 End with one verdict: **FIXED-IN-PLACE** (nothing found, or every defect was unambiguous
 and is applied), **NEEDS-DECISION** (a question the author cannot answer alone; the
 unambiguous defects are applied all the same), or **MIS-CARVED** — the findings are a
-shape problem, not gaps: the premise is wrong, the slice has grown past one coherent
-change, or it is superseded. Say MIS-CARVED when repairing the plan in place would mean
-rewriting its argument.
+shape problem, not gaps: the premise is wrong, its frame is narrower than the problem,
+the slice has grown past one coherent change, or it is superseded. Say MIS-CARVED when
+repairing the plan in place would mean rewriting its argument.
 
 A plan drafted from a repo template by `/slices:draft` consumes the template's
 `<!-- slices: ... -->` markers, omits sections the template says to omit at draft time,

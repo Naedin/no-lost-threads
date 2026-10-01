@@ -12,7 +12,8 @@ whether it holds; the review sees its failures only when a retro happens to noti
 This command measures it: a seeded draw from the rule's population, judged cold, the
 flagged verdicts re-checked cold, and one line of counts a later run can trend.
 
-`/threads:process-review` runs this procedure as its step 0d, once per rule, every run.
+`/threads:process-review` runs this procedure as its step 0d, once per rule, every run
+whose range reaches the rule's `floor`.
 Invoked directly it is the same procedure with nothing landed: no commit, no log line, no
 tag moved — for a **baseline** over one window, and for a **calibration** over a fixed
 block list in a checkout pinned to a commit.
@@ -26,7 +27,8 @@ block list in a checkout pinned to a commit.
     "population": "rg -n --type swift '^\\s*///?\\s*\\S.{30,}' Sources",
     "judgePrompt": "Plans/templates/adherence-comment-truth.md",
     "n": 20,
-    "weighting": "window"
+    "weighting": "window",
+    "floor": 5
   }
 ]
 ```
@@ -41,8 +43,15 @@ block list in a checkout pinned to a commit.
   space, since a checklist-bounded judge misses the drift no one has named yet. The judge
   reads it first and it wins over the judge's own brief.
 - `n` — distinct blocks per draw. A population with fewer blocks is sampled whole.
-- `weighting` — `window` (only hits in files changed over `<markTag>..<head>`: the rate
-  of what the window's review let through) or `uniform` (every hit: the stock).
+- `weighting` — `window` (only hits in files changed over the range: the rate of what
+  the range's reviews let through) or `uniform` (every hit: the stock).
+- `floor` — optional: the fewest commits in the range touching a file that holds a hit,
+  a review's own commits (a `Process-Review:` trailer — the sample's fixes) not counted.
+  Below it the draw prints its header at `n 0` and nothing is judged, so the cadence
+  follows source change rather than the review's. The range starts at the rule's **last
+  sample** — the newest commit carrying a `Process-Review:` trailer and this rule's
+  `Adherence:` line — else the mark, so a range skipped under the floor, or by a run that
+  failed, is drawn from by the next run and never lost.
 - `block` — optional regex; a line matching it joins the drawn line's block, a blank or
   non-matching line ends it. Default `^\s*(//|/\*|\*)`; a `#`-comment language sets its own.
 
@@ -51,8 +60,9 @@ block list in a checkout pinned to a commit.
 ## Arguments
 
 - `<rule-id>` — required when more than one rule is declared.
-- `--since REV` / `--head REV` — the window, for a `window` rule (default: the mark to
-  `HEAD`). The blocks are read from the working tree, so the checkout sits at `--head`.
+- `--since REV` / `--head REV` — the range (default: the rule's last sample, else the
+  mark, to `HEAD`): a `window` rule's draw and any rule's `floor` read it. The blocks are
+  read from the working tree, so the checkout sits at `--head`.
 - `--seed S` — default today as `YYYYMMDD`; a recorded seed reproduces a draw.
 - `--blocks FILE --root DIR` — calibration: a fixed list (`path:line` or
   `path:start-end`, one per line, each expanded to its block) replaces the population and
@@ -83,8 +93,9 @@ edited, completed, or assembled by hand — and let the script check it.
    checked exists — the path steps 2 and 3 hand the agents.
    A refusal (a population line that is not `path:line:`, a missing mark, a malformed
    rule, a judge prompt not on disk) is reported as it reads and the rule is skipped — never re-run with a hand-edited
-   population. A manifest at `n 0` is a window with nothing to sample: report it and skip
-   2–4.
+   population. A manifest at `n 0` — a range with nothing to sample, or one `below floor`
+   — is reported as its header reads and 2–4 are skipped; no line is recorded, so the
+   next draw's range still starts at the last sample.
 2. **Judge — once, fresh context.** Spawn `threads:adherence-judge` with the judge prompt
    path, the manifest path, and the root, all absolute. One judge rules every block; a
    second judge per block would trade the one context that sees the draw whole for

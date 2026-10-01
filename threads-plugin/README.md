@@ -139,18 +139,29 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
 - **It samples whether a prose rule holds.** A lint proves itself at its gate; a rule an
   agent is supposed to apply — *a comment states only what the code makes true* — has no
   gate. A rule declared under `adherenceRules` (a whole-tree population command, your judge
-  prompt, a draw size, `window` or `uniform` weighting) is sampled every review: a seeded
+  prompt, a draw size, `window` or `uniform` weighting, an optional `floor` of change) is
+  sampled at each review whose range reaches the floor — the range starting at the rule's
+  last sample, so a review that skips it loses nothing: a seeded
   draw of distinct blocks, one fresh-context judge ruling each TRUE / DRIFTED / HISTORY
   against the tree, one refuter re-checking every flag (the script checks each agent's
   output; nothing is hand-assembled), and an `Adherence:` line in the marker commit — a
   trend one `git log` reads, a lower bound since only flags are re-checked. A drift shape seen in two windows becomes a review candidate.
   **`/threads:adherence`** runs the same sample standalone, landing nothing: a baseline
   over one window, or a calibration over a fixed block list in a tree pinned to a commit.
-- **It closes with its own economics**, as questions to you: what it read against what
-  bore on a ruling, how much of the marker stream was its own weight, how many keys it
-  carried against how many recurred, and its own landing errors — and the standing
-  question, *what should the next run stop reading?* Its own misses go there, never into
-  the log it is trying to keep small.
+- **It reads a key's chain before counting it.** Sessions patch what they hit before a
+  review comes round, and parallel sessions hit one condition at once, so a count is not
+  a recurrence by itself. `retro-log.py view --chain` orders each key's occurrences, at
+  their capture time, with the process commits that touched its placement; the review
+  rules each key a burst (one incident), patched (its status line cites the patch, and a
+  partial one names the open half), or unpatched, and names any process commit that
+  answers no key, since nothing else counts its recurrence.
+- **It closes with its own economics**, as questions to you, each carrying the review's
+  own answer and the default it acts on, or why only you can answer it: what it read
+  against what bore on a ruling, how much of the marker stream was its own weight, how
+  many keys it carried against how many recurred, and its own landing errors — and the
+  standing question, *what should the next run stop reading?* A question whose answer
+  could change a decision row is worked before the table is written. Its own misses go
+  there, never into the log it is trying to keep small.
 - **Nothing silent.** Applying anything requires recorded consent (`applyMode`,
   starting `read-only`, ratcheting by an answer to `apply-on-approval` and then to
   `apply-mechanical`, where a run nobody is answering lands wording amendments and trims

@@ -342,6 +342,55 @@ python3 "$ms" count --arc why-not-now --since process-review-mark --root "$M" 2>
 python3 "$ms" count --arc Not_A_Slug --root "$M" >/dev/null 2>&1 && fail "--arc accepted a non-slug"
 ok "marker-stream --arc: commits carrying the Arc trailer, whole history by default, dated rows"
 
+# ---- retro-log.py view --chain: a key's occurrences (capture time by blame) and the organic
+# markers on its placement since the first, in time order; then the window's organic markers
+C="$tmp/chain"; mkdir -p "$C/.claude" "$C/docs"
+git init -q -b main "$C"; c_() { git -C "$C" "$@"; }
+c_ config user.email t@t; c_ config user.name t
+at() { GIT_AUTHOR_DATE="$1" GIT_COMMITTER_DATE="$1" git -C "$C" commit -q -m "$2"; }
+printf '{ "markerPattern": "^docs(process", "retroLogPath": ".claude/log.md" }\n' > "$C/.claude/threads.json"
+printf '# a\n' > "$C/docs/a.md"; printf '# o\n' > "$C/docs/other.md"; printf '## Entries\n' > "$C/.claude/log.md"
+c_ add -A; at "2026-09-01T09:00:00+00:00" base
+printf 'x\n' >> "$C/docs/a.md"; c_ add -A; at "2026-09-02T08:00:00+00:00" "docs(process/a): before any capture, the same day"
+c_ tag process-review-mark
+printf 'k/a\n  2026-09-02 | s1 | first.\n    Placement: a.md §x\n' >> "$C/.claude/log.md"; c_ add -A; at "2026-09-02T09:00:00+00:00" "capture a"
+printf 'y\n' >> "$C/docs/a.md"; c_ add -A; at "2026-09-03T09:00:00+00:00" "docs(process/a): the patch"
+printf 'k/a\n  2026-09-05 | s2 | again.\n' >> "$C/.claude/log.md"; c_ add -A; at "2026-09-05T09:00:00+00:00" "capture a again"
+printf '# b\n' > "$C/docs/b.md"; c_ add -A; at "2026-09-05T10:00:00+00:00" "docs(process/b): before k/b's first capture"
+printf 'k/b\n  2026-09-06 | p1 | once.\n    Placement: docs/b.md §y\n' >> "$C/.claude/log.md"; c_ add -A; at "2026-09-06T09:00:00+00:00" "capture b"
+printf 'k/b\n  2026-09-06 | p2 | twice, a parallel session.\n' >> "$C/.claude/log.md"; c_ add -A; at "2026-09-06T15:00:00+00:00" "capture b again"
+printf 'z\n' >> "$C/docs/other.md"; c_ add -A; at "2026-09-07T09:00:00+00:00" "docs(process/other): a patch no key is placed at"
+python3 "$rl" view --chain --recurred --root "$C" > "$C/out" 2>"$C/err" || fail "view --chain failed: $(cat "$C/err")"
+sed -n '/^k\/a /,/^$/p' "$C/out" | grep '^  [0-9]' | awk '{print $3}' | tr '\n' ' ' | grep -qx 'occurrence touched occurrence ' || fail "k/a's chain is not in time order, or reached before its first occurrence: $(cat "$C/out")"
+grep -q "^  2026-09-02 09:00  occurrence  $(c_ log -1 --format=%h --grep='^capture a$')  s1\$" "$C/out" || fail "an occurrence lacks its capture time and commit: $(cat "$C/out")"
+grep -q '^  chain: 2 occurrences in 2 bursts · occurred again after [0-9a-f]* touched it$' "$C/out" || fail "k/a's chain read wrong: $(grep chain: "$C/out")"
+grep -q '^  chain: 2 occurrences in 1 burst · placement untouched since the first$' "$C/out" || fail "k/b's same-day pair did not read as one burst: $(grep chain: "$C/out")"
+grep -q '^## Organic markers since process-review-mark: 3 .* 2 touch no live key.s placement$' "$C/out" || fail "the window's markers miscounted: $(grep '^##' "$C/out")"
+grep -q '^0	0	2026-09-07 09:00  [0-9a-f]*  docs(process/other): a patch no key is placed at$' "$C/out" || fail "the unkeyed patch was not read as touching no placement: $(cat "$C/out")"
+grep -q '^1	1	.*the patch$' "$C/out" || fail "the patch was not joined to k/a's chain: $(cat "$C/out")"
+printf 'k/a\n  2026-09-08 | s3 | uncommitted.\n' >> "$C/.claude/log.md"
+python3 "$rl" view --chain --key k/a --root "$C" 2>/dev/null | grep -q '^  2026-09-08 --:--  occurrence  uncommitted  s3$' || fail "an uncommitted occurrence was not dated by its line alone"
+python3 "$rl" view --chain --key k/a --root "$C" 2>/dev/null | grep -q '^  chain: 3 occurrences in 3 bursts · occurred again after' || fail "the uncommitted occurrence did not join the chain"
+# one clock: a patch authored before a capture and committed after it orders by its author time
+printf 'w\n' >> "$C/docs/a.md"; c_ add -A
+GIT_AUTHOR_DATE="2026-09-09T08:00:00+00:00" GIT_COMMITTER_DATE="2026-09-09T12:00:00+00:00" git -C "$C" commit -q -m "docs(process/a): written early, landed late"
+printf 'k/a\n  2026-09-09 | s4 | between.\n' >> "$C/.claude/log.md"; c_ add -A; GIT_AUTHOR_DATE="2026-09-09T10:00:00+00:00" GIT_COMMITTER_DATE="2026-09-09T12:00:00+00:00" git -C "$C" commit -q -m "capture a, between"
+python3 "$rl" view --chain --key k/a --root "$C" > "$C/out2" 2>&1
+grep -E '^  [0-9].*(written early|  s4$)' "$C/out2" | awk '{print $3}' | tr '\n' ' ' | grep -qx 'touched occurrence ' || fail "a patch was ordered on another clock than the capture: $(cat "$C/out2")"
+head -1 "$C/out2" | grep -q '^chain: author times on both kinds of line' || fail "the chain does not name its clock"
+# a marker touching more than 30 files is bracketed as broad, with its file count and placement churn
+for i in $(seq 1 31); do printf '%s\n' "$i" > "$C/docs/f$i.md"; done; printf 'relink\n' >> "$C/docs/a.md"; c_ add -A; at "2026-09-10T09:00:00+00:00" "docs(process/links): repoint every link"
+python3 "$rl" view --chain --key k/a --root "$C" > "$C/out3" 2>&1
+grep -q '^  2026-09-10 09:00  broad       [0-9a-f]*  docs(process/links): repoint every link  (docs/a.md +1 -0 · [0-9]* files)$' "$C/out3" || fail "a broad marker was not bracketed with its churn and file count: $(cat "$C/out3")"
+grep -q '^  chain: .*broad: [0-9a-f]*$' "$C/out3" && ! grep -q 'touched after the last' "$C/out3" || fail "a broad marker was read as a touch after the last: $(grep chain: "$C/out3")"
+# --prs: an open PR touching the placement is in flight; gh failing is narrated, never fatal
+mkdir -p "$C/bin"; printf '#!/bin/sh\necho '"'"'[{"number": 7, "title": "fix a", "files": [{"path": "docs/a.md"}]}]'"'"'\n' > "$C/bin/gh"; chmod +x "$C/bin/gh"
+PATH="$C/bin:$PATH" python3 "$rl" view --chain --prs --key k/a --root "$C" > "$C/out4" 2>&1 || fail "--prs failed: $(cat "$C/out4")"
+grep -q '^  open PR #7  fix a  (docs/a.md)$' "$C/out4" && grep -q '^  chain: .*in flight: #7$' "$C/out4" || fail "an open PR on the placement was not named in flight: $(cat "$C/out4")"
+printf '#!/bin/sh\necho "no remote" >&2; exit 1\n' > "$C/bin/gh"
+PATH="$C/bin:$PATH" python3 "$rl" view --chain --prs --key k/a --root "$C" 2>&1 | head -1 | grep -q 'open PRs not read (no remote)' || fail "a failing gh was not narrated"
+ok "view --chain: occurrences and the placement's organic markers on one clock, in order; a same-day pair one burst; a broad marker bracketed; an open PR in flight; the window's unkeyed patch named; an uncommitted line dated by its own"
+
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.
 cd_="$here/scripts/core-diff.py"
@@ -502,6 +551,31 @@ a_ commit -q --allow-empty -m "docs(process/review): 09-03" -m "$(sed 's/count-o
 python3 "$ad" recur --rule comment-truth --current "$AD/tc" --root "$AD" > "$AD/r2" 2>"$AD/err" || fail "recur failed: $(cat "$AD/err")"
 grep -qx '1	count-over-hand-list	2026-09-01	recorded' "$AD/r2" && ! grep -q 'control-only-shape' "$AD/r2" || fail "recur counted a control line as a window: $(cat "$AD/r2")"
 ok "adherence recur: windows by trailer date, routed at two, recorded at one, a quoting commit and a control line ignored"
+
+# the range starts at the rule's last sample (the newest review commit carrying its line),
+# else the mark; --since overrides it; a floor skips a range too quiet to sample
+cat > "$AD/.claude/floor.json" <<'EOF5'
+{ "markTag": "process-review-mark", "adherenceRules": [
+  { "id": "comment-truth", "population": "grep -rnE '^[[:space:]]*//' src", "judgePrompt": "judge.md", "n": 20, "weighting": "window" },
+  { "id": "floored", "population": "grep -rnE '^[[:space:]]*//' src", "judgePrompt": "judge.md", "n": 20, "weighting": "window", "floor": 2 },
+  { "id": "stock", "population": "grep -rnE '^[[:space:]]*//' src", "judgePrompt": "judge.md", "n": 1, "weighting": "uniform", "floor": 1 } ] }
+EOF5
+sample="$(a_ log -1 --format=%h --grep='^Process-Review: 2026-09-02')"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule comment-truth --seed 7 --root "$AD" > "$AD/w1" 2>"$AD/err" || fail "a draw from the last sample failed: $(cat "$AD/err")"
+head -1 "$AD/w1" | grep -q "^adherence comment-truth: window last sample (20[0-9-]*, $sample)\.\.HEAD · pop 0f/0l · n 0 · seed 7$" || fail "the window did not start at the rule's last sample ($sample), past the control line: $(head -1 "$AD/w1")"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule comment-truth --seed 7 --since process-review-mark --root "$AD" 2>/dev/null | head -1 | grep -q '^adherence comment-truth: window process-review-mark (.*· pop 1f/1l · n 1 ' || fail "--since did not override the last sample"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule floored --seed 7 --root "$AD" > "$AD/w2" 2>"$AD/err" || fail "a floored draw failed: $(cat "$AD/err")"
+head -1 "$AD/w2" | grep -q '^adherence floored: window process-review-mark (.*)\.\.HEAD · below floor 1/2 commits · pop 1f/1l · n 0 · seed 7$' && [ "$(wc -l < "$AD/w2" | tr -d ' ')" -eq 1 ] || fail "a range under the floor drew blocks or misread the floor: $(cat "$AD/w2")"
+printf 'int z;\n' >> "$AD/src/a.c"; a_ add -A; a_ commit -q -m "docs(process/review): the sample's own fix" --trailer "Process-Review: 2026-09-04"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule floored --seed 7 --root "$AD" 2>/dev/null | head -1 | grep -q ' · below floor 1/2 commits · ' || fail "a review's own commit counted toward the floor"
+printf '// one, changed\n// two\n// three\nint a;\n\n// four\n// five\nint b;\n' > "$AD/src/a.c"; a_ add -A; a_ commit -q -m "feat: touch a"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule comment-truth --seed 7 --root "$AD" 2>/dev/null | head -1 | grep -q "last sample (20[0-9-]*, $sample)\.\.HEAD · pop 1f/5l · n 2 " || fail "the window from the last sample did not hold exactly the file changed after it"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule floored --seed 7 --root "$AD" 2>/dev/null | head -1 | grep -q '\.\.HEAD · floor 2/2 commits · pop 2f/6l · n 3 ' || fail "a range at the floor was not drawn"
+python3 "$ad" draw --config "$AD/.claude/floor.json" --rule stock --seed 7 --root "$AD" 2>/dev/null | head -1 | grep -q '^adherence stock: uniform since process-review-mark (.*)\.\.HEAD · floor 2/1 commits · pop 2f/6l · n 1 ' || fail "a uniform rule's floor did not read its range"
+printf '{ "adherenceRules": [ { "id": "zero", "population": "true", "judgePrompt": "judge.md", "n": 1, "weighting": "uniform", "floor": 0 } ] }\n' > "$AD/.claude/bad.json"
+python3 "$ad" draw --config "$AD/.claude/bad.json" --root "$AD" >/dev/null 2>"$AD/err" && fail "a zero floor was accepted"
+grep -q 'floor must be a positive integer' "$AD/err" || fail "a bad floor was not named: $(cat "$AD/err")"
+ok "adherence draw: the range starts at the rule's last sample, else the mark; --since overrides; under the floor the header alone, at it the draw; a bad floor refuses"
 
 # ---- scripts/land-process-commit.py: one commit lands on the default branch through the
 # adopter's own pre-commit hook, the sha printed is the remote's, the slice branch drops

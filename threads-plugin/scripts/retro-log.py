@@ -2,7 +2,7 @@
 """retro-log — the retro log as an append-only stream, read through a view.
 
   retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--live]
-                    [--since YYYY-MM-DD] [--docs] [--arc NAME] [--arcs]
+                    [--since YYYY-MM-DD] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
                     [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
 
@@ -91,7 +91,27 @@ recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` p
 instead of the keys, the files the shown keys name in their detail — a `Placement:`, a
 `LANDED … — <where>`, a `FILED <stub>` — as `<keys naming it>\t<path>`, most first:
 the docs a run should read because its own findings point there, derived from the
-filtered view rather than configured. `--arc NAME` prints, instead of the view, every
+filtered view rather than configured. `--chain` prints, instead of the keys, each shown
+key's chain: its occurrences and the organic marker commits (`marker-stream.py`'s
+classes) that touched a file the key is placed at — a path after `Placement:`, or one its
+status lines name — since its first occurrence, in time order on one clock, author time:
+an occurrence's is its capture, the commit `git blame -M` names for its line, which
+survives compaction and re-keying, and a line not yet committed is dated by its own date
+at the start of the day and reads `uncommitted`. Each marker line carries the placement
+file's `+added -removed` and the commit's file count; a marker wider than 30 files reads
+`broad` — a relink touches every chain — and is kept out of the reading below. Then one
+line per key, `<n> occurrences in <b> bursts` — consecutive occurrences within 24 hours
+with no marker between are one burst — plus the markers that touched the placement after
+the last occurrence and those it occurred again after, or that nothing touched it, and
+the broad ones. `--prs` adds the open PRs (`gh pr list`) touching the placement, `in
+flight`; when `gh` cannot say, the header says why and the chain is read without them. A
+compacted closed key has no occurrence left to order. A file is not a fix: the chain is
+what the review reads before ruling a key burst, patched, or unpatched, never the
+ruling. It closes with every organic marker since the mark, one line each and
+tab-separated: the shown chains it is in, the live keys placed at a file it touched with
+a first occurrence on or before it, then `<time>  <sha>  <subject>` — fewest first, and
+under a marker in no shown chain its keys named when there are three or fewer. A marker
+at zero and zero answers no key, so its recurrence is uncountable. `--arc NAME` prints, instead of the view, every
 key carrying `ARC NAME` — its state and count, then its blocks as the stream holds
 them, occurrences dated and statuses one line — ordered by the date each key entered
 the arc: the ARC line's own date, else the key's first occurrence; a key with neither
@@ -108,6 +128,7 @@ NAME` joins them.
 """
 import argparse
 import datetime
+import importlib.util
 import json
 import pathlib
 import re
@@ -163,6 +184,7 @@ class Block:
     def __init__(self, key, uncold, line_no):
         self.key, self.uncold, self.line_no = key, uncold, line_no
         self.lines = []          # detail lines, verbatim
+        self.nums = []           # their 1-based line numbers in the file
 
     @property
     def status(self):
@@ -247,6 +269,7 @@ def parse(text):
             violations.append(f"line {n}: not a key line, a detail line, or blank")
             if cur is not None:
                 cur.lines.append("  " + line)
+                cur.nums.append(n)
             continue
         if cur is None:
             violations.append(f"line {n}: detail line with no key above it")
@@ -265,6 +288,7 @@ def parse(text):
                 if tok == "ARC":
                     violations.append(f"line {n}: an arc name is a slug: \"ARC <name> — <text>\"")
                     cur.lines.append(line)
+                    cur.nums.append(n)
                     continue
                 if tok in TOKENS:
                     violations.append(f"line {n}: status line must be \"{tok} <ref> — <text>\"")
@@ -281,6 +305,7 @@ def parse(text):
                 f"line {n}: status line inside an occurrence entry ({cur.key}); a status is its "
                 "own entry: the key line again, then the status line")
         cur.lines.append(line)
+        cur.nums.append(n)
     for b in blocks:
         if not b.lines:
             violations.append(f"line {b.line_no}: key with no detail ({b.key})")
@@ -384,6 +409,221 @@ def render_docs(shown):
     return "".join(f"{len(ks)}\t{p}\n" for p, ks in ranked)
 
 
+BURST = datetime.timedelta(hours=24)
+BROAD = 30      # files: a commit wider than this touched the placement as one of many
+FEW = 3
+BLAME_HEAD = re.compile(r"^([0-9a-f]{40}) \d+ (\d+)")
+
+
+def marker_stream():
+    path = pathlib.Path(__file__).with_name("marker-stream.py")
+    spec = importlib.util.spec_from_file_location("marker_stream", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def capture_times(root, log):
+    """{line number: (short sha, aware datetime)}: the commit that wrote each committed
+    line and its author time, by `git blame -M`; a line not yet committed is absent."""
+    r = subprocess.run(["git", "blame", "-M", "--line-porcelain", "--", str(log.relative_to(root))],
+                       cwd=root, capture_output=True, text=True)
+    out, cur = {}, None
+    if r.returncode != 0:
+        return out
+    for line in r.stdout.splitlines():
+        m = BLAME_HEAD.match(line)
+        if m:
+            cur = {"sha": m.group(1), "n": int(m.group(2))}
+        elif cur is not None and line.startswith("author-time "):
+            cur["t"] = int(line.split()[1])
+        elif cur is not None and line.startswith("author-tz "):
+            tz = line.split()[1]
+            off = datetime.timedelta(hours=int(tz[1:3]), minutes=int(tz[3:5]))
+            cur["tz"] = datetime.timezone(-off if tz.startswith("-") else off)
+        elif line.startswith("\t") and cur is not None:
+            if set(cur["sha"]) != {"0"} and "t" in cur:
+                out[cur["n"]] = (cur["sha"],
+                                 datetime.datetime.fromtimestamp(cur["t"], cur.get("tz")))
+            cur = None
+    full = sorted({sha for sha, _ in out.values()})
+    if full:
+        r = subprocess.run(["git", "log", "--no-walk=unsorted", "--format=%H %h", *full],
+                           cwd=root, capture_output=True, text=True)
+        short = dict(l.split() for l in r.stdout.splitlines()) if r.returncode == 0 else {}
+        out = {n: (short.get(sha, sha[:8]), t) for n, (sha, t) in out.items()}
+    return out
+
+
+def placed_paths(bs):
+    """The files a key is placed at: the paths after `Placement:` in its occurrences, and
+    those its status lines name (a LANDED's where, a FILED stub)."""
+    out = set()
+    for b in bs:
+        texts = b.lines[:1] if b.status in TOKENS and b.status not in ANNOTATIONS else [
+            l.split("Placement:", 1)[1] for l in b.lines if "Placement:" in l]
+        for t in texts:
+            out |= {re.sub(r"^(?:\.\.?/)+", "", p) for p in PATH.findall(t)}
+    return out
+
+
+def touching(files, named):
+    """The files a commit touched that a key names: the same path, or one ending in it."""
+    return sorted({f for f in files for n in named if f == n or f.endswith("/" + n)})
+
+
+def stamp(t, exact):
+    return t.strftime("%Y-%m-%d %H:%M") if exact else t.strftime("%Y-%m-%d") + " --:--"
+
+
+def placement_churn(root, sha, files):
+    """`<path> +a -b` for each placement file a commit touched."""
+    r = subprocess.run(["git", "show", "--no-renames", "--numstat", "--format=", sha, "--", *files],
+                       cwd=root, capture_output=True, text=True)
+    out = []
+    for line in r.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3:
+            out.append(f"{parts[2]} +{parts[0]} -{parts[1]}")
+    return out or files
+
+
+def open_prs(root):
+    """([(number, title, files)], None) for the open PRs, or ([], why) when gh cannot say."""
+    try:
+        r = subprocess.run(["gh", "pr", "list", "--state", "open", "--limit", "200",
+                            "--json", "number,title,files"], cwd=root, capture_output=True,
+                           text=True)
+    except OSError:
+        return [], "gh not on PATH"
+    if r.returncode != 0:
+        return [], (r.stderr.strip().splitlines() or ["gh failed"])[0]
+    try:
+        return [(p["number"], p["title"], [f["path"] for f in p.get("files") or []])
+                for p in json.loads(r.stdout or "[]")], None
+    except (ValueError, KeyError, TypeError) as e:
+        return [], f"gh output unreadable ({e})"
+
+
+def render_chain(shown, blocks, root, log, prs=False):
+    """Each shown key's occurrences and the organic markers touching a file it is placed at
+    since its first occurrence, in time order, with the chain read; then the window's
+    organic markers, each with the shown chains it appears in and the live keys placed at a
+    file it touched, named when there are few enough to check by hand."""
+    ms = marker_stream()
+    cfg, marker, mark, bookkeeping = ms.stream_config(root)
+    times = capture_times(root, log)
+    occs = {}
+    for key, bs, st, dates in shown:
+        rows = []
+        for b in bs:
+            if b.status:
+                continue
+            gate = dict(b.occurrences)
+            for line, n in zip(b.lines, b.nums):
+                m = OCCURRENCE.match(line)
+                if not m:
+                    continue
+                sha, t = times.get(n, (None, None))
+                exact = t is not None
+                if not exact:
+                    t = datetime.datetime.fromisoformat(m.group(1)).astimezone()
+                rows.append((t, exact, sha, m.group(2).strip(), gate.get(m.group(1))))
+        occs[key] = sorted(rows, key=lambda r: r[0])
+    firsts = [r[0][0] for r in occs.values() if r]
+    stream = []
+    if firsts:
+        since = min(firsts).isoformat()          # a bare date is today's time of day to git
+        stream = [r for r in ms.classify(ms.commits(root, [f"--since={since}", "HEAD"]),
+                                         marker, bookkeeping) if r[0] == "organic"]
+    pulls, why = open_prs(root) if prs else ([], None)
+    out = [f"chain: author times on both kinds of line; a marker touching more than {BROAD} "
+           "files is bracketed as broad — its placement hunk is read before it is ruled a fix"
+           + ("" if not prs else f"; open PRs: {len(pulls)}" if why is None
+              else f"; open PRs not read ({why})"), ""]
+    joined, churn = {}, {}
+    for key, bs, st, dates in shown:
+        rows, placed = occs[key], placed_paths(bs)
+        out.append(f"{key}  ×{len(dates)}" + (f"  {st}" if st else ""))
+        if not rows:
+            out += ["  chain: no occurrence in the log to order — a compacted closed key; "
+                    "rule its chain before its status line is compacted", ""]
+            continue
+        first, last = rows[0][0], rows[-1][0]
+        pats = []
+        for cls, sha, short, subject, files, date, time in stream:
+            t = datetime.datetime.fromisoformat(time)
+            hit = touching(files, placed)
+            if hit and t >= first:
+                if sha not in churn:
+                    churn[sha] = placement_churn(root, sha, hit)
+                pats.append((t, short, subject, hit, len(files) > BROAD, len(files), sha))
+                joined[short] = joined.get(short, 0) + 1
+        events = sorted([(r[0], 0, r) for r in rows] + [(p[0], 1, p) for p in pats],
+                        key=lambda e: (e[0], e[1]))
+        bursts, prev = 0, None
+        for t, kind, e in events:
+            if kind == 1:
+                _, short, subject, hit, broad, n, sha = e
+                if not broad:
+                    prev = None
+                out.append(f"  {stamp(t, True)}  {'broad  ' if broad else 'touched'}     {short}  "
+                           f"{subject}  ({'; '.join(churn[sha])} · {n} file{'s' * (n != 1)})")
+                continue
+            if prev is None or t - prev > BURST:
+                bursts += 1
+            prev = t
+            _, exact, sha, source, gate = e
+            out.append(f"  {stamp(t, exact)}  occurrence  {sha or 'uncommitted'}  {source}"
+                       + (f"  caught: {gate}" if gate else ""))
+        flight = [(n, title, touching(files, placed)) for n, title, files in pulls
+                  if touching(files, placed)]
+        for n, title, hit in flight:
+            out.append(f"  open PR #{n}  {title}  ({', '.join(hit)})")
+        scoped = [p for p in pats if not p[4]]
+        after = [p[1] for p in scoped if p[0] > last]
+        between = [p[1] for p in scoped if p[0] <= last]
+        broad = [p[1] for p in pats if p[4]]
+        parts = [f"{len(rows)} occurrence{'s' * (len(rows) != 1)} in {bursts} "
+                 f"burst{'s' * (bursts != 1)}"]
+        if after:
+            parts.append(f"placement touched after the last: {', '.join(after)}")
+        if between:
+            parts.append(f"occurred again after {', '.join(between)} touched it")
+        if not scoped:
+            parts.append("placement untouched since the first"
+                         + (" but by broad markers" if broad else ""))
+        if broad:
+            parts.append(f"broad: {', '.join(broad)}")
+        if flight:
+            parts.append(f"in flight: {', '.join(f'#{n}' for n, _, _ in flight)}")
+        out += ["  chain: " + " · ".join(parts), ""]
+    r = subprocess.run(["git", "rev-parse", "--verify", "-q", mark + "^{commit}"],
+                       cwd=root, capture_output=True, text=True)
+    if r.returncode != 0:
+        out.append(f"## Organic markers since the mark: no mark {mark}; read skipped")
+    else:
+        window = [r for r in ms.classify(ms.commits(root, [f"{mark}..HEAD"]), marker, bookkeeping)
+                  if r[0] == "organic"]
+        live = [(k, bs) for k, bs in keys_in_order(blocks).items() if state(bs) not in CLOSED]
+        placed = {}
+        for r in window:
+            placed[r[2]] = [k for k, bs in live if touching(r[4], placed_paths(bs))
+                            and any(d <= r[5] for b in bs for d in b.dates)]
+        rows = sorted(window, key=lambda r: (joined.get(r[2], 0), len(placed[r[2]]), r[6]))
+        out.append(f"## Organic markers since {mark}: {len(window)} — shown chains · live keys "
+                   f"placed at a file it touched; {sum(1 for r in window if not placed[r[2]])} "
+                   "touch no live key's placement")
+        for cls, sha, short, subject, files, date, time in rows:
+            ks = placed[short]
+            out.append(f"{joined.get(short, 0)}\t{len(ks)}\t"
+                       f"{stamp(datetime.datetime.fromisoformat(time), True)}  {short}  {subject}"
+                       + (f"  (broad: {len(files)} files)" if len(files) > BROAD else ""))
+            if 0 < len(ks) <= FEW and not joined.get(short):
+                out.extend(f"\t\t  {k}" for k in ks)
+    return "\n".join(out) + "\n"
+
+
 def entered(bs, name):
     """The date a key entered an arc: its ARC line's date, else its first occurrence."""
     dated = [b.arc_date for b in bs if b.arc == name and b.arc_date]
@@ -442,7 +682,8 @@ def arc_tags(bs):
 
 
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
-                live_only=False, since=None, today=None, docs=False, past_gate=False):
+                live_only=False, since=None, today=None, docs=False, past_gate=False,
+                chain=None):
     today = today or datetime.date.today()
     by_key = keys_in_order(blocks)
     if only:
@@ -481,6 +722,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
     shown_closed = [] if (live_only or held) else [r for r in closed if keep(r)]
     if docs:
         return render_docs(shown_live + shown_closed)
+    if chain:
+        return render_chain(shown_live + shown_closed, blocks, *chain)
     out = [f"{len(by_key)} keys · {len(live)} live · {n_held} held · "
            + " · ".join(f"{v} {k.lower()}" for k, v in n_closed.items())
            + f" · {n_recurred} recurred (two or more occurrences"
@@ -571,6 +814,11 @@ def main():
     ap.add_argument("--live", action="store_true", help="view: live keys only, no closed section")
     ap.add_argument("--docs", action="store_true",
                     help="view: the files the shown keys name, `<keys>\\t<path>`, instead of the keys")
+    ap.add_argument("--chain", action="store_true",
+                    help="view: each shown key's occurrences and the organic markers touching "
+                         "its placement, in time order, with the chain read")
+    ap.add_argument("--prs", action="store_true",
+                    help="view --chain: also the open PRs touching each key's placement (gh)")
     ap.add_argument("--arc", default=None, metavar="NAME",
                     help="view: every key carrying `ARC NAME`, by date entered, with detail")
     ap.add_argument("--arcs", action="store_true",
@@ -606,7 +854,8 @@ def main():
         sys.stdout.write(render_view(blocks, args.keys, args.key, held=args.held,
                                      recurred=args.recurred, live_only=args.live,
                                      since=args.since, today=today, docs=args.docs,
-                                     past_gate=args.reached))
+                                     past_gate=args.reached,
+                                     chain=(root, path, args.prs) if args.chain else None))
         return 0
     if violations:
         refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])

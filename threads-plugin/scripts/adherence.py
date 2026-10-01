@@ -26,11 +26,22 @@ A rule:
                                                holding the config
    "n": 20,                                    distinct blocks to draw
    "weighting": "window" | "uniform",          window: only hits in files changed over
-                                               <markTag>..<head>; uniform: every hit
+                                               the range (below); uniform: every hit
+   "floor": 5,                                 optional: the fewest commits in the range
+                                               touching a file that holds a hit, below
+                                               which the rule is not sampled; a review's
+                                               own commits (a `Process-Review:` trailer)
+                                               never count toward it
    "block": "^\\\\s*(//|/\\\\*|\\\\*)"}               optional regex: a line matching it belongs to
                                                the block around a drawn line (default the
                                                C-family comment leaders shown); a blank or
                                                non-matching line ends the block
+
+The range is `<start>..<head>`, and `<start>` is `--since`, else the rule's **last
+sample** — the newest commit reachable from `<head>` carrying a `Process-Review:` trailer
+and this rule's `Adherence:` line in its body — else the mark. A review that skips the
+rule, or whose run of it fails, writes no line, so the next draw starts where the last
+recorded one did and no range goes unsampled.
 
 The window restriction is the weighting, never the command: the command is the
 whole-tree population, so `uniform` stays a one-word change and the command never runs
@@ -43,7 +54,12 @@ Modes:
          population with fewer than `n` blocks is sampled whole. One header line, then per
          block `== path:start-end` and its lines:
            adherence <id>: <scope> · pop <f>f/<l>l · n <drawn> · seed <s>
-         <scope> is `window <since> (<date>, <sha>)..<head>`, `uniform`, or `blocks <file>`.
+         <scope> is `window <start> (<date>, <sha>)..<head>`, `uniform`, or `blocks <file>`,
+         <start> being `--since`'s rev, `last sample`, or the mark. With a `floor`, a
+         `uniform` scope adds ` since <start> (<date>, <sha>)..<head>`, and the scope ends
+         ` · floor <c>/<floor> commits`; a range under the floor prints the header alone,
+           adherence <id>: <scope> · below floor <c>/<floor> commits · pop … · n 0 · seed <s>
+         and no blocks — nothing to judge, no line to record.
          The seed defaults to today as YYYYMMDD. `--blocks FILE` replaces the population
          and the draw with a fixed list (`path:line` or `path:start-end`, one per line,
          each expanded to its block) — the calibration read, run with `--root` at a
@@ -98,7 +114,7 @@ Modes:
          window is `recorded`.
 
 Exit 2 on a malformed config or rule, a population line that is not `path:line:`, a
-population command that fails, a missing mark without --since, a window whose `--repo` is
+population command that fails, a missing mark without --since or a last sample, a window whose `--repo` is
 not a git checkout, agent output with a defect, a verdicts file that does not cover the
 manifest exactly, or git failing.
 """
@@ -159,6 +175,9 @@ def pick_rule(cfg, rule_id, cfg_path):
             refuse(f"{cfg_path}: rule {rid}: n must be a positive integer")
         if r.get("weighting") not in ("window", "uniform"):
             refuse(f"{cfg_path}: rule {rid}: weighting must be window or uniform")
+        fl = r.get("floor")
+        if fl is not None and (not isinstance(fl, int) or isinstance(fl, bool) or fl < 1):
+            refuse(f"{cfg_path}: rule {rid}: floor must be a positive integer")
         try:
             re.compile(r.get("block", DEFAULT_BLOCK))
         except (re.error, TypeError) as e:
@@ -199,6 +218,39 @@ def expand(lines, lineno, block_re):
     while end + 1 < len(lines) and lines[end + 1].strip() and block_re.search(lines[end + 1]):
         end += 1
     return start + 1, end + 1
+
+
+def last_sample(rid, head, repo):
+    """The newest review commit (one carrying a `Process-Review:` trailer) reachable from
+    `head` whose body holds this rule's `Adherence:` line, or None."""
+    log = git(["log", head, "--grep=^Process-Review: ", "--format=%x00%H%x01%b"], repo)
+    want = re.compile(r"^Adherence: " + re.escape(rid) + r" ")
+    for rec in log.split("\x00")[1:]:
+        sha, _, body = rec.partition("\x01")
+        if any(want.match(l) for l in body.splitlines()):
+            return sha.strip()
+    return None
+
+
+def window_start(a, cfg, rule, repo):
+    """(rev, label) the window starts at: --since, else the rule's last sample, else the
+    mark."""
+    if subprocess.run(["git", "rev-parse", "--git-dir"], cwd=repo,
+                      capture_output=True).returncode != 0:
+        refuse(f"{repo}: not a git checkout — a window reads its diff and mark there; "
+               f"pass --repo DIR")
+    if a.since:
+        since, label = a.since, a.since
+    else:
+        since = last_sample(rule["id"], a.head, repo)
+        label = "last sample"
+        if since is None:
+            since = cfg.get("markTag") or DEFAULT_MARK
+            label = since
+    if subprocess.run(["git", "rev-parse", "--verify", "-q", f"{since}^{{commit}}"],
+                      cwd=repo, capture_output=True).returncode != 0:
+        refuse(f"no such rev: {since}" + ("" if a.since else " (the mark; pass --since REV)"))
+    return since, label
 
 
 def population(rule, root):
@@ -257,22 +309,36 @@ def cmd_draw(a):
         limit = len(refs)
     else:
         seed = a.seed if a.seed is not None else int(datetime.date.today().strftime("%Y%m%d"))
-        hits = population(rule, root)
-        if rule["weighting"] == "window":
-            since = a.since or cfg.get("markTag") or DEFAULT_MARK
-            if subprocess.run(["git", "rev-parse", "--git-dir"], cwd=repo,
-                              capture_output=True).returncode != 0:
-                refuse(f"{repo}: not a git checkout — a window reads its diff and mark there; "
-                       f"pass --repo DIR")
-            if subprocess.run(["git", "rev-parse", "--verify", "-q", f"{since}^{{commit}}"],
-                              cwd=repo, capture_output=True).returncode != 0:
-                refuse(f"no such rev: {since}" + ("" if a.since else " (the mark; pass --since REV)"))
-            changed = set(git(["diff", "--name-only", f"{since}..{a.head}"], repo).splitlines())
-            hits = [h for h in hits if h[0] in changed]
+        hits = whole = population(rule, root)
+        floor = rule.get("floor")
+        if rule["weighting"] == "window" or floor:
+            since, label = window_start(a, cfg, rule, repo)
             date, short = git(["log", "-1", "--format=%cs %h", since], repo).split()
-            scope = f"window {since} ({date}, {short})..{a.head}"
+            rng = f"{since}..{a.head}"
+            label = f"{label} ({date}, {short})..{a.head}"
+        if rule["weighting"] == "window":
+            changed = set(git(["diff", "--name-only", rng], repo).splitlines())
+            hits = [h for h in hits if h[0] in changed]
+            scope = f"window {label}"
         else:
             scope = "uniform"
+        if floor:
+            covered = {p for p, _ in whole}
+            log = git(["log", "--format=%x00%(trailers:key=Process-Review,valueonly)%x01",
+                       "--name-only", rng], repo)
+            moved = 0
+            for c in log.split("\x00")[1:]:
+                trailer, _, names = c.partition("\x01")
+                if not trailer.strip() and covered & {l.strip() for l in names.splitlines()
+                                                      if l.strip()}:
+                    moved += 1
+            if rule["weighting"] == "uniform":
+                scope += f" since {label}"
+            if moved < floor:
+                print(f"adherence {rule['id']}: {scope} · below floor {moved}/{floor} commits · "
+                      f"pop {len({p for p, _ in hits})}f/{len(hits)}l · n 0 · seed {seed}")
+                return
+            scope += f" · floor {moved}/{floor} commits"
         pop_files, pop_lines = len({p for p, _ in hits}), len(hits)
         order = sorted(hits)
         random.Random(seed).shuffle(order)
