@@ -61,11 +61,12 @@ Work in this order:
    plans root with `grep -r` or `rg --no-ignore` — an ignore file can hide the archive
    from plain `rg`); a guard or
    hazard analysed in one direction only — what it must block named, what it must not
-   block unnamed; a bundled second concern hiding inside the slice — bundled only when
-   it brings its own dependency, its own verification run (a distinct harness, fixture
-   set, or tooling, not a distinct criterion in the same session), or an independently
-   useful landing boundary, since a concern sharing all three with the slice is the
-   same change argument, a split that can name none of the three is not one to ask
+   block unnamed; a bundled second concern hiding inside the slice — one to carve out
+   when it brings any one of its own dependency, its own verification run (a distinct
+   harness, fixture set, or tooling, not a distinct criterion in the same session), or
+   an independently useful landing boundary (landed alone with nothing after it, a user
+   meets the change or a process uses it), since a concern sharing all three with the
+   slice is the same change argument, a split that can name none of the three is not one to ask
    for, and a doc amendment the change itself requires is part of its argument whatever
    commit carries it; a ruling or tension in the plan that changes a recorded decision
    without naming that decision's own amendment in scope.

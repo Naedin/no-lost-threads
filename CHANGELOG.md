@@ -252,6 +252,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`retro-log`** — the retro log's grammar; discovers `retroLogPath` from `.claude/threads.json`.
 - **`review-ledger`** — the ledger's shape; discovers `ledgerPath` from `.claude/threads.json`.
 
+## slices [0.6.1] — 2026-09-30
+
+### Fixed
+
+- **The split test reads the right way round.** `/slices:draft` §1 said a second concern is *bundled* when it brings its own dependency, verification run, or independently useful landing boundary; any one of the three is what carves it into its own stub, and sharing all three keeps it bundled. The gap-checker's restatement carried the same inversion. The test now defines an *independently useful* landing boundary — landed alone with nothing after it, a user meets the change or a process uses it — and names the size bound (overflow, self-conflict) as what splits one argument, not the test. Adopter-side edit: none.
+
 ## slices [0.6.0] — 2026-09-24
 
 ### Contract

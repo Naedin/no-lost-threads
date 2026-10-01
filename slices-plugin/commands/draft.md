@@ -135,13 +135,16 @@ for it.
 A stub that bundles several concerns gets carved into separate stubs first, and exactly
 one is promoted.
 
-**The split test.** A second concern is bundled only when it brings its own dependency,
-its own verification run, or an independently useful landing boundary; a concern that
-shares all three with the slice is the same change argument, and a split that can name
-none of the three is not made. A *verification run* is a distinct harness, fixture set,
-or tooling — not a distinct acceptance criterion inside the same session. A doc
-amendment the change itself requires is part of its argument whatever commit carries
-it.
+**The split test.** A second concern is carved into its own stub when it brings any one
+of its own dependency, its own verification run, or an independently useful landing
+boundary; a concern that shares all three with the slice is the same change argument and
+stays bundled, and a split that can name none of the three is not made. A *verification
+run* is a distinct harness, fixture set, or tooling — not a distinct acceptance criterion
+inside the same session. A landing boundary is *independently useful* when the piece,
+landed alone with nothing after it, is worth landing: a user meets the change or a
+process uses it. A doc amendment the change itself requires is part of its argument
+whatever commit carries it. The test separates arguments; one argument too large for a
+session is split by the size bound above — overflow or self-conflict — not by this test.
 
 **A deferral written into the plan is a stub, not a sentence.** Any "until X lands", "a
 later slice may absorb this", or "interim shape" note the draft writes about something it
