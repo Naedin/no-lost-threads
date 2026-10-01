@@ -9,6 +9,15 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.7.1] — 2026-10-01
+
+### Changed
+
+- **`draftBrief` carries frame rules as well as section-filling rules**, each applied at its own moment of §1's frame step: a **sizing rule** (where the repo's data lives, how a harm is counted) while the harm is sized, a **standing-shape rule** (an instrument picked for the shape left standing, a reference the plan names) once one shape stands and before the site-opening pass, never at a stop. A decision an adopter makes from the frame is made once on the frame rather than on the stub, and what it names is opened with the rest; section-filling rules still apply in §2. With 0.7.0 the plugin ran from the frame straight to the ledger, so a wrapper deciding from the standing shape had to size the frame a second time before calling it.
+- **The frame stop and re-entry are specified.** The stub's shape stands, or a shape the maintainer agreed (the new `frame: <shape>` argument, or one the stub records as theirs) stands, and the plan is drafted; a stub shape overturned with no agreed replacement — several standing, exactly one the walk reached alone, or a product call — is a frame stop, which writes a `## Frame` record into the stub (`framed at <sha>, <date>, slices <version>`, the value sentence, the sizing rows as the ledger holds them, every shape with its user outcome, any probe's source) and returns. Re-invoked with `frame: <shape>`, the record's rows are read, not re-sized, when nothing they cite moved since its sha; a moved row is re-run alone, the neighbouring-states walk runs only on a shape the record did not present, and an overturn stops again. An agreed shape that is not the stub's is sized like the stub's and stands only if that leaves it standing; a stub carrying a record but invoked with no `frame:` re-presents the recorded shapes and returns. The rows carry into the ledger and a probe's source beside it. Also: a fifth premise verdict, *real, a claim moved*, whose corrected row feeds the frame; feasibility is traced again for a shape the frame stands up that is not the stub's; a probe a row cites stays runnable, never landing in the product tree; "what the stub's shape buys" replaces a chosen shape assumed before the outcome; `draftBrief` is §0's third field.
+
+Adopter-side edit: move a wrapper's frame-dependent step into the `draftBrief` (sizing rules and standing-shape rules), drop the wrapper's own frame sizing, and re-invoke at a frame stop with `frame: <the picked shape>`. A stub template whose grammar refuses unknown sections admits `## Frame`.
+
 ## threads [0.20.0] — 2026-10-01
 
 ### Contract

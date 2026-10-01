@@ -1,6 +1,6 @@
 ---
 description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code and size its frame first, carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus at most five tension points). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
-argument-hint: "<stub path, or the concern to promote>"
+argument-hint: "<stub path, or the concern to promote> [frame: <the shape picked at a frame stop>]"
 allowed-tools: Bash, Read, Grep, Glob, Write, Edit
 ---
 
@@ -33,11 +33,17 @@ absent (this repo's own config, and the common case), §2 writes the built-in pl
 unchanged; a repo sets it only to carry sections beyond the invariant shape. Bootstrap
 never invents one. A `planTemplate` path that does not resolve to a readable file is
 narrated and the built-in plan is written — never refuse; the missing template is the
-adopter's gap to fill. A second optional field, `draftBrief`, is the path of an
-adopter-owned markdown file of **section-filling rules** — how this repo enumerates UI
-states, what its test plan must route through, which data types trigger a compatibility
-check. Read it before §2 and apply it when filling the template's local sections. An
-unreadable path is narrated and the sections are filled from their placeholders alone.
+adopter's gap to fill. The third, `draftBrief`, is the path of an
+adopter-owned markdown file of the repo's own drafting rules. Its **frame rules** apply
+at §1's frame step, each at its own moment there: a **sizing rule** (where this repo's
+data lives, how a harm is counted) while the harm is sized, and a **standing-shape rule**
+(what the repo decides from the shape the frame leaves standing — an instrument picked
+for it, a reference the plan must name) once one shape stands, never at a stop. Its
+**section-filling rules** — how this repo enumerates UI states, what its test
+plan must route through, which data types trigger a compatibility check — apply in §2 to
+the template's local sections. Read it before §1's frame step. An unreadable path is
+narrated, the frame is sized on the built-in steps alone, and the sections are filled
+from their placeholders.
 The fourth, `deleteCommand`, routes every delete this command performs through an
 adopter-owned tool (below).
 
@@ -89,10 +95,13 @@ Re-verify the stub's claims against the current tree — with commands and reads
 recall. Before treating the concern as new, sweep `plansDir` recursively (inbox, plans,
 completed) for its terms with `grep -r` or `rg --no-ignore`, never plain `rg`: a repo's
 ignore file can hide its archive from ripgrep, and the sweep then misses a closed concern
-in silence. A concern is often already framed under another filename. Then one of four
+in silence. A concern is often already framed under another filename. Then one of five
 verdicts:
 
 - **Still real** → carry on.
+- **Real, a claim moved** → the concern stands, but a claim it rests on is false or its
+  measured instance is stale. Write the claim's current measurement as a row and carry
+  the correction into the frame step, whose first input it is.
 - **Already closed** → report what closed it (the commit, the plan, the code that now does
   it), delete the stub (§0, *Every delete*), write no plan.
 - **Partly closed** → draft the remaining increment only, and say which part had landed.
@@ -102,7 +111,8 @@ verdicts:
   then draft the survivor. Never leave the loser sitting.
 
 Two more axes, on the surviving claims. **Feasibility:** trace the mechanism end to end
-in the source — "X completes via Y" is a claim, walk it. **Sequencing:** do not inherit
+in the source — "X completes via Y" is a claim, walk it — and trace it again for a shape
+the frame step stands up that is not the stub's, before the site-opening pass. **Sequencing:** do not inherit
 the stub's order; a capability this slice consumes makes its producer an upstream
 prerequisite, drafted first, never folded in or deferred downstream.
 
@@ -116,24 +126,65 @@ claim like any other, settled here by measurement:
   is not one yet. It is the Shape paragraph's spine.
 - **The harm, sized.** A stub's *may*, *can*, or *sometimes* is measured before anything
   is designed against it: how often the state arises and what it costs, by running the
-  mechanism over the inputs that vary (a throwaway probe, deleted before the plan is
-  written) or by counting in the repo's own data — a `draftBrief` names where that lives.
-  The measurement is a claim row like any other; a harm that cannot be sized is an
-  `unverified:` row naming what would size it, never a premise.
+  mechanism over the inputs that vary or by counting in the repo's own data, the
+  `draftBrief`'s sizing rules (§0) saying where that lives and how it is counted. The
+  measurement is a claim row like any other, so its command stays runnable: a probe
+  written for it never lands in the product tree, and its source rides with the record
+  that cites it — fenced under the stub's frame record, or beside the plan's ledger —
+  for as long as a row cites it. A harm that cannot be sized is an `unverified:` row
+  naming what would size it, never a premise.
 - **The neighbouring states.** Walk outward from the stub's case: each surface the change
   touches shown alone, beside the others, and not at all; every legitimate answer the user
   has to what the change asks of them — accept, decline, put off, ignore — and who is right
   to give each, which sizes how many users the stub's case leaves out; what undoes the
-  trigger a week on. A design that is right only in the stub's case is wrong.
+  trigger a week on.
 - **Two cheaper deliveries.** Name at least two ways to deliver as much value with less
-  surface — doing less is always one — and what the chosen shape buys over each.
+  surface — doing less is always one — and what the stub's shape buys over each. A cheaper
+  delivery that buys as much overturns the stub's shape.
 
-**One shape left standing** → it is the plan's frame, written as its first tension
-(§2): the shape taken over the cheaper deliveries, the states it covers and the ones it
-leaves out, the harm cited by its row. **More than one, or a walk that overturns the
-stub's shape on a product call** → present the shapes, each with its user outcome, and
-stop before the ledger: the frame's measurements go into the stub as a capture update
-(§3), and no plan is written until the maintainer picks one.
+Then one of two outcomes:
+
+- **The stub's shape stands**, or a shape the maintainer agreed stands — named in this
+  command's `frame:` argument, or recorded in the stub as theirs → it is the plan's frame,
+  written as its first tension (§2): the shape taken over the cheaper deliveries, the
+  states it covers and the ones it leaves out, the harm cited by its row. The
+  `draftBrief`'s standing-shape rules (§0) run on it now, before the site-opening pass, so
+  what they decide is decided once on the frame and not on the stub, and whatever they
+  name is opened with the rest. An agreed shape that is not the stub's is sized like the
+  stub's was — the harm rows run against it, the walk run on it — and stands only if they
+  leave it standing; one they overturn is a frame stop naming what moved.
+- **The stub's shape is overturned and nobody has agreed the shape that replaces it** —
+  more than one standing, or exactly one the walk reached alone, or a product call the
+  walk cannot settle → **a frame stop**: no ledger, no plan, and no standing-shape rule
+  runs. Write the frame into the stub as a capture update — a `## Frame` section, the one
+  edit this command makes to a stub it does not promote:
+
+  ```markdown
+  ## Frame
+
+  framed at <short sha>, <date>, slices <version>
+  - value: <the sentence>
+  - <claim> — `<generating command>` — <one line of its output>
+  - shape A: <the shape> — <its user outcome>
+  - shape B: <the shape> — <its user outcome>
+  ```
+
+  — the sizing rows exactly as the ledger would hold them, every shape presented with its
+  user outcome, any probe's source fenced below. Present the shapes in-thread and return;
+  what a caller does at the stop — a prototype, a commit — runs after this command does.
+
+**Re-entry after a frame stop.** The invocation names the picked shape as `frame:
+<shape>`, and the stub carries the `## Frame` record. The record's rows are **read, not
+re-sized**, when `git log --oneline <its sha>..HEAD -- <the paths its rows cite>` is
+empty; a row whose cited paths moved is re-run, and only that row. The neighbouring-states
+walk runs only on a picked shape that was not among those the record presents. The picked
+shape stands — the first outcome above — unless a re-run row or that walk overturns it,
+which is a frame stop again, naming the rows or the states that moved. A stub carrying a
+`## Frame` record invoked with no `frame:` is a stop still waiting on its pick: re-run only
+the rows whose cited paths moved, present the record's shapes again, and return. The premise audit
+above still runs, since the stub's other claims are not the frame's; the record's rows
+are carried into the ledger under the `drafted at` line rather than re-measured, and a
+probe's source moves beside the ledger before §3 deletes the stub.
 
 **Every artifact the draft names is opened at draft time** — a symbol, a file, a test, a
 precedent ("as Y does"), a rule — and cited at file-and-line or section. A claim recalled

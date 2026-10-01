@@ -151,7 +151,10 @@ exactly as before, so each is pure opt-in.
 plan is drafted whole. Each local section's placeholder is its instruction. For rules
 too long for a placeholder (how your repo enumerates UI states, what its test plan
 routes through, which types trigger a compatibility check), point `draftBrief` at a
-markdown file and the drafter applies it:
+markdown file and the drafter applies it. The same file carries your **frame rules** —
+where your data lives for sizing a harm, and anything your repo decides from the shape
+the frame leaves standing (a prototyping instrument, a reference the plan names) — which
+run once that shape stands and before the claim ledger is written:
 
 ```json
 { "inboxDir": "Plans/inbox", "plansDir": "Plans",
