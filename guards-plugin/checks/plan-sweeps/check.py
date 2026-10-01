@@ -90,8 +90,10 @@ is finalized. So under the git adapter, which hands the staged diff over as
 its count sits — is one the commit adds or changes; one the commit leaves untouched is
 not run and not compared, and the stderr summary counts it. A plan added, or a row
 edited, is judged in full; a commit that only moves the tree under a plan, or moves the
-plan itself (the diff reads renames), judges none of it. Without `GUARDS_DIFF` — `run.py`
-by hand — every sweep is judged, which is the audit read of a plan's standing claims.
+plan itself (the diff reads renames), judges none of it. `run.py --diff-range` hands over
+a range's diff the same way, for a landing step judging its own rows. Without
+`GUARDS_DIFF` — `run.py` by hand — every sweep is judged, which is the audit read of a
+plan's standing claims.
 
 Scope: the universe is `--paths` — each entry a root-relative file, or an fnmatch glob
 where `*` crosses `/` as in a git pathspec; a literal is tried first, so a name

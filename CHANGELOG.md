@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.14.0] — 2026-10-01
+
+### Added
+
+- **`run.py --diff-range RANGE`** hands the checks the diff of `RANGE` in the root's checkout as `GUARDS_DIFF`, written as the git adapter writes the staged diff (`-U0 -M`, prefixes pinned, a non-ASCII path left raw). A landing step that runs the runner on the rebased tree — the gate for what a rebase or a union merge carries past the pre-commit hook — passes its range (`<upstream>...HEAD`), so `plan-sweeps` judges the rows the landing adds or changes against the tree it lands on, while the whole-tree checks read the whole tree as before. Run bare, the step is the audit read and refuses a landing over a row another branch wrote whose tree has since moved, which leaves the passer-by to edit a plan it does not own. A range git cannot diff exits 2. `test.sh` proves the audit read refusing a standing row the tree moved under, the same run with `--diff-range` passing it, a row the range adds judged alone, and a bad range refusing; with the diff not handed over, the passing case fails. Adopter-side edit: a landing step that runs `run.py` by hand adds `--diff-range`.
+
 ## threads [0.19.0] — 2026-09-30
 
 ### Contract

@@ -454,6 +454,37 @@ printf "# Q\n\n- lets — \`rg -n 'let' Sources | wc -l\` — \`5\`\n" > "$a/wri
 git -C "$a/written" add -A
 expect 1 "adapter: a plan added with a wrong count is judged" hook "$a/written"
 
+# The runner by hand, with --diff-range: the range's diff is GUARDS_DIFF, so a landing
+# judged on its range passes over a row the tree moved under, where the audit read
+# without it refuses; a row the range adds is judged; a range git cannot diff refuses.
+rr="$tmp/ranged"
+mkdir -p "$rr/.claude" "$rr/Sources"
+git -C "$rr" init -q
+git -C "$rr" config user.email guards@test
+git -C "$rr" config user.name guards
+printf 'let a = 1\nlet b = 2\n' > "$rr/Sources/a.swift"
+printf "# P\n\n- lets — \`rg -n 'let' Sources | wc -l\` — \`2\`\n" > "$rr/plan.md"
+printf '{"checks": {"plan-sweeps": {"rung": "block", "paths": ["*.md"]}}}' \
+  > "$rr/.claude/guards.json"
+git -C "$rr" add -A && git -C "$rr" commit -q -m base
+printf 'let c = 3\n' >> "$rr/Sources/a.swift"
+git -C "$rr" add -A && git -C "$rr" commit -q -m drift
+git -C "$rr" branch -q upstream
+printf '# Notes\n' > "$rr/notes.md"
+git -C "$rr" add -A && git -C "$rr" commit -q -m landing
+expect 1 "runner: by hand, the audit read judges a standing row" \
+  python3 "$here/run.py" --root "$rr"
+expect 0 "runner: --diff-range passes over a row it leaves" \
+  python3 "$here/run.py" --root "$rr" --diff-range upstream...HEAD
+printf "\n- lets in a — \`rg -n 'let' Sources/a.swift | wc -l\` — \`9\`\n" >> "$rr/notes.md"
+git -C "$rr" add -A && git -C "$rr" commit -q -m wrong-row
+out="$(python3 "$here/run.py" --root "$rr" --diff-range upstream...HEAD 2>/dev/null)"
+[ "$(printf '%s\n' "$out" | cut -d: -f2-3)" = " notes.md:3" ] \
+  || { echo "FAIL  runner: --diff-range judges a row the range adds, alone"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "runner: --diff-range judges a row the range adds, alone"
+says 2 "runner: a range git cannot diff refuses" "diff-range no-such-ref...HEAD: " \
+  python3 "$here/run.py" --root "$rr" --diff-range no-such-ref...HEAD
+
 # comment-ordinals reads code the markdown export drops, so a dropped source refuses by
 # name, whether its extension or its shebang puts it in scope; exported, it is judged.
 mkrepo "$a/code"
