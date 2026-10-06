@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.20.2] — 2026-10-05
+
+### Changed
+
+- **A retro-log pointer names its section or item, never its number alone.** Under `retroPlacement: "keys"`, `/threads:retro`'s `Caught:` counts a numbered class or item in a `processDocs` doc as its section only when the citation carries the item's name (`check-brief.md *Real-gate vs proxy*`), where 0.19.0 sanctioned `check-brief.md class 2`. The same rule binds every writer of a pointer: retro's `Placement:` and `Caught:`, `/threads:process-review`'s `LANDED` (and every status line's) where, and `finding-placer`'s returned placement; the grammar's `LANDED` example cites a named section. A numbered list renumbers when an item is inserted or removed, and an append-only line cannot be re-pointed. On the reference adopter eight `Caught:` lines and 60 `LANDED` lines cited a check class or a command section by number, and the habit had spread to 15 live-doc citations across 8 docs, each correct only because every new class had been appended. `retro-log.py` reads only the path in a pointer, so a numbered line already in a log still parses; `test.sh` case 9 proves `view --docs` reads the named form, in a `Placement:` and a `LANDED` where, beside it. Adopter-side edit: none; existing lines stay as written.
+
 ## threads [0.20.1] — 2026-10-01
 
 ### Changed

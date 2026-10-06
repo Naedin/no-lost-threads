@@ -206,6 +206,12 @@ drift/p
 drift/q
   2026-09-03 | s1 | no home.
     Placement: none
+drift/r
+  2026-09-04 | s1 | caught by a named class.
+    Placement: check-brief.md *Real-gate vs proxy*
+    Caught: /slices:check — check-brief.md *Real-gate vs proxy* states the rule.
+drift/s
+  LANDED def5678 — gap-check.md *Real-gate vs proxy*: the gate names its proxy.
 EOF2
 python3 "$rl" view --recurred --docs --root "$tmp" --log docs.md 2>/dev/null > "$tmp/docs.out" || fail "--docs refused"
 grep -qx '1	Plans/active/pre-pr.md' "$tmp/docs.out" || fail "--docs under --recurred did not count pre-pr.md once: $(cat "$tmp/docs.out")"
@@ -214,7 +220,9 @@ grep -q 'principles' "$tmp/docs.out" && fail "--docs under --recurred showed a p
 python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -q 'none' && fail "--docs listed a Placement: none as a path"
 python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | head -1 | grep -qx '2	Plans/active/pre-pr.md' || fail "--docs over the whole log did not rank pre-pr.md first at 2 keys"
 python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -qx '1	docs/principles.md' || fail "--docs missed the path in a LANDED line"
-ok "--docs lists the files the shown keys name, most-named first; a bare §-pointer counts, Placement: none does not"
+python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -qx '1	check-brief.md' || fail "--docs missed a pointer naming a numbered item by name"
+python3 "$rl" view --docs --root "$tmp" --log docs.md 2>/dev/null | grep -qx '1	gap-check.md' || fail "--docs missed a LANDED where naming a numbered item by name"
+ok "--docs lists the files the shown keys name, most-named first; a bare §-pointer, a numbered one, and a named item count, in a Placement: or a LANDED where; Placement: none does not"
 
 # 10. ARC is an annotation: transparent to state and count, kept by compact on either side
 # of a closing status, refused on a non-slug name; --arc prints the carrying keys by the

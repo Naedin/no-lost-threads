@@ -78,7 +78,9 @@ have, place it and name what's missing. The rule's content belongs to your calle
 
 ## 5. Return, per finding
 
-- **placement** — amend / merge / narrow / add, with file and section
+- **placement** — amend / merge / narrow / add, with file and section — the section or a
+  numbered item by its name, never its number alone: your caller writes it into an
+  append-only log, and a list renumbers
 - **the existing text**, quoted **as it sits on disk**: `path:first-last` line numbers,
   the lines verbatim, a sentence the file wraps quoted wrapped. The landing is a text
   match against this quote; an unwrapped join or a paraphrase is the anchor that fails

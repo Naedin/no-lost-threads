@@ -166,8 +166,9 @@ Under `"keys"`:
   and the review's placer writes the edit. No home you can name → `Placement: none`.
 - **`Caught:`** needs the rule present at the placement, and nobody read it. Write it only
   when the gate's own output cited the rule by file and section — that citation is the
-  read; a numbered class or item in a doc `processDocs` covers counts as its section
-  (`check-brief.md class 2`). Otherwise the occurrence goes untagged and ranks.
+  read; a numbered class or item in a doc `processDocs` covers counts as its section when
+  the citation carries the item's name (`check-brief.md *Real-gate vs proxy*`), never its
+  number alone. Otherwise the occurrence goes untagged and ranks.
 - **The escape hatch** needs an edit this run never specified: spawn the full placer
   over the accepted findings first, then apply what it returns.
 
@@ -288,17 +289,20 @@ a paragraph:
 
 ```
 scope-leak/edit-landed-without-exercising-the-sibling-path
-  LANDED 9f60e91e — .claude/commands/land.md §4: the sibling carrier is amended in the same commit as the primary, and the commit names both; the second carrier was the one the rule kept missing.
+  LANDED 9f60e91e — .claude/commands/land.md §Carriers: the sibling carrier is amended in the same commit as the primary, and the commit names both; the second carrier was the one the rule kept missing.
 ```
 
 - **A new finding** → key line + one occurrence line, continuations to **eight lines at
   most**: the cited moment, the cost, the placement (`Placement: file §section — amend
   "…"`, or key-only the bare `Placement: file §section`). What does not fit goes where the placement points; the `guards`
   `retro-log-size` check holds the cap.
+- **A pointer names its section or item, never its number alone** — `Placement:`,
+  `Caught:`, a status line's where. A numbered list renumbers when an item is inserted or
+  removed, and an append-only line cannot be re-pointed afterwards.
 - **A finding a gate caught with its rule already present** → the ordinary key +
   occurrence, with one continuation line `Caught: <gate> — <where the rule is>` (the
   gate that stopped it: `/slices:check`, the guards, a review round; the rule's file and
-  section as the placer quoted it). Written only when both hold: the placer reports the
+  section, by name, as the placer quoted it). Written only when both hold: the placer reports the
   rule **present** at the placement (§3b; key-only, the gate's output cited it, §3c), and
   the finding's whole cost was the gate's own catch. Any cost spent past the gate — a maintainer question the finding raised, a
   fix batch, a revision, code that ran — is the shape reaching implementation, and the

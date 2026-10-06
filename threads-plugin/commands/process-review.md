@@ -307,7 +307,7 @@ rebase.
        for ranking, the count kept — `ADJUDICATED <date> — burst: <n> occurrences, <dates>,
        one incident`.
      - **patched** — a marker between or after the occurrences answers the key. Judge
-       the patch: **structural** → `LANDED <its sha> — <where>`, so a later occurrence
+       the patch: **structural** → `LANDED <its sha> — <where, by name>`, so a later occurrence
        reads recurred after LANDED; **partial** → `ADJUDICATED <date> — patched in part by
        <sha>; open: <the half still open>`, and the key ranks on the open half. An
        occurrence after a patch is evidence that patch did not hold, and outranks the same
@@ -677,6 +677,10 @@ as a check at the write than as an executor sub-agent between judgment and landi
     `RETIRED <date> — <why>` line; **one that must land elsewhere** is `UPSTREAM <ref>`;
     **one routed to a stub or plan** is `FILED <ref>` — the key stays live, so a further
     occurrence counts against the stub instead of vanishing into a closed key.
+  - **A status line's where names its section or item, never its number alone** —
+    `land.md §Carriers`, `check-brief.md *Real-gate vs proxy*`, not `§4` or `class 9`. A
+    numbered list renumbers when an item is inserted or removed, and an append-only line
+    cannot be re-pointed afterwards. Lines already written stay as they are.
   - **A candidate this run proposed and held** (an autonomous run, or one the user did
     not answer) is `HELD <today's date> — <letter, class, the proposal in one line>` on
     its key, and the lines ride **this run's marker commit** — the date is the ref because
