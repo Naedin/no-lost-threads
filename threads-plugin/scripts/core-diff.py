@@ -37,16 +37,26 @@ docs have a window:
   core-diff process-review-mark (2026-09-08, ba7d3a35)..origin/main: 6 docs (4 whole, 2 window), 2 with a window
 
 Neither list configured prints one line saying so and exits 0: the command narrates and
-skips. Exit 2 when the config is malformed, the mark is missing without --since, a doc is
-in neither list, or git fails.
+skips. Exit 2 when the config is malformed, the mark is missing without --since, the start
+is a tag the remote holds elsewhere (`marker-stream.py` names the fetch), a doc is in
+neither list, or git fails.
 """
 import argparse
+import importlib.util
 import json
 import pathlib
 import subprocess
 import sys
 
 DEFAULT_MARK = "process-review-mark"
+
+
+def marker_stream():
+    path = pathlib.Path(__file__).with_name("marker-stream.py")
+    spec = importlib.util.spec_from_file_location("marker_stream", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def refuse(msg):
@@ -123,6 +133,9 @@ def main():
     if subprocess.run(["git", "rev-parse", "--verify", "-q", f"{since}^{{commit}}"],
                       cwd=root, capture_output=True).returncode != 0:
         refuse(f"no such rev: {since}" + ("" if a.since else " (the mark; pass --since REV)"))
+    stale = marker_stream().stale_tag(root, since)
+    if stale:
+        refuse(stale)
     if a.mode == "diff":
         if not a.doc:
             refuse("diff needs the doc's path")

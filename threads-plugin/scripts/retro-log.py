@@ -88,7 +88,8 @@ one without, which reached past the gate that had caught it and ranks regardless
 count; the key line says `escaped <gate>`), `--since DATE` (keys with an occurrence,
 status, or annotation dated on or after DATE), `--since REV` (keys with a detail line the
 log at REV did not hold — what was appended after that commit, to the commit and not to
-the day; compaction and re-keying move no line into it: the read for "since the mark"),
+the day; compaction and re-keying move no line into it: the read for "since the mark";
+a REV naming a local tag the remote holds elsewhere refuses, naming the fetch that moves it),
 `--live` (no closed section). Filters compose; the summary line counts the whole log and names how many keys the filter
 shows. Without `--keys` a filtered view carries each shown key's detail, so the
 recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` prints,
@@ -478,6 +479,9 @@ def lines_at(root, log, rev):
     if subprocess.run(["git", "rev-parse", "--verify", "-q", rev + "^{commit}"], cwd=root,
                       capture_output=True).returncode != 0:
         refuse([f"--since takes YYYY-MM-DD or a commit, not {rev}"])
+    stale = marker_stream().stale_tag(root, rev)
+    if stale:
+        refuse([stale])
     r = subprocess.run(["git", "show", f"{rev}:{log.relative_to(root).as_posix()}"], cwd=root,
                        capture_output=True, text=True)
     if r.returncode != 0:

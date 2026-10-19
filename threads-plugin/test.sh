@@ -443,6 +443,35 @@ printf '{ "markTag": "process-review-mark" }\n' > "$CD/.claude/threads.json"
 python3 "$cd_" --root "$CD" 2>/dev/null | grep -q 'no invariantDocs or windowOnlyDocs configured' || fail "no invariantDocs did not say so"
 ok "core-diff: per-doc words at mark and head, added/removed, commits, whole/window; diff; --since; a missing mark, a doc in neither list, and one in both refuse"
 
+# ---- a mark a peer force-pushed: a plain fetch leaves the local tag behind, and every
+# script reading the mark refuses it and names the fetch that moves it
+SR="$tmp/sr"; mkdir -p "$SR/w/.claude"
+git init -q --bare -b main "$SR/remote.git"
+git init -q -b main "$SR/w"; w() { git -C "$SR/w" "$@"; }
+w config user.email t@t; w config user.name t
+printf '{ "markerPattern": "^docs(process", "markTag": "process-review-mark", "retroLogPath": ".claude/log.md", "invariantDocs": ["CLAUDE.md"] }\n' > "$SR/w/.claude/threads.json"
+printf '# base\n' > "$SR/w/CLAUDE.md"; printf '## Entries\n' > "$SR/w/.claude/log.md"
+w add -A; w commit -q -m base; w tag process-review-mark
+w remote add origin "$SR/remote.git"; w push -q origin main refs/tags/process-review-mark 2>/dev/null
+git clone -q "$SR/remote.git" "$SR/peer" 2>/dev/null; p_() { git -C "$SR/peer" "$@"; }
+p_ config user.email t@t; p_ config user.name t
+printf 'rule\n' >> "$SR/peer/CLAUDE.md"; p_ commit -qam "docs(process/claude): a rule"
+p_ tag -f process-review-mark >/dev/null; p_ push -q origin main 2>/dev/null; p_ push -q -f origin refs/tags/process-review-mark 2>/dev/null
+w fetch -q origin 2>/dev/null; w merge -q --ff-only origin/main
+[ "$(w rev-parse process-review-mark)" = "$(w rev-parse HEAD~1)" ] || fail "fixture: a plain fetch moved the tag, so this case proves nothing"
+python3 "$ms" count --root "$SR/w" >/dev/null 2>"$SR/e1" && fail "marker-stream read a mark the remote holds elsewhere"
+grep -q 'process-review-mark is [0-9a-f]* here but [0-9a-f]* on origin .* git fetch origin +refs/tags/process-review-mark:refs/tags/process-review-mark$' "$SR/e1" || fail "the stale mark's refusal did not name the fetch: $(cat "$SR/e1")"
+python3 "$cd_" --root "$SR/w" >/dev/null 2>"$SR/e2" && fail "core-diff read a stale mark"
+grep -q '+refs/tags/process-review-mark' "$SR/e2" || fail "core-diff's refusal did not name the fetch: $(cat "$SR/e2")"
+python3 "$rl" view --keys --since process-review-mark --root "$SR/w" --log .claude/log.md >/dev/null 2>"$SR/e3" && fail "retro-log --since read a stale mark"
+grep -q '+refs/tags/process-review-mark' "$SR/e3" || fail "retro-log's refusal did not name the fetch: $(cat "$SR/e3")"
+python3 "$ms" count --since HEAD~1 --root "$SR/w" >/dev/null 2>&1 || fail "a --since that is not a tag was checked against the remote"
+w fetch -q origin +refs/tags/process-review-mark:refs/tags/process-review-mark 2>/dev/null
+python3 "$ms" count --root "$SR/w" 2>/dev/null | grep -q '^0 markers since process-review-mark' || fail "the fetched mark did not read: $(python3 "$ms" count --root "$SR/w" 2>&1)"
+w tag -f process-review-mark HEAD~1 >/dev/null; w remote set-url origin "$SR/nowhere.git"
+python3 "$ms" count --root "$SR/w" >/dev/null 2>&1 || fail "an unreachable remote refused — offline is not stale"
+ok "stale mark: a force-pushed mark a plain fetch left behind refuses in marker-stream, core-diff, retro-log --since, naming the fetch; a fetched mark, a non-tag --since, an unreachable remote read"
+
 # ---- scripts/adherence.py: a declared rule's seeded draw of distinct blocks, the window as
 # the weighting, the tally's line with judge FPs, and a shape's windows read by the trailer.
 ad="$here/scripts/adherence.py"

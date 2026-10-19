@@ -120,6 +120,7 @@ manifest exactly, or git failing.
 """
 import argparse
 import datetime
+import importlib.util
 import json
 import pathlib
 import random
@@ -133,6 +134,14 @@ VERDICTS = ("TRUE", "DRIFTED", "HISTORY")
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 HIT = re.compile(r"^(?:\./)?([^:]+):(\d+):")
 BLOCK_REF = re.compile(r"^(?:\./)?([^:\s]+):(\d+)(?:-(\d+))?$")
+
+
+def marker_stream():
+    path = pathlib.Path(__file__).with_name("marker-stream.py")
+    spec = importlib.util.spec_from_file_location("marker_stream", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def refuse(msg):
@@ -250,6 +259,9 @@ def window_start(a, cfg, rule, repo):
     if subprocess.run(["git", "rev-parse", "--verify", "-q", f"{since}^{{commit}}"],
                       cwd=repo, capture_output=True).returncode != 0:
         refuse(f"no such rev: {since}" + ("" if a.since else " (the mark; pass --since REV)"))
+    stale = marker_stream().stale_tag(repo, since)
+    if stale:
+        refuse(stale)
     return since, label
 
 

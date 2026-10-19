@@ -39,8 +39,12 @@ line names the range, the mark's date, and the four counts:
 
   36 markers since process-review-mark (2026-09-08, ba7d3a35)..HEAD: 9 organic · 21 review · 6 bookkeeping
 
-Exit 0; 2 when the config is malformed, the mark is missing without --since/--all, or git
-fails.
+A start that names a local tag the remote holds elsewhere refuses, naming the fetch that
+moves it (the same read guards `core-diff.py`, `retro-log.py --since REV`, and
+`adherence.py`'s window).
+
+Exit 0; 2 when the config is malformed, the mark is missing without --since/--all, the
+start is a tag stale against the remote, or git fails.
 """
 import argparse
 import json
@@ -65,6 +69,32 @@ def git(args, cwd):
     if r.returncode != 0:
         refuse(f"git {' '.join(args[:2])} failed: {r.stderr.strip()}")
     return r.stdout
+
+
+def stale_tag(root, rev):
+    """Why `rev` must not be read, when it names a local tag the remote holds at another
+    object: a plain `git fetch` never moves a tag it already has, so a mark a peer
+    force-pushed reads stale here and the window opens at the old one. None when `rev` is
+    not a local tag, the repo has no remote, or the remote cannot be asked — offline is
+    not stale."""
+    def run(*args, timeout=None):
+        try:
+            r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                               timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return None
+        return r.stdout.strip() if r.returncode == 0 else None
+    local = run("rev-parse", "--verify", "-q", f"refs/tags/{rev}")
+    remotes = (run("remote") or "").split()
+    if not local or not remotes:
+        return None
+    remote = "origin" if "origin" in remotes else remotes[0]
+    out = run("ls-remote", "--tags", remote, f"refs/tags/{rev}", timeout=20)
+    there = (out or "").split()
+    if not there or there[0] == local:
+        return None
+    return (f"{rev} is {local[:8]} here but {there[0][:8]} on {remote} — a plain fetch never "
+            f"moves a tag it already has; git fetch {remote} +refs/tags/{rev}:refs/tags/{rev}")
 
 
 def bre_to_python(pattern):
@@ -173,6 +203,9 @@ def main():
         if r.returncode != 0:
             refuse(f"no such rev: {start}" + ("" if a.since else
                    f" — the mark; bootstrap sets it, or pass --since/--all"))
+        stale = stale_tag(root, start)
+        if stale:
+            refuse(stale)
         date = git(["log", "-1", "--format=%ad", "--date=short", start], root).strip()
         short = git(["rev-parse", "--short", start], root).strip()
         rng, label = [f"{start}..{a.head}"], f"{start} ({date}, {short})..{a.head}"

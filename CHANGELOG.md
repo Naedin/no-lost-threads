@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.20.3] — 2026-10-19
+
+### Fixed
+
+- **The review reads the mark the remote holds, not the one this clone last saw.** A review advances `markTag` with a force-push, and a plain `git fetch` never moves a tag a clone already has, so the next review's pre-flight read the old mark and opened its window there. `/threads:process-review`'s pre-flight, and its re-read before the first write, fetch the mark by its own refspec, `git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`, and `/threads:retro`'s ripeness check does the same before it measures. `marker-stream.py`, `core-diff.py`, `retro-log.py --since REV`, and `adherence.py`'s window refuse a start naming a local tag the remote holds at another commit, and name that fetch; no remote, or one that cannot be reached, reads as before. On the reference adopter a review's window opened at a mark five days old, read 33 markers where 14 were in range, and counted the previous review's own landings as organic churn. `test.sh` proves the refusal in three scripts on a peer's force-pushed mark, and the fetched mark, a non-tag `--since`, and an unreachable remote reading. Adopter-side edit: none.
+
 ## threads [0.20.2] — 2026-10-05
 
 ### Changed

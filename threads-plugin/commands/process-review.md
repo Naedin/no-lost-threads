@@ -211,14 +211,18 @@ commits of process-doc churn — here's what this tool does with that."*
 **Pre-flight — one review at a time.** This command is the only mutator of the retro log
 and the ledger and it advances a shared tag, and nothing else stops two reviews from running
 at once. Before reading anything, `git fetch` and record the two facts a peer run would
-move, **on the remote's default branch, never the local head**: `git rev-parse <markTag>`
+move, **as the remote holds them, never as this checkout does**: `git rev-parse <markTag>`
 and `git rev-parse origin/<default>:<retroLogPath>` — a peer lands on the default branch
 while this checkout's head sits untouched, so a local read is unchanged in exactly the case
-the check exists for. Where the harness exposes a session listing, look: a peer is
-identified by its **working directory and branch**, never by a worktree name, which a later
-session on another repo can carry — a review on this repo already in flight means stop and
-say so. Then, **immediately before the first write** (a log append, the ledger edit,
-`compact`, the tag), fetch and re-read both facts. Either moved → a peer landed while this
+the check exists for. The mark needs its own fetch,
+`git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`: a peer advances it with a
+force-push, and a plain `git fetch` never moves a tag this clone already has. The scripts
+that read the mark refuse a local tag the remote holds elsewhere and name that fetch.
+Where the harness exposes a session listing, look: a peer is identified by its **working
+directory and branch**, never by a worktree name, which a later session on another repo
+can carry — a review on this repo already in flight means stop and say so. Then,
+**immediately before the first write** (a log append, the ledger edit, `compact`, the
+tag), fetch the same two ways and re-read both facts. Either moved → a peer landed while this
 one ran: **re-derive, then write** — rebase onto `origin/<default>` (the log merges by
 union; the ledger is a working file), run the `guards` gate on the rebased tree since a
 rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a rebase

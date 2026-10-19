@@ -410,7 +410,9 @@ The log has just grown, and at closeout *opening a new thread* is an available n
 Read `.claude/threads.json`; skip this step entirely if there's no config, no `markTag`
 tag, or nothing accrued.
 
-Measure — three commands, all local:
+Measure — three commands, after `git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`
+(a review advances the mark by force-push, which a plain fetch never takes; no remote →
+skip the fetch):
 
 - **Pending** — key lines appended to the retro log since the mark. The mark is the
   adjudication boundary `/threads:process-review` advances, so it is the one thing both
