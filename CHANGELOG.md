@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.20.4] — 2026-10-20
+
+### Changed
+
+- **A trim's cold read is adjudicated, not counted to zero.** `/threads:process-review` step 0a keeps the fresh-context read of an enforced doc's trim and its exclusion list, and no longer needs it to report zero moved predicates: each one it reports is verified, like a review finding, against the doc it was routed to and the reader's real path to the moment the rule fires (who reaches it, whether their command or doc already carries it, what missing it costs). A confirmed loss is restored; a refuted one is overridden with that measured reason in the trim's commit. A gate that must reach zero holds a trim on a reading that misses where the rule went. Adopter-side edit: none.
+
 ## slices [0.8.0] — 2026-10-20
 
 ### Changed

@@ -247,8 +247,12 @@ rebase.
    cull, beside the churn findings of step 4: its remedy is a trim, and a trim of an
    enforced doc lands only after a fresh-context read comparing old and new, handed both
    files and the exclusion list (wording, order, examples restating a present rule,
-   symbols, generic rationale) and never the trimmer's account, reports zero moved
-   predicates. **A core doc that bore on nothing is grounds to ask why — a doc twice its
+   symbols, generic rationale) and never the trimmer's account. Each moved predicate it
+   reports is adjudicated like a review finding, not counted to zero: verified against the
+   doc it was routed to and the reader's real path to the moment the rule fires — who
+   reaches that moment, whether their command or doc already carries the rule, what
+   missing it costs. A confirmed loss is restored; a refuted one is overridden, with that
+   measured reason in the trim's commit. **A core doc that bore on nothing is grounds to ask why — a doc twice its
    size bearing on nothing is the prose finding above — never grounds to leave the
    core**; only a doc that has stopped stating the repo's authority order or this
    review's contract leaves it — to `windowOnlyDocs` when its churn still needs
