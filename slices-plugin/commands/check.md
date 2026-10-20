@@ -38,6 +38,15 @@ including a model name, is false. When it is true and `checkerModel` is also set
 
 ## 1. Spawn the checker cold
 
+**First, count the round.** This check is round `<r>`: one more than the `gap-checked at`
+records already in the plan's ledger. **Cap:** never start a third round, or any after it,
+without the frame owner's go — a `go at` line (§3) appended after the newest
+`gap-checked at` record. With none, spawn nothing: append the held record (§3), commit the
+plan file as WIP, send the hand-up report (§2) built from the rounds already recorded, and
+stop. Otherwise copy the
+plan file to a scratch path outside the repo before the spawn — the round's baseline, which
+§2 restores on a stop.
+
 Use the `Agent` tool with this plugin's `gap-checker` agent
 (`subagent_type: slices:gap-checker`). Pass **only the plan's path** — e.g. *"Try
 to break the slice plan at `<path>`."* — and, when `checkBrief` is set, one more
@@ -66,7 +75,7 @@ ledger entry must say the check was warm.
 ## 2. Reconcile what comes back
 
 The report ends in one verdict — **FIXED-IN-PLACE**, **NEEDS-DECISION**, or
-**MIS-CARVED** — and its findings arrive in two kinds; keep them separate.
+**MIS-CARVED** — and its findings arrive in three kinds; keep them separate.
 
 **First, read the verdict's vocabulary.** The harness loads an agent definition at
 session start and this command's text at its first invocation in the session, so after
@@ -77,7 +86,58 @@ applying them, came from an older `gap-checker` than this text. Say so in one li
 remedy is a session restart — then do the agent's part yourself: apply the unambiguous
 fixes with the fold sweep, read `holds` as FIXED-IN-PLACE and `open` as NEEDS-DECISION,
 and add `agent-stale` to the record line (§3). Do not re-spawn; the same definition
-would answer.
+would answer. A report with no dependency kind and no `Round:` count line is from an
+older agent too: the stop reasons below cannot be read from it, so only the backstops run,
+and the record says `agent-stale`.
+
+### Stop before folding
+
+Every finding has an owner: a **defect** is the plan's, and the checker applied it; a
+**question** is a product call, put through its escalation walk and then to the user; a
+**dependency finding** is the frame owner's. Before you verify a fold or put a question,
+read the report against the stops. **Reasons**, which fire at any round:
+
+- **(a) dependency** — the report carries a dependency finding;
+- **(b) cluster** — most of the round's defects (more than half of `<N>`) are
+  `lands: outside`: their fixes need code outside the plan's changed files to change, or to
+  behave differently than the plan assumes. A fix that only corrects the plan's text about
+  code it reads lands in the plan;
+- **(c) reopen** — most of the round's defects are marked `reopens`: they land on what the
+  previous round's fixes touched.
+
+**Backstops**, which fire whatever the reasons say:
+
+- **(d) no decay** — the round's `<N>` is not below the previous `gap-checked at`
+  record's `<N>`;
+- **(e) cap** — §1's: no third round without the frame owner's go.
+
+Name every one that fired, reasons first. A **MIS-CARVED** verdict is not read against
+the stops: it already returns the plan upward. **On a stop**, apply nothing from the
+round: copy §1's baseline back over the plan file, so a fix the checker applied is undone
+and no question is folded; run no further check. Append the record (§3) to the restored
+plan, commit the plan file and any stubs filed during the rounds as WIP, and send the frame
+owner the **hand-up report**:
+
+```
+HAND-UP — <plan path>, round <r>, stopped: <reasons fired>
+Rounds: <N> per round, oldest first (<r1>, <r2>, …)
+Clusters: <code area> — <k> defects; … (by the code the defects land on)
+Stubs filed as different code: <each stub filed during the rounds, by path> | none
+Dependency findings:
+  <each, verbatim from the report>
+Recommendation: <one line>
+Shape: <the plan's Shape paragraph, verbatim>
+```
+
+The frame owner decides from that and the Shape, not by re-reading the plan. **The frame
+owner** is the session that started the draft — the `frame owner:` the `drafted at` record
+names, or the session whose message started this one; with none, the user. Send the report
+to a session by the channel it reached you on; to the user, it is your final message. The
+stopped round reports **NEEDS-DECISION**, whatever the checker's verdict, with the hand-up
+as its open decision, and §2's questions wait on the frame owner's answer. The frame
+owner's go for a further round is a `go at` line (§3), which whoever relays the go appends.
+
+With no stop, reconcile as below.
 
 - **Defects** — the plan contradicts the repo, a claim failed re-verification, a
   scope hole, a failure class hit. **The unambiguous ones are already applied** — the
@@ -103,11 +163,6 @@ would answer.
   `docs/direction.md`). On conflict, cite the doc and surface the conflict to the
   user instead of recording the ruling.
 
-If a plan keeps coming back with findings after a round when you think it should be
-done, stop folding them and ask whether you are solving the wrong problem one layer
-down — a doc the plan restates, a term nobody defined, a contract being designed in
-prose. Fix that instead, then check again.
-
 A clean report is a first-class outcome. Don't pressure the checker for findings,
 and don't pad its clean verdict with your own.
 
@@ -130,8 +185,18 @@ carries a `- (none yet)` placeholder, and the first append replaces it. That, an
 creation above, are the only writes into the ledger that are not appends:
 
 ```
-- gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, warm-context][, agent-stale]
+- gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
+- check held at <short commit sha>, <date>, slices <version> — round <r>: no frame-owner go
+- go at <short commit sha>, <date> — <frame owner>: <the disposition, one line>
 ```
+
+`<N>` counts every defect, dependency findings included, so the next round's no-decay
+backstop reads it from this line; `<D>` is written when any dependency finding came back.
+`touched:` carries the report's `touched` sections when its fixes stand, and is what the
+next round's checker marks `reopens` against. A stopped round writes `addressed: 0` and
+no `touched:`, since §2 restored the plan, and `stopped:` names the reasons fired as
+§2 lists them — `dependency`, `cluster`, `reopen`, `no-decay`. The `check held` line is the
+cap's stop, written when no checker ran; a `go at` line lets one further round start.
 
 `warm-context` when the checklist ran in this context (§1); `agent-stale` when the
 report's vocabulary showed an agent definition older than this text (§2). Each names a
@@ -166,8 +231,8 @@ that cannot be re-run; do not write one.
 On **FIXED-IN-PLACE**, flip the plan's
 status line from draft to **`Status: checked — implement-ready.`** **NEEDS-DECISION**
 keeps it a draft; name each open question and who has to answer it, and flip the line
-only once the answers are folded in. **MIS-CARVED**
-never flips it. A plan with no
+only once the answers are folded in. **MIS-CARVED** and a stopped round
+never flip it. A plan with no
 `**Status:**` line — another drafter's — gets the verdict in-thread and nothing
 flipped; **never write the line into it**: its top of file is the adopter's, and
 slices' readiness guard is a line only `/slices:draft` emits.
@@ -181,5 +246,8 @@ slices' readiness guard is a line only `/slices:draft` emits.
   question to avoid an edit.
 - **Holding the checker's fixes for approval**, or reverting one from memory of the
   drafting. A doubt about an applied fix is a question to the user.
+- **Folding past a stop**, or applying a dependency finding in the plan. A fix that
+  routes around code the plan does not own is the frame owner's call; another round of
+  patches is what the stop exists to prevent.
 - **Skipping the ledger line.** The check that leaves no record didn't happen, as
   far as any future session can tell.

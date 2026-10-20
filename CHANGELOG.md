@@ -9,6 +9,16 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.8.0] — 2026-10-20
+
+### Changed
+
+- **A gap-check round stops when its findings show the problem sits above the plan, and hands it up.** Every finding has an owner: a defect is the plan's, a question goes through its escalation walk to the user, and a new third kind, the **dependency finding** — a fix that would edit or gate on code outside the plan's changed files or on a sibling change not yet landed, or an in-plan fix that only routes around such code (withhold, gate, cap) — is the frame owner's and is never applied. Before folding, `/slices:check` reads each round against the stops: reasons first, (a) a dependency finding, (b) most defects landing outside the changed files — a fix that needs code outside the list to change or to behave differently than the plan assumes, never a correction of the plan's text about code it only reads — (c) most defects reopening what the previous round's fixes touched; then backstops, (d) a defect count not below the previous round's and (e) no third round without the frame owner's go. On a stop it restores the plan to the round's baseline, appends the record, commits WIP, and sends the frame owner a hand-up report (counts per round, clusters by code area, stubs filed as different code, the dependency findings verbatim, one line of recommendation, the Shape). The frame owner is the session that started the draft, which `/slices:draft` names on its `drafted at` record, or the user. The stopped round reports `NEEDS-DECISION`; no verdict is added. The gap-checker marks each defect's `lands: plan | outside — <code>`, judged by what the fix changes, and `reopens`, applies nothing when a dependency finding or the outside majority holds, and ends in a `Round:` count line. The judgment sentence it replaces carried no count and no owner. On the reference adopter one plan took four rounds (10, 7, 8, 6 defects), rounds two to four on a model the plan did not change; another took three (13, 15, 13).
+
+### Contract
+
+- **A third finding kind and new ledger fields; no new verdict.** Adopter-side edit: a wrapper that reads `NEEDS-DECISION` routes a dependency finding and a hand-up to the frame owner, not to the user's question walk; a wrapper that starts a draft for another session passes its handle so the `drafted at` record can name it. Ledger records gain optional `, <D> dependency`, `, touched:` and `, stopped:` fields on `gap-checked at`, `, frame owner:` on `drafted at`, and two line forms, `check held at` and `go at`; existing lines stay as written.
+
 ## threads [0.20.3] — 2026-10-19
 
 ### Fixed

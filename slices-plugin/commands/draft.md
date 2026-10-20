@@ -277,7 +277,7 @@ that most need the reviewer>
 ## Verification ledger
 
 <the drafter's claim rows sit under its record line; /slices:check and later hardening rungs append>
-- drafted at <short commit sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)
+- drafted at <short commit sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)[, frame owner: <session>]
   - <claim> — `<generating command>` — <one line of its output>
   - <claim> — unverified: <what would settle it>
 ```
@@ -285,6 +285,10 @@ that most need the reviewer>
 `<version>` is the `version` field of `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
 read at write time, as `/slices:check` reads it for its own line; `slices ?` when the file
 cannot be read. The record's sha is the baseline the rows were measured against.
+`frame owner:` names the session that started this draft — the one whose message asked
+for it — by the handle a later session can reach it at; a draft the user started omits
+it, and the user is the frame owner. `/slices:check` sends its hand-up there when a round
+stops.
 
 ### `planTemplate` is set — overlay the invariants onto it
 
@@ -382,6 +386,9 @@ this draft shipped with. If the check returns **MIS-CARVED**, the plan does not 
 last commit that carries it, with the check's reframing folded in, delete the plan and any
 spin-offs that only made sense under the carve — each onto the restored stub (§0) — and
 say so: the stub is the tracker again.
+If the check **stops** (its §2 *Stop before folding*), the plan stands as a draft at the
+round's baseline and the hand-up has gone to the frame owner: fold nothing and check
+nothing further until its answer comes back.
 When a `planTemplate` was used and an invariant had to be auto-emitted, a marker was
 ignored, or a duplicate spelling was written, say so in one line each, so the adopter
 learns their template has a gap to fill.

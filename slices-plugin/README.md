@@ -37,8 +37,13 @@ a virtue: where the coherent change already fits one context, it ships whole.
   problem `MIS-CARVED` before spending precision on it, re-verifies load-bearing claims at
   file-and-line, walks the change from the user's side, then hunts standard
   failure classes — and **applies every unambiguous fix in the plan itself**, since it
-  holds the freshest read; only a product question comes back. One verdict:
-  `FIXED-IN-PLACE`, `NEEDS-DECISION`, or `MIS-CARVED`. No plan is implement-ready
+  holds the freshest read; only a product question comes back, or a **dependency
+  finding** — a fix resting on code outside the plan's changed files, never applied. One
+  verdict: `FIXED-IN-PLACE`, `NEEDS-DECISION`, or `MIS-CARVED`. A round whose findings show
+  the problem sits above the plan — a dependency finding, most defects needing code outside
+  the plan to change, or on the last round's fixes, a count that did not fall, a third round with no go — **stops**:
+  nothing from it is applied, and a hand-up report goes to the session that started the
+  draft, or the user. No plan is implement-ready
   until it survives; every check
   leaves a ledger line in the plan, stamped with the plugin version that wrote it.
 
@@ -223,8 +228,10 @@ not a single refreshed field. A plan whose ledger has no rows is one whose named
 were never measured, which is what the rows exist to make visible.
 
 ```
-- drafted at <sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)
-- gap-checked at <sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, warm-context][, agent-stale]
+- drafted at <sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)[, frame owner: <session>]
+- gap-checked at <sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
+- check held at <sha>, <date>, slices <version> — round <r>: no frame-owner go
+- go at <sha>, <date> — <frame owner>: <disposition>
 ```
 
 ## How this hardens — and why adopting it early is safe

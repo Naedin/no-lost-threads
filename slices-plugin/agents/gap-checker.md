@@ -85,6 +85,33 @@ Work in this order:
    commit carries it; a ruling or tension in the plan that changes a recorded decision
    without naming that decision's own amendment in scope.
 
+**Owner each defect before you act on it.** A defect is the plan's when its fix stays
+inside the plan's changed files — the files its Scope, or a changed-files section, says the
+change edits; a plan that names none has that hole as a defect, and you read the change's
+files from its Scope. **A dependency finding** is a defect whose fix would edit or gate on
+code outside the plan's changed files, or on a sibling change not yet landed — and also a
+defect whose in-plan fix only routes around such code (withhold, gate, cap). The test is
+mechanical: the file or behavior the fix rests on is not in the plan's changed-files list.
+Wiring the plan's own change into a file outside the list — a call site, a test, a doc
+the change itself requires — is the plan's, and its fix adds the file to the list; code the
+slice needs to be correct, whose behavior for its other readers the fix would change or
+whose correctness the plan only assumes, is a dependency. **A dependency finding is never
+applied**: it is reported with the code or change it rests on. A product or priority call
+is a question, as below.
+
+Every defect also says where its fix lands, judged by what the fix changes, never by
+what the defect cites — `lands: plan` or `lands: outside — <path or code area>`. A fix that
+only corrects the plan's own text about code — a claim, a line number, a symbol, a count —
+lands in the plan, whatever file it cites. A fix lands outside only when it needs code
+outside the changed files to change, or to behave differently than the plan assumes. A
+plan that reads `Store.swift:40` where the symbol now sits at `:52` is `lands: plan`; a plan
+whose new caller needs `Store.load()` to stop throwing on an empty file it is not changing
+is `lands: outside — Store.load()`, and a dependency finding as well. When the ledger already holds a `gap-checked at` record
+carrying `touched: <sections>`, a defect whose fix lands in one of those sections is marked
+`reopens`. **When you report a dependency finding, or more than half your defects land
+outside the changed files, apply nothing** — the round stops at the command that spawned
+you, and an edit it would undo is spent twice; say which held.
+
 **Act on the defects, in the plan file.** A defect whose fix is unambiguous or
 code-derivable — a corrected claim, a missing verify command, a renamed symbol, a hole
 the source dictates how to fill — is edited into the plan directly; this is most
@@ -97,13 +124,20 @@ when your verdict is MIS-CARVED: a bad shape is not repaired in place. Never wri
 `## Verification ledger` or the `**Status:**` line; the command that spawned you does
 both from your report.
 
-Report in two kinds, and keep them separate:
+Report in three kinds, and keep them separate:
 
 - **Defects** — the plan is wrong about the repo or has a hole. Cite the evidence
-  (file, line, command output). State the fix in one line and say whether you
-  applied it, naming the sections the fold sweep reached.
+  (file, line, command output). State the fix in one line, its `lands:` and any
+  `reopens`, and say whether you applied it, naming the sections the fold sweep reached.
+- **Dependency findings** — each as `<the defect> — rests on: <path:line, or the sibling
+  change> — outside: <that path is not in the changed files | the change has not landed>`,
+  with the fix it would need and its `lands:`. Never applied.
 - **Questions** — anything that hinges on a product or priority call. State the
   decision and the pull in each direction; do not answer it yourself.
+
+Then one count line: `Round: <N> defects (<D> dependency), <k> landing outside the changed
+files (`lands: outside`), <r> reopening; touched: <the sections your applied fixes reached, or none>`. `<N>`
+counts the dependency findings with the other defects.
 
 Then **the claim rows**: every load-bearing claim you verified that the drafter's rows
 did not already hold unchanged, one line each —
@@ -115,8 +149,9 @@ how many draft-time rows you re-ran, held, found moved or mis-recorded, and sett
 `unverified`.
 
 End with one verdict: **FIXED-IN-PLACE** (nothing found, or every defect was unambiguous
-and is applied), **NEEDS-DECISION** (a question the author cannot answer alone; the
-unambiguous defects are applied all the same), or **MIS-CARVED** — the findings are a
+and is applied), **NEEDS-DECISION** (a question the author cannot answer alone, or a
+dependency finding; the unambiguous defects are applied all the same unless a dependency
+finding or the outside majority held), or **MIS-CARVED** — the findings are a
 shape problem, not gaps: the premise is wrong, its frame is narrower than the problem,
 the slice has grown past one coherent change, or it is superseded. Say MIS-CARVED when
 repairing the plan in place would mean rewriting its argument.
