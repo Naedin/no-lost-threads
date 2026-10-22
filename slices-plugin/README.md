@@ -25,6 +25,10 @@ a virtue: where the coherent change already fits one context, it ships whole.
   and its frame is sized — the value in one sentence, the harm measured, the
   neighbouring states walked, two cheaper deliveries named — before the ledger is
   spent on it, stopping for the maintainer when more than one shape stands;
+  every Out item records which in-scope surface is wrong or hands the user a chore
+  without it — none, a refinement, or a named limit no capability could lift — and any
+  other is pulled in or, when another seam owns it, stops the draft for the frame
+  owner rather than being deferred;
   bundled concerns are carved into separate stubs; the stub is deleted in the
   promotion. The plan ends in a **review digest** — a cold-readable Shape
   paragraph plus at most five tension points — so a human with limited time

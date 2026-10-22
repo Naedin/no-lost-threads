@@ -97,7 +97,9 @@ Every finding has an owner: a **defect** is the plan's, and the checker applied 
 **dependency finding** is the frame owner's. Before you verify a fold or put a question,
 read the report against the stops. **Reasons**, which fire at any round:
 
-- **(a) dependency** — the report carries a dependency finding;
+- **(a) dependency** — the report carries a dependency finding, an Out item an in-scope
+  surface needs and another seam owns among them (`/slices:draft` §1 stops on the same
+  item at draft time);
 - **(b) cluster** — most of the round's defects (more than half of `<N>`) are
   `lands: outside`: their fixes need code outside the plan's changed files to change, or to
   behave differently than the plan assumes. A fix that only corrects the plan's text about

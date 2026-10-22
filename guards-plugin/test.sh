@@ -68,8 +68,8 @@ run_case() {  # run_case <code> <id> <case dir>
 
 for check in "$here"/checks/*/; do
   id="$(basename "$check")"
-  for dir in "$check"fixtures/pass/*/; do run_case 0 "$id" "$dir"; done
-  for dir in "$check"fixtures/fail/*/; do run_case 1 "$id" "$dir"; done
+  for dir in "$check"fixtures/pass/*/; do [ -d "$dir" ] && run_case 0 "$id" "$dir"; done
+  for dir in "$check"fixtures/fail/*/; do [ -d "$dir" ] && run_case 1 "$id" "$dir"; done
   expect 2 "$id refuses: root missing" \
     python3 "$check/check.py" --root "$tmp/no-such-root"
   mkdir -p "$tmp/empty-$id"
@@ -484,6 +484,66 @@ out="$(python3 "$here/run.py" --root "$rr" --diff-range upstream...HEAD 2>/dev/n
 printf 'ok    %-52s\n' "runner: --diff-range judges a row the range adds, alone"
 says 2 "runner: a range git cannot diff refuses" "diff-range no-such-ref...HEAD: " \
   python3 "$here/run.py" --root "$rr" --diff-range no-such-ref...HEAD
+
+# deferral-trailer reads commit messages, so its cases are ranges in a built repo: a
+# stub added needs a trailer naming it on some commit in the range; an amendment, a
+# consolidation, and a removal need none; with no range it judges nothing, and the
+# runner hands --diff-range over as GUARDS_RANGE.
+dt="$tmp/deferral"
+mkdir -p "$dt/.claude" "$dt/Plans/inbox"
+git -C "$dt" init -q
+git -C "$dt" config user.email guards@test
+git -C "$dt" config user.name guards
+printf '{"checks": {"deferral-trailer": {"rung": "block", "paths": ["Plans/inbox/*.md"], "exclude": ["Plans/inbox/README.md"]}}}' \
+  > "$dt/.claude/guards.json"
+printf '# Inbox\n' > "$dt/Plans/inbox/README.md"
+printf '# Inbox — a\n\n- Blocked on: decision — x\n\n| row a |\n' > "$dt/Plans/inbox/feat-a.md"
+printf '# Inbox — c\n\nA different concern entirely, kept apart.\n\n| row c |\n' > "$dt/Plans/inbox/feat-c.md"
+git -C "$dt" add -A && git -C "$dt" commit -q -m base -m 'Why-not-now: feat-a — base' -m 'Why-not-now: feat-c — base'
+dtc() {  # dtc <message> [trailer] — commit the tree's changes
+  git -C "$dt" add -A && git -C "$dt" commit -q -m "$1" ${2:+-m "$2"}
+}
+dtr() {  # dtr <range> — the check over the deferral repo with that range
+  GUARDS_RANGE="$1" python3 "$here/checks/deferral-trailer/check.py" --root "$dt" \
+    --paths 'Plans/inbox/*.md' --exclude Plans/inbox/README.md
+}
+says 0 "deferral-trailer: no range judges nothing, and says so" "nothing judged" \
+  env -u GUARDS_RANGE python3 "$here/checks/deferral-trailer/check.py" --root "$dt" --paths 'Plans/inbox/*.md'
+printf '| the pushes, deferred |\n' >> "$dt/Plans/inbox/feat-a.md"
+dtc amend
+expect 0 "deferral-trailer: an amended stub needs no trailer" dtr HEAD^..HEAD
+cat "$dt/Plans/inbox/feat-c.md" | sed -n '/row c/p' >> "$dt/Plans/inbox/feat-a.md"
+git -C "$dt" rm -q Plans/inbox/feat-c.md
+dtc consolidate
+expect 0 "deferral-trailer: a consolidation needs no trailer" dtr HEAD^..HEAD
+printf '# Inbox — b\n\nA new deferral of its own.\n' > "$dt/Plans/inbox/feat-b.md"
+dtc add-b
+out="$(dtr HEAD^..HEAD 2>/dev/null)"
+[ "$out" = "Plans/inbox/feat-b.md:1: added with no Why-not-now: trailer naming feat-b" ] \
+  || { echo "FAIL  deferral-trailer: a stub added with no trailer is a finding"; printf '%s\n' "$out"; exit 1; }
+printf 'ok    %-52s\n' "deferral-trailer: a stub added with no trailer is a finding"
+git -C "$dt" commit -q --allow-empty -m later -m 'Why-not-now: feat-b — the reason'
+expect 0 "deferral-trailer: a trailer anywhere in the range names it" dtr HEAD~2..HEAD
+printf '# Inbox — bb\n\nAnother new one, unrelated.\n' > "$dt/Plans/inbox/feat-bb.md"
+dtc add-bb 'Why-not-now: feat-bbq — a longer name'
+expect 1 "deferral-trailer: a trailer naming a longer stem does not name it" dtr HEAD^..HEAD
+git -C "$dt" commit -q --amend -m add-bb -m 'Why-not-now: feat-bb'
+expect 0 "deferral-trailer: a bare stem names it" dtr HEAD^..HEAD
+mkdir -p "$dt/Plans/active"
+printf '# Plan — d\n\nA plan sent back to the inbox.\n' > "$dt/Plans/active/feat-d.md"
+dtc plan-d
+git -C "$dt" mv Plans/active/feat-d.md Plans/inbox/feat-d.md
+dtc restore-d
+expect 1 "deferral-trailer: a stub renamed in from outside is added" dtr HEAD^..HEAD
+git -C "$dt" branch -q dt-base HEAD~1
+expect 1 "runner: --diff-range hands the range as GUARDS_RANGE" \
+  python3 "$here/run.py" --root "$dt" --diff-range dt-base...HEAD
+expect 0 "runner: without --diff-range no GUARDS_RANGE reaches a check" \
+  env GUARDS_RANGE=dt-base...HEAD python3 "$here/run.py" --root "$dt"
+printf '{"checks": {"deferral-trailer": {"rung": "block", "paths": ["Plans/inbox/*.md"], "trailerKey": "not a key"}}}' \
+  > "$dt/.claude/guards.json"
+expect 2 "deferral-trailer: a malformed trailerKey refuses" dtr HEAD^..HEAD
+expect 2 "deferral-trailer: a range git cannot read refuses" dtr no-such-ref..HEAD
 
 # comment-ordinals reads code the markdown export drops, so a dropped source refuses by
 # name, whether its extension or its shebang puts it in scope; exported, it is judged.

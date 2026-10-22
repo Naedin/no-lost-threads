@@ -84,6 +84,22 @@ Work in this order:
    for, and a doc amendment the change itself requires is part of its argument whatever
    commit carries it; a ruling or tension in the plan that changes a recorded decision
    without naming that decision's own amendment in scope.
+4. **Then every Out item, against the slice's own surfaces.** For each item Scope puts
+   Out, find an in-scope surface — copy, behavior, timing — that is wrong, or hands the
+   user a chore, without it; an item's recorded `without it:` answer is a claim like any
+   other, checked here. Copy that hands the user something to remember, track, or time
+   ("test after 8 PM", "check back tomorrow", "keep an eye on") is the tell that a
+   capability was deferred, all the more when string checks pass on it. Two answers are
+   not hits once checked: a `refinement:` whose surface does differ without the item but
+   stays correct and asks the user to carry nothing, and a `limit:` naming why no
+   capability in any seam's reach could supply the item — a limit whose capability is only
+   unbuilt is a hit, and a limit's surface whose copy does not keep the chore to the moment
+   it matters is a defect of the plan's. Each hit is
+   owned by the rule below: pulling the item in is a defect when its fix stays in the
+   changed files and leaves what the slice delivers as it was, a question when pulling it
+   in changes what the slice delivers, and a dependency finding when the capability rests
+   on code or a change outside the changed files. Rewording the copy around the missing
+   capability routes around it, and is never the fix.
 
 **Owner each defect before you act on it.** A defect is the plan's when its fix stays
 inside the plan's changed files — the files its Scope, or a changed-files section, says the

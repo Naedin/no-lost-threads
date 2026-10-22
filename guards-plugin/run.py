@@ -7,9 +7,11 @@ and maps its findings through the check's rung.
 
 --diff-range hands the checks the diff of RANGE in DIR's checkout (any range
 `git diff` takes, e.g. `origin/main...HEAD`) as GUARDS_DIFF, written the way the git
-adapter writes the staged diff. A check that judges a claim when it is written then
+adapter writes the staged diff, and RANGE itself as GUARDS_RANGE, for a check that
+reads the range's commit messages. A check that judges a claim when it is written then
 judges the lines the range adds or changes, where a run without it is the audit read
-of every standing claim; the other checks read the whole tree either way.
+of every standing claim; the other checks read the whole tree either way. Without
+--diff-range no check sees a GUARDS_RANGE, inherited or not.
 
 Output: one line per finding on stdout, `<id>: <path>:<line>: <message>`, prefixed
 `warn ` when the check's rung is warn. One summary line on stderr names each check
@@ -111,7 +113,8 @@ def main():
         return 2
 
     if args.diff_range is None:
-        return run_checks(root, checks, None)
+        return run_checks(root, checks,
+                          {k: v for k, v in os.environ.items() if k != "GUARDS_RANGE"})
     try:
         diff = range_diff(root, args.diff_range)
     except ValueError as e:
@@ -121,7 +124,8 @@ def main():
                                      suffix=".diff") as f:
         f.write(diff)
         f.flush()
-        return run_checks(root, checks, dict(os.environ, GUARDS_DIFF=f.name))
+        return run_checks(root, checks, dict(os.environ, GUARDS_DIFF=f.name,
+                                             GUARDS_RANGE=args.diff_range))
 
 
 def run_checks(root, checks, env):

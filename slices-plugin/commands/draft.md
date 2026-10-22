@@ -172,6 +172,8 @@ Then one of two outcomes:
   — the sizing rows exactly as the ledger would hold them, every shape presented with its
   user outcome, any probe's source fenced below. Present the shapes in-thread and return;
   what a caller does at the stop — a prototype, a commit — runs after this command does.
+  The Out-item dependency test (below) stops here too, whenever it finds a dependency
+  another seam owns.
 
 **Re-entry after a frame stop.** The invocation names the picked shape as `frame:
 <shape>`, and the stub carries the `## Frame` record. The record's rows are **read, not
@@ -179,7 +181,8 @@ re-sized**, when `git log --oneline <its sha>..HEAD -- <the paths its rows cite>
 empty; a row whose cited paths moved is re-run, and only that row. The neighbouring-states
 walk runs only on a picked shape that was not among those the record presents. The picked
 shape stands — the first outcome above — unless a re-run row or that walk overturns it,
-which is a frame stop again, naming the rows or the states that moved. A stub carrying a
+which is a frame stop again, naming the rows or the states that moved. A pick to block on
+a dependency writes the stub's `Blocked on:` line and drafts nothing. A stub carrying a
 `## Frame` record invoked with no `frame:` is a stop still waiting on its pick: re-run only
 the rows whose cited paths moved, present the record's shapes again, and return. The premise audit
 above still runs, since the stub's other claims are not the frame's; the record's rows
@@ -232,6 +235,41 @@ ships becomes its own stub in the same change, `Blocked on: slice:<X> — <why>`
 named slice clears it. A sentence in the plan body is found by nobody; a stub is found by
 the next triage.
 
+**Every Out item answers the dependency test before it is written:** *which in-scope
+surface is wrong, or hands the user a chore, without this?* Walk the slice's own copy,
+behavior, and timing against the item's absence. Copy that hands the user something to
+remember, track, or time — "test after 8 PM", "check back tomorrow", "keep an eye on" — is
+the tell that a capability was deferred, and copy rules that forbid promising an unshipped
+capability only make it quieter, since the copy is then written as instructions and every
+string check still passes. The answer is recorded on the item's line, so a reader sees it,
+in one of three forms, and only these go Out:
+
+- `- Out: <item> — without it: none` — no surface needs it; a deferral, to a stub as above.
+- `- Out: <item> — without it: none (refinement: <what improves>)` — a surface behaves
+  differently without it but stays correct and honest, and its copy asks the user to
+  carry nothing.
+- `- Out: <item> — without it: <surface> (limit: <why no capability exists>)` — no
+  capability in any seam's reach could supply it (the system cannot observe or reach what
+  it needs), so no slice removes the chore. The surface still owes copy that keeps the
+  chore to the moment it matters. A limit is a claim: when a capability that would supply
+  it is merely unbuilt, it is a dependency.
+
+Any other answer makes the item a **dependency**, never Out:
+
+- **Inside the slice's reach** — what it needs lives in code this slice may change and the
+  split test (below) names nothing of its own → pulled into Scope's In, the call written as
+  a tension.
+- **Another seam owns it** — a capability whose code, plan, or stub is not this slice's,
+  or pulling it in brings its own dependency, verification run, or landing boundary → the
+  slice cannot meet it alone, and that is not the drafter's call. **A frame stop**, and no
+  plan is written: the `## Frame` record carries the dependency as a row, `- dependency: <item>
+  — needed by: <the in-scope surface> — owned by: <the seam, by path>`, and presents two
+  shapes — pull it in, or block on it, where the producer is drafted first (the sequencing
+  rule above) and this stub takes `Blocked on: slice:<its plan>`. The frame owner (§2's
+  `frame owner:`, or the user) picks. Routing the item to a stub and drafting on is the
+  failure this stop exists to prevent: the slice ships a surface that quietly hands the
+  user the deferred chore.
+
 ## 2. Write the plan
 
 One markdown file in `draftDir` — `plansDir` when it is unset — named for the slice. The
@@ -260,7 +298,7 @@ Write exactly this shape. Nothing here changes when a repo has no template:
 ## Scope
 
 - In:
-- Out:
+- Out: <item> — without it: none
 
 ## Acceptance
 
@@ -407,4 +445,7 @@ check exists precisely because this context just wrote the plan.
   the digest is the filter, and omitting a tension from the section to fit the digest is
   the inverse failure.
 - **Promoting a bundle.** One slice per plan; carve first.
+- **An Out item the slice leans on.** An item without which an in-scope surface is wrong
+  or hands the user a chore is a dependency (§1), pulled in or stopped on, never deferred —
+  unless no capability could supply it, which is a named limit.
 - **Leaving the stub behind** as a stale twin of the plan.

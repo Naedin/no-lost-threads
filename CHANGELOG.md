@@ -9,6 +9,30 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.15.0] — 2026-10-21
+
+### Added
+
+- **`deferral-trailer`: a landing that adds an inbox stub names it in a trailer.** In a range that `run.py --diff-range` hands over, a stub in `paths` that is added, copied, or renamed in from outside the scope needs a trailer naming it on some commit in the range: `Why-not-now: <basename> …`, with the key set by `trailerKey`. An amended, consolidated, or deleted stub needs none, because no diff can tell a deferral from a rewording. The deferral a slice leans on is caught at `/slices:draft`'s Out-item test instead. Without a range, which includes the pre-commit adapter, the check judges nothing and says so. It is the docs-lane counterpart of a PR gate that reads the same trailer.
+
+### Changed
+
+- **`run.py --diff-range` also hands the range over as `GUARDS_RANGE`**, for a check that reads commit messages. Without `--diff-range`, an inherited `GUARDS_RANGE` is removed before any check runs.
+
+### Contract
+
+- **A new check id and a new runner variable; nothing existing changes.** `deferral-trailer` takes `paths` (required) and `trailerKey` in its `.claude/guards.json` entry. Checks run under `--diff-range` now also see `GUARDS_RANGE`. Adopter-side edit: none required. A repo that wants the check enables it scoped to its stubs. The reference adopter already has it at `block`.
+
+## slices [0.9.0] — 2026-10-21
+
+### Changed
+
+- **An Out-of-scope item that the slice depends on is a dependency, not a deferral.** `/slices:draft` makes each Out item answer *which in-scope surface is wrong, or hands the user a chore, without this?* and records the answer on the item's line. Three forms go Out: `without it: none` (a deferral), `none (refinement: <what improves>)` (a surface differs but stays correct and honest), and `<surface> (limit: <why no capability exists>)` (nothing in any seam's reach could supply it, and the surface keeps the chore to the moment it matters). If a surface needs the item, it is pulled into scope when it lies within the slice's reach. When another seam owns it, the draft makes a frame stop for the frame owner, with the dependency as a `## Frame` row. The two shapes offered are to pull it in, or to block on it: the producer is drafted first and the stub takes `Blocked on: slice:<its plan>`. A pick to block writes that line and drafts nothing. The gap-checker gains a lens for this: it tests each Out item against the slice's copy, behaviour and timing, and treats copy that leaves the user something to remember, track or time as the tell. It accepts a checked refinement or limit, and a limit whose capability is only unbuilt is a hit. It owns each hit as a defect, a question or a dependency finding, and never accepts rewording the copy as the fix. A dependency finding of this kind fires `/slices:check` stop (a), as any other does. Before this change, an Out item routed to a stub was never tested against the slice's own surfaces: copy written around the missing capability passed every string check, through five gap-check rounds and a review.
+
+### Contract
+
+- **A Scope Out line carries its `without it:` answer, and a frame stop may carry a `dependency:` row.** Adopter-side edit: a `planTemplate` whose Out-of-scope placeholder has no room for the three forms should be given room; the reference adopter's template carries them verbatim. A wrapper that starts a draft for another session should expect a frame stop that carries a `dependency:` row.
+
 ## threads [0.20.4] — 2026-10-20
 
 ### Changed
