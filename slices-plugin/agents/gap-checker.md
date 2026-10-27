@@ -38,9 +38,12 @@ record written from your walk.
 Work in this order:
 
 0. **Re-run the drafter's rows first.** When the plan's ledger carries a `drafted at`
-   record with claim rows under it, run each row's command verbatim against the current
-   tree and compare its output line: a row that moved is a defect, cited with both
-   outputs; a row whose claim or output line characterizes the whole set of hits — a
+   record with claim rows under it, run every row's command verbatim against the current
+   tree and compare its output line — with the row re-runner when your brief names one
+   (`python3 <its path> rerun <plan>`, one call printing `held`, `differs` with both
+   outputs, `unverified`, or `unparsed` per row). A row that moved is a defect, cited
+   with both outputs; an `unparsed` row is off the writer's form — not
+   written by running it — and is mis-recorded: a defect, re-run and reported as a row; a row whose claim or output line characterizes the whole set of hits — a
    summary (`only`, `all`, `none`), a count, a list given as the hits — is confirmed by
    reading every hit the command returns, never a sample, and a hit it does not cover
    makes the row moved or mis-recorded, a defect either way. A sweep of hundreds of hits
@@ -122,9 +125,10 @@ lands in the plan, whatever file it cites. A fix lands outside only when it need
 outside the changed files to change, or to behave differently than the plan assumes. A
 plan that reads `Store.swift:40` where the symbol now sits at `:52` is `lands: plan`; a plan
 whose new caller needs `Store.load()` to stop throwing on an empty file it is not changing
-is `lands: outside — Store.load()`, and a dependency finding as well. When the ledger already holds a `gap-checked at` record
-carrying `touched: <sections>`, a defect whose fix lands in one of those sections is marked
-`reopens`. **When you report a dependency finding, or more than half your defects land
+is `lands: outside — Store.load()`, and a dependency finding as well. When the ledger holds a `gap-checked at` record
+carrying `touched: <sections>` below its newest `drafted at` or `reframed at` record — the
+frame baseline; records above it measured a different document — a defect whose fix lands in
+one of the newest such record's sections is marked `reopens`. **When you report a dependency finding, or more than half your defects land
 outside the changed files, apply nothing** — the round stops at the command that spawned
 you, and an edit it would undo is spent twice; say which held.
 
@@ -157,10 +161,11 @@ counts the dependency findings with the other defects.
 
 Then **the claim rows**: every load-bearing claim you verified that the drafter's rows
 did not already hold unchanged, one line each —
-`<claim> — <the command you ran> — <one line of its output>` — every draft-time row whose
+`<claim> — \`<the command you ran>\` — <one line of its output>` — every draft-time row whose
 output moved, with the new output, and every claim you could not check, as
-`<claim> — unverified: <what would settle it>`. These are copied into the plan's ledger
-verbatim, so write them to be re-run, not re-read. Say in one line, as four numbers,
+`<claim> — unverified: <what would settle it>`. The command is the one the ledger
+re-runs: the ledger's writer runs it again and records its own output line, so write the
+whole command, verbatim, never a sample of it. Say in one line, as four numbers,
 how many draft-time rows you re-ran, held, found moved or mis-recorded, and settled from
 `unverified`.
 

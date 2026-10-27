@@ -9,6 +9,21 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.10.0] — 2026-10-27
+
+### Added
+
+- **`scripts/ledger-row.py`: a claim row's output line is derived, never authored.** `add <plan> '<claim>' '<command>'` runs the command with bash in the plan's repo root and writes `  - <claim> — \`<command>\` — <output line>` under the plan's newest `drafted at` or `gap-checked at` record: up to ten output lines, each a code span, joined by `; ` (the form the reference adopter's drafters already wrote by hand), more as `<n> lines, first: <line>`, none as `no output`, a non-zero exit appended. Every command runs with the plan file itself emptied and restored, so a sweep over a tree holding the plan never matches the pattern its own row quotes. The same command again replaces its row, `--unverified '<what would settle it>'` writes an unverified row, and under a `drafted at` record the `<N> sites opened (unverified: <n>)` counts are recounted from the rows. `rerun <plan>` re-runs every row under the newest `drafted at` record and prints `held`, `differs` with both outputs, `unverified`, or `unparsed`, exiting 1 on a difference or an unparsed row. `/slices:draft` writes the plan with its record and no rows, then writes every row through `add`; a characterization of the hits moves from the output line into the claim. `/slices:check` names the script to the gap-checker, which runs `rerun` first and reports a row off the writer's form as mis-recorded, and §3 writes the checker's rows through `add` rather than pasting them. On the reference adopter, one plan's ledger was drafted across two sessions with row results and line numbers written from memory of earlier output — one hit listed where the command returns three, line numbers off by one or two — and the check caught two to six such rows in each of four rounds, with the rule already stated in prose in two places. `test.sh` proves the refusal without a record, short-listing, long-listing, count, and empty outputs, rows under the record with the count recounted, a re-added command replacing its row, a backtick command fenced, `rerun` holding a fresh ledger and catching a moved tree, a check-side row under the `gap-checked at` record, a sweep over the plan's own directory held across `add` and `rerun` with the plan restored byte for byte, and a row off the writer's form failing `rerun`.
+
+### Fixed
+
+- **A rewritten plan gets a fresh baseline for its round count, no-decay comparison, and `reopens` list.** `/slices:check` reads all three from the records since the plan's **frame baseline**: its newest `drafted at` or `reframed at` record. The first round after a baseline cannot fire (c) reopen or (d) no decay, since it has no previous round in that frame. Two things set a baseline. A re-draft (a carve drafted again from its stub, or a file that already carries a ledger) appends its `drafted at` record after the existing ones. A fold of the frame owner's disposition that rewrites the Shape or what Scope puts In or Out appends a new `reframed at` line. Within one frame nothing resets: a `go at`, a folded question, or applied fixes leave the baseline where it was. The gap-checker marks `reopens` only against the newest `touched:` below the baseline. Before this change, a round after a frame fold or a re-draft was compared with records that measured a different document, so (d) and (c) stopped rounds that were converging.
+
+### Contract
+
+- **One new ledger line form, `reframed at`.** Existing lines stay as written. Adopter-side edit: a wrapper that folds a frame owner's reframing into a plan appends the `reframed at` line.
+- **A row's output line follows the writer's form.** Rows already in a ledger stay as written; `rerun` reports a prose output line as `differs` and a row without a backticked command as `unparsed`. Adopter-side edit: a plan template's ledger guidance names `ledger-row.py add` as the row writer.
+
 ## guards [0.15.0] — 2026-10-21
 
 ### Added

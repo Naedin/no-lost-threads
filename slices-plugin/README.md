@@ -221,8 +221,10 @@ brief, the local command calls `/slices:check`, and nothing is duplicated.
 The drafter writes it first. `/slices:draft` opens every production symbol, file, test,
 and site the plan names before the plan is written, and records each as a claim row
 under a `drafted at <sha>, <date>, slices <version>` line — the claim, the generating
-command, one line of its output; a site it could not open is a row marked `unverified`
-with what would settle it. `/slices:check` re-runs those rows verbatim before it hunts,
+command, its output line; a site it could not open is a row marked `unverified`
+with what would settle it. A row is written only by `scripts/ledger-row.py add`, which
+runs the command and derives the output line, so no row's result comes from memory;
+`ledger-row.py rerun` re-runs a plan's draft rows in one call. `/slices:check` re-runs those rows verbatim before it hunts,
 reports a row that moved as a defect, and appends its own record line with the rows it
 added — a claim no draft row covered, a draft row whose output changed. The record's
 commit sha is the baseline, and the newest record's sha is the plan's baseline as a
@@ -236,6 +238,7 @@ were never measured, which is what the rows exist to make visible.
 - gap-checked at <sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
 - check held at <sha>, <date>, slices <version> — round <r>: no frame-owner go
 - go at <sha>, <date> — <frame owner>: <disposition>
+- reframed at <sha>, <date>, slices <version> — <frame owner>: <what the frame now is>
 ```
 
 ## How this hardens — and why adopting it early is safe
@@ -251,8 +254,8 @@ rung ships changes what these files are.
 ## Requirements
 
 Claude Code with sub-agent support (for `/slices:check`; the command narrates and
-degrades to a warm-context check without it). No other dependencies: no scripts,
-no hooks, nothing at session start. All three commands are explicit-only.
+degrades to a warm-context check without it). Python 3 for
+`scripts/ledger-row.py`, the claim-row writer. No hooks, nothing at session start. All three commands are explicit-only.
 
 A plugin update reaches nothing in a running session: the agent definition loads at
 session start and a command's text at its first invocation, and neither follows the

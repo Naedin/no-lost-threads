@@ -39,7 +39,11 @@ including a model name, is false. When it is true and `checkerModel` is also set
 ## 1. Spawn the checker cold
 
 **First, count the round.** This check is round `<r>`: one more than the `gap-checked at`
-records already in the plan's ledger. **Cap:** never start a third round, or any after it,
+records the plan's ledger holds since its **frame baseline** — the newest `drafted at` or
+`reframed at` record (§3). A re-draft writes a fresh `drafted at`, and a fold that rewrites
+the plan's frame appends `reframed at`; either way the records above it measured a
+different document, so they are history: no round count, no-decay `<N>`, or `touched:`
+list is read from them. **Cap:** never start a third round, or any after it,
 without the frame owner's go — a `go at` line (§3) appended after the newest
 `gap-checked at` record. With none, spawn nothing: append the held record (§3), commit the
 plan file as WIP, send the hand-up report (§2) built from the rounds already recorded, and
@@ -50,7 +54,9 @@ plan file to a scratch path outside the repo before the spawn — the round's ba
 Use the `Agent` tool with this plugin's `gap-checker` agent
 (`subagent_type: slices:gap-checker`). Pass **only the plan's path** — e.g. *"Try
 to break the slice plan at `<path>`."* — and, when `checkBrief` is set, one more
-sentence: *"Also run the local gap classes in `<checkBrief path>`."* No background, no
+sentence: *"Also run the local gap classes in `<checkBrief path>`."* — and always one
+naming the row re-runner by its absolute path: *"The row re-runner is
+`${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py`."*, the variable expanded. No background, no
 rationale, no summary of the drafting conversation, no note about what you're unsure
 of. Its brief lives in the agent definition, and the plan's own ledger tells it where to
 start: once the frame is read — a frame narrower than the problem ends the check
@@ -105,12 +111,15 @@ read the report against the stops. **Reasons**, which fire at any round:
   behave differently than the plan assumes. A fix that only corrects the plan's text about
   code it reads lands in the plan;
 - **(c) reopen** — most of the round's defects are marked `reopens`: they land on what the
-  previous round's fixes touched.
+  previous round's fixes touched. The first round after a frame baseline has no previous
+  round, so (c) cannot fire on it.
 
 **Backstops**, which fire whatever the reasons say:
 
 - **(d) no decay** — the round's `<N>` is not below the previous `gap-checked at`
-  record's `<N>`;
+  record's `<N>` since the frame baseline. The first round after one has nothing to decay
+  from, so (d) cannot fire on it. Within one frame nothing resets it: a `go at` line, a
+  folded question, or a round of applied fixes leaves the baseline where it is;
 - **(e) cap** — §1's: no third round without the frame owner's go.
 
 Name every one that fired, reasons first. A **MIS-CARVED** verdict is not read against
@@ -122,7 +131,7 @@ owner the **hand-up report**:
 
 ```
 HAND-UP — <plan path>, round <r>, stopped: <reasons fired>
-Rounds: <N> per round, oldest first (<r1>, <r2>, …)
+Rounds: <N> per round since the frame baseline, oldest first (<r1>, <r2>, …)
 Clusters: <code area> — <k> defects; … (by the code the defects land on)
 Stubs filed as different code: <each stub filed during the rounds, by path> | none
 Dependency findings:
@@ -190,6 +199,7 @@ creation above, are the only writes into the ledger that are not appends:
 - gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
 - check held at <short commit sha>, <date>, slices <version> — round <r>: no frame-owner go
 - go at <short commit sha>, <date> — <frame owner>: <the disposition, one line>
+- reframed at <short commit sha>, <date>, slices <version> — <frame owner>: <what the frame now is, one line>
 ```
 
 `<N>` counts every defect, dependency findings included, so the next round's no-decay
@@ -199,6 +209,15 @@ next round's checker marks `reopens` against. A stopped round writes `addressed:
 no `touched:`, since §2 restored the plan, and `stopped:` names the reasons fired as
 §2 lists them — `dependency`, `cluster`, `reopen`, `no-decay`. The `check held` line is the
 cap's stop, written when no checker ran; a `go at` line lets one further round start.
+
+A `reframed at` line is the frame baseline (§1), appended by whoever folds a frame owner's
+disposition that rewrites the plan's frame — its Shape paragraph, or what its Scope puts
+In or Out — so the next round is measured against the document it reads. Folding defects,
+answers to questions, or a `go at` into the plan writes none: the frame is unchanged, and
+a stop answered with another round of the same frame is what (d) and (e) exist to catch.
+A re-draft — a carve re-drafted from its stub, or a MIS-CARVED plan drafted again — needs
+no `reframed at`, since `/slices:draft` writes the plan's fresh `drafted at` record, which
+is the baseline.
 
 `warm-context` when the checklist ran in this context (§1); `agent-stale` when the
 report's vocabulary showed an agent definition older than this text (§2). Each names a
@@ -215,7 +234,12 @@ searching. When the file cannot be read, write `slices ?` rather than omitting t
 checker verified, carrying the probe and not only the verdict, in the checker's own
 report order. A draft-time row the checker re-ran and found unchanged is not copied
 again; a row whose output moved, or that the drafter marked `unverified` and the checker
-settled, is written under the check's record with its new output:
+settled, is written under the check's record with its new output. Each is written through
+the writer once the record line is in, never pasted from the report — it re-runs the
+command and derives the output line, so a report row recalled rather than run is
+corrected on the way in:
+`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py add <plan> '<claim>' '<command>'`,
+or `… add <plan> '<claim>' --unverified '<what would settle it>'`.
 
 ```
   - <claim> — `<generating command>` — <one line of its output>

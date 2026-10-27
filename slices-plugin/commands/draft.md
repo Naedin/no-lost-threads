@@ -186,7 +186,7 @@ a dependency writes the stub's `Blocked on:` line and drafts nothing. A stub car
 `## Frame` record invoked with no `frame:` is a stop still waiting on its pick: re-run only
 the rows whose cited paths moved, present the record's shapes again, and return. The premise audit
 above still runs, since the stub's other claims are not the frame's; the record's rows
-are carried into the ledger under the `drafted at` line rather than re-measured, and a
+go into the ledger under the `drafted at` line through the writer (§1), and a
 probe's source moves beside the ledger before §3 deletes the stub.
 
 **Every artifact the draft names is opened at draft time** — a symbol, a file, a test, a
@@ -196,24 +196,36 @@ test that pins it and walk the case where the new mechanism and the old path mee
 
 **The site-opening pass writes the ledger.** Before the plan is written, list every
 production symbol, file, test, and site the draft will name; open each one with a command
-(`rg -n`, `git grep`, `sed -n`, a test run) and keep the command and one line of its
-output. The kept command is the one that produced the output: a run piped through `head`
-or `tail` is re-run whole before a row is written off it. An output line that summarizes
-the hits — `doc comments only`, `all 12 sites`, `none outside Tests` — is written after
-reading every hit, never a sample; a read that contradicts the summary rewrites the
-summary, never narrows the command to fit it. Those pairs are the plan's **claim rows** — `<claim> — \`<generating command>\` —
-<one line of its output>` — and §2 writes them into the ledger under a `drafted at` record
-line. **A count is a row of its own.** A number the plan states about a set of sites,
-anywhere in it — a Note's "all six tests", a test plan's "the 21 existing cases", a claim's
-"two consumers" — comes from a command that counts (`rg -c`, `… | wc -l`), never from
-tallying a listing, and its row's output is the bare number as a code span:
-`<claim> — \`rg -c '@Test' <file>\` — \`21\``. The prose that uses the count repeats that
-number. A mechanical check can re-run a counting row and compare; a count tallied off a
-listing is measured by nothing but the listing that produced it. A site the pass could not open is a row marked `unverified: <what would settle it>`,
-never a sentence in the body. The rows are what `/slices:check` re-runs before it hunts,
-so write each to be re-run: the exact command, verbatim, against the current tree. The
-rule in prose failed to hold on its own; the rows are the same rule with a row to show
-for it.
+(`rg -n`, `git grep`, `sed -n`, a test run). Those are the plan's **claim rows** —
+`<claim> — \`<generating command>\` — <its output line>` — and a row is written only by
+running its command through the writer, never typed:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py add <plan> '<claim>' '<command>'
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py add <plan> '<claim>' --unverified '<what would settle it>'
+```
+
+It runs the command in the plan's repo root, derives the output line (up to ten output
+lines, each a code span, joined by `; `; more as `<n> lines, first: <line>`; none as
+`no output`; a non-zero exit appended), and writes the row under the plan's newest `drafted at`
+record, recounting that record's sites; the same command again replaces its row. So §2
+writes the plan with its `drafted at` record and no rows, and the rows follow through the
+writer — the output line comes from the run, never from memory of an earlier one, and a
+row off the writer's form is the visible exception `/slices:check` names first. Every
+command runs with the plan file itself emptied, so a sweep over a tree that holds the
+plan never matches the pattern its own row quotes. A row's command
+is one whole command: a run piped through `head` or `tail` is not a row, and two probes
+are two rows. A characterization
+of the hits — `doc comments only`, `all 12 sites`, `none outside Tests` — belongs in the
+claim, written after reading every hit the command returns, never a sample; a read that
+contradicts it rewrites the claim, never narrows the command to fit it. **A count is a row
+of its own.** A number the plan states about a set of sites, anywhere in it — a Note's
+"all six tests", a test plan's "the 21 existing cases", a claim's "two consumers" — comes
+from a command that counts (`rg -c <file>`, `… | wc -l`), never from tallying a listing,
+and the writer records it as a bare number: `<claim> — \`rg -c '@Test' <file>\` —
+\`21\``. The prose that uses the count repeats that number. A site the pass could not open
+is an `unverified` row, never a sentence in the body. The rows are what `/slices:check`
+re-runs before it hunts, against the current tree.
 
 A stub that bundles several concerns gets carved into separate stubs first, and exactly
 one is promoted.
@@ -316,9 +328,12 @@ that most need the reviewer>
 
 <the drafter's claim rows sit under its record line; /slices:check and later hardening rungs append>
 - drafted at <short commit sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)[, frame owner: <session>]
-  - <claim> — `<generating command>` — <one line of its output>
+  - <claim> — `<generating command>` — <its output line>
   - <claim> — unverified: <what would settle it>
 ```
+
+The record is written with `0 sites opened (unverified: 0)`, and the rows under it come
+from `ledger-row.py add`, which keeps the counts (§1).
 
 `<version>` is the `version` field of `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
 read at write time, as `/slices:check` reads it for its own line; `slices ?` when the file
@@ -327,6 +342,11 @@ cannot be read. The record's sha is the baseline the rows were measured against.
 for it — by the handle a later session can reach it at; a draft the user started omits
 it, and the user is the frame owner. `/slices:check` sends its hand-up there when a round
 stops.
+A re-draft — a carve drafted again from its stub, or a plan whose file already carries a
+ledger — appends its `drafted at` record after the records already there, never above them.
+The newest `drafted at` is the frame baseline `/slices:check` counts rounds, no-decay, and
+`touched:` from, so the earlier records stay as history without being read as this
+document's rounds.
 
 ### `planTemplate` is set — overlay the invariants onto it
 
