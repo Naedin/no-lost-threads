@@ -46,11 +46,14 @@ convention in the moment. Fields:
 - `workflowDocs` — optional: files that describe one workflow and are expected to
   co-evolve (e.g. a command pipeline). Absent → detected command directories
   (`.claude/commands/` and the like), each directory treated as one set.
-- `trigger` — `{ "n": 10, "concentration": 3 }`: the volume backstop and the
+- `trigger` — `{ "n": 10, "concentration": 3, "cluster": 3 }`: the volume backstop and the
   distinct-commit re-touch bar, both over **organic** markers — the ones no review landed
-  and that changed something beyond the log and the ledger (Telemetry, below). Read by
+  and that changed something beyond the log and the ledger (Telemetry, below) — and the
+  placement-cluster bar: live keys placed at one file (step 0b). Read by
   `/threads:retro` for its closing ripeness nudge, which calls a review *ripe* on a key
-  recurred since the mark, or on either bar, and never on pending captures alone.
+  recurred since the mark, on a cluster with a key new since it, or on either marker bar,
+  and never on pending captures alone. `cluster` unset is the adoption state: the next
+  review reads the whole cluster backlog once (0b) and records the value.
 - `applyMode` — `read-only` | `apply-on-approval` | `apply-mechanical`. Starts
   `read-only`. Once the user has approved candidates in two or more reviews, offer **once**
   to ratchet to `apply-on-approval`; once they have approved the mechanical line as a batch
@@ -286,6 +289,17 @@ rebase.
    - `view --keys --since <markTag>` — what this window touched, to the commit: a line
      the log at the mark did not hold. A date would read the mark's whole day, the last
      run's own rulings included. The re-key sweep reads these plus the `(uncold)` ones.
+   - `view --placements --since <markTag>` — every live key grouped by the file its
+     occurrences are placed at, command docs first (read on every run of the command),
+     resolved the way `--docs` paths are. A file at `trigger.cluster` keys **fires** when one
+     of them is new since the mark, or, once weighed, when it has grown the bar past the
+     weighed size: findings that each stayed at one occurrence, so no key recurs, and
+     together say the doc is not being followed. Counted like `--reached`:
+     a `Caught:` occurrence, a key ruled count-only after its last occurrence, and an
+     occurrence before a landing are left out, so a gate catching with its rule present is
+     not counted twice. With `trigger.cluster` unset, drop `--since`: every cluster at the
+     bar fires, the backlog read once; record `cluster` (default 3) in the config at the
+     run's close.
    - `view --key <key>` — one key's detail, for the keys the reads above surfaced.
    `view --keys` alone is every key on one line each and is the read for a small log; past
    a hundred keys it outgrows a tool result, and `view` with detail is the read to avoid at
@@ -338,6 +352,17 @@ rebase.
      a burst as one incident, and carry the count as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
      count-only: the `Caught:` tags are the ruling, and the count they build is the
      evidence a rule is cited past, read when the key escapes.
+   - **A fired cluster is one candidate, not a rule per key.** Read its keys together
+     (`view --key`, repeated) against the sections they name: the question is why the doc
+     is not being followed — too long, a step buried, two sections stating one rule, a
+     stop path nothing exercises — and the expected answer cuts or restructures, never
+     appends one clause per key. A key the cut answers gets `LANDED`; one it does not stays
+     live. A cluster the run weighs and does not cut gets one `ADJUDICATED <date> —
+     cluster <path> weighed at <n>: <ruling>` line on its newest key: it fires again only
+     at `<n> + trigger.cluster` keys, so a doc that is the home of a whole class of
+     findings is not re-asked every window it gains one. A backlog read fires more
+     clusters than a run can rule; take them in the view's order, name the rest in the
+     record, and they fire on their next new key.
    - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
      view, which is strictly better standing for ranking than the single session that set
      it — so re-rank freely, in either direction. Record the re-rank and the reason as an
@@ -385,7 +410,8 @@ rebase.
 expensive path and they are *conditional*, not automatic:
 
 - **Nothing recurred** in 0b, 0c, or 0d (no key `--reached` shows after re-keying, no
-  shape routed), and no ledger signal fired → **stop and say so.** Report the pending
+  placement cluster fires, no shape routed), and no ledger signal fired → **stop and say
+  so.** Report the pending
   captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
   the complete answer for the price of step 0; running the full funnel against it burns
   wall-clock and tokens to rediscover that. This is the expected outcome in a young or healthy repo, not a failed run.

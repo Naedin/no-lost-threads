@@ -410,7 +410,7 @@ The log has just grown, and at closeout *opening a new thread* is an available n
 Read `.claude/threads.json`; skip this step entirely if there's no config, no `markTag`
 tag, or nothing accrued.
 
-Measure — three commands, after `git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`
+Measure — four commands, after `git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`
 (a review advances the mark by force-push, which a plain fetch never takes; no remote →
 skip the fetch):
 
@@ -432,9 +432,12 @@ skip the fetch):
   or more of them touched. The review's own landings (the `Process-Review:` trailer) and
   commits that touched only the log and the ledger are classified out — counting them is
   how a review comes out ripe on its own output the next morning.
+- **Clusters** — `retro-log.py view --placements --since <markTag>`: a file placed at by
+  `trigger.cluster` or more live keys, one of them new since the mark, fires — single
+  findings that together say one doc is not being followed.
 
-**Ripe** means one of: a key recurred since the mark; organic markers at or above
-`trigger.n`; a file at or above `trigger.concentration`. Pending captures alone are not
+**Ripe** means one of: a key recurred since the mark; a placement cluster fires; organic
+markers at or above `trigger.n`; a file at or above `trigger.concentration`. Pending captures alone are not
 ripe — they are the substrate waiting to recur, and a review run on volume pays for the
 funnel to learn that nothing recurred. Say something only when pending is non-zero or a
 bar is met; when neither holds, say nothing — the review is current, and a nudge with

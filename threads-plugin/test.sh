@@ -296,6 +296,76 @@ python3 "$check" --root "$tmp" --paths arc2.md 2>/dev/null | grep -q 'an arc nam
 python3 "$rl" view --keys --root "$tmp" --log arc2.md 2>"$tmp/err" >/dev/null; grep -q 'an arc name is a slug' "$tmp/err" || fail "view did not warn on a non-slug arc name"
 ok "ARC is transparent to state and count, outlives a closing status; --arc derives the trajectory by date entered; --arcs lists them"
 
+# 11. --placements: live keys clustered by resolved placement file, command docs first; caught,
+#     count-only, and pre-landing occurrences uncounted; --since narrows firing, never counting
+P="$tmp/pl"; mkdir -p "$P/.claude/commands" "$P/docs" "$P/other"
+touch "$P/.claude/commands/run.md" "$P/docs/rules.md" "$P/other/rules.md"
+printf '{ "processDocs": ["docs", ".claude/commands"], "trigger": { "cluster": 3 } }\n' > "$P/.claude/threads.json"
+cat > "$P/log.md" <<'EOF'
+## Entries
+
+a/one
+  2026-10-01 | s1 | one. Placement: .claude/commands/run.md §Stop
+a/two
+  2026-10-02 | s2 | two.
+    Placement: run.md §Stop — by basename
+a/three
+  2026-10-02 | s2 | caught.
+    Caught: /pre-pr — run.md §Stop
+    Placement: run.md §Stop
+a/four
+  2026-10-20 | s3 | four. Placement: run.md §Pause
+a/five
+  2026-10-03 | s2 | ruled. Placement: run.md §Stop
+a/five
+  ADJUDICATED 2026-10-04 — count-only at ×1: gate catch, rule present.
+a/six
+  2026-09-01 | s0 | landed. Placement: run.md §Stop
+a/six
+  LANDED abc1234 — run.md §Stop.
+a/seven
+  2026-09-01 | s0 | before. Placement: run.md §Stop
+a/seven
+  LANDED abc1235 — run.md §Stop.
+a/seven
+  2026-10-03 | s2 | after. Placement: rules.md §R
+b/r1
+  2026-09-05 | s1 | r1. Placement: rules.md §R
+b/r2
+  2026-09-06 | s1 | r2. Placement: docs/rules.md §R
+b/r3
+  2026-09-07 | s1 | r3. Placement: ./rules.md §R
+c/x
+  2026-09-08 | s1 | x. Placement: nowhere.md §Q
+c/y
+  2026-09-09 | s1 | no placement.
+EOF
+cp "$P/log.md" "$P/weighed.md"
+cat >> "$P/weighed.md" <<'EOF'
+b/r3
+  ADJUDICATED 2026-10-05 — cluster rules.md weighed at 3: rule home by design, not cut.
+a/two
+  ADJUDICATED 2026-10-05 — cluster .claude/commands/run.md weighed at 3: read, not cut.
+EOF
+python3 "$rl" view --placements --root "$P" --log log.md 2>/dev/null > "$P/all.out"
+head -1 "$P/all.out" | grep -q '^placements: 9 live keys counted · 1 occurrences unplaced · 3 files · 2 at or above cluster 3, 2 firing: a key new (no since: every one), or grown 3 past its weighing$' || fail "--placements summary: $(head -1 "$P/all.out")"
+grep -q $'^3\t3\t2026-10-01..2026-10-20\t3 new\tcommand\t.claude/commands/run.md\tfires$' "$P/all.out" || fail "run.md cluster (basename resolved; caught, count-only, landed excluded): $(cat "$P/all.out")"
+grep -q $'^4\t4\t2026-09-05..2026-10-03\t4 new\tdoc\tdocs/rules.md\tfires$' "$P/all.out" || fail "rules.md cluster (processDocs preferred over other/rules.md; post-LANDED occurrence counted): $(cat "$P/all.out")"
+grep -q $'^1\t1\t2026-09-08\t1 new\tdoc\tnowhere.md (not in this repo)$' "$P/all.out" || fail "an unresolvable placement is not marked: $(cat "$P/all.out")"
+[ "$(grep -n 'run.md' "$P/all.out" | head -1 | cut -d: -f1)" -lt "$(grep -n 'docs/rules.md' "$P/all.out" | head -1 | cut -d: -f1)" ] || fail "a command cluster did not rank before a larger doc cluster"
+grep -qE 'a/(three|five|six)' "$P/all.out" && fail "a caught, count-only, or landed key was listed in a cluster"
+python3 "$rl" view --placements --since 2026-10-10 --root "$P" --log log.md 2>/dev/null > "$P/since.out"
+grep -q $'\t1 new\tcommand\t.claude/commands/run.md\tfires$' "$P/since.out" || fail "--since did not fire on a cluster with a new key: $(cat "$P/since.out")"
+grep -q $'^\t\ta/four  ×1  2026-10-20  new$' "$P/since.out" || fail "the new key is not marked: $(cat "$P/since.out")"
+grep -q $'^4\t4\t.*\t0 new\tdoc\tdocs/rules.md$' "$P/since.out" || fail "--since fired on a cluster with nothing new, or changed its count: $(cat "$P/since.out")"
+python3 "$rl" view --placements --reached --root "$P" --log log.md >/dev/null 2>&1; [ $? -eq 2 ] || fail "--placements accepted a narrowing filter"
+python3 "$rl" view --placements --since 2026-09-01 --root "$P" --log weighed.md 2>/dev/null > "$P/w.out"
+grep -q $'\tcommand\t.claude/commands/run.md\tweighed at 3$' "$P/w.out" || fail "a cluster weighed at its size fired on new keys: $(cat "$P/w.out")"
+grep -q $'^4\t.*\tdocs/rules.md\tweighed at 3$' "$P/w.out" || fail "a cluster one key past its weighing fired below the bar: $(cat "$P/w.out")"
+printf 'b/r4\n  2026-10-06 | s4 | r4. Placement: rules.md §R\nb/r5\n  2026-10-06 | s4 | r5. Placement: rules.md §R\n' >> "$P/weighed.md"
+python3 "$rl" view --placements --root "$P" --log weighed.md 2>/dev/null | grep -q $'^6\t.*\tdocs/rules.md\tweighed at 3\tfires$' || fail "a cluster grown the bar past its weighing did not fire"
+ok "--placements: clusters by resolved file, command docs first, gate-caught/count-only/landed uncounted; --since narrows firing only; a weighed cluster fires again only the bar past its size"
+
 # ---- scripts/marker-stream.py: the marker stream classified — organic, review (the
 # Process-Review trailer), bookkeeping (log/ledger-only) — so the trigger and the tally
 # count what no review has adjudicated.

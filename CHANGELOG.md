@@ -9,6 +9,16 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.21.0] — 2026-10-28
+
+### Added
+
+- **Findings that pile up on one doc open the depth gate, a key at a time.** `retro-log.py view --placements` groups every live key by the file its occurrences are placed at, resolved the way a placement is written (a basename to the one tracked file it names, preferring `processDocs`), with keys, occurrences, and date span per file, command docs first since they are read on every run of their command. It counts what a recurrence would: occurrences after the key's last landing, none tagged `Caught:`, and no key ruled count-only after its last occurrence, so a gate catching with its rule present is not counted twice. A file at `trigger.cluster` keys (default 3) fires, and under `--since <markTag>` only when one key is new since the mark. A cluster the review weighs and does not cut gets an `ADJUDICATED … — cluster <path> weighed at <n>` line and fires again only at `<n> + trigger.cluster` keys, so a doc that is the home of a whole class of findings is not re-asked every window it gains one. A placement naming no file in the repo, such as an upstream plugin's, reads `(not in this repo)`. `/threads:process-review` reads it in 0b, a fired cluster opens the depth gate and is read as one candidate whose expected answer cuts or restructures the doc rather than adding a clause per key, and `/threads:retro` counts a fired cluster as ripe. On the reference adopter, five keys at one occurrence each pointed at one command doc over three weeks, one recording its stop path failing in use, and three reviews surfaced none of them. `test.sh` proves basename resolution with the `processDocs` preference, command-first order, caught, count-only, and pre-landing occurrences left out, an unresolvable path marked, `--since` narrowing firing without changing counts, a weighed cluster held until it grows the bar past its size, and a narrowing filter refused.
+
+### Contract
+
+- **`trigger.cluster` is a new config field.** Unset is the adoption state: the next review reads the whole cluster backlog once, without `--since`, and records the value. Adopter-side edit: none.
+
 ## slices [0.10.0] — 2026-10-27
 
 ### Added

@@ -111,14 +111,17 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
 - **It reads what's pending first.** Findings captured by `/threads:retro` are the only
   already-adjudicated material in a window — you accepted each one — so the review leads
   with them, ranks any key that shows up more than once, and is free to re-rank what a
-  single session called urgent now that it can see across sessions.
+  single session called urgent now that it can see across sessions. Findings that each
+  stayed at one occurrence but pile up on one doc are a cluster, read together as one
+  candidate to cut, command docs first.
 - **`/threads:retro` tells you when a review looks ripe.** One sentence at the end of a
   retro — what's pending, whether anything recurred since the last review, and what's
   churned — delivered at closeout, when the backlog has just grown and opening a new
   thread is the natural next move. No hooks ship: a nudge at session start would compete
   with the task you just asked for. It always points you at a *fresh* session, since the
   review can't run in the one it reviews. Never urgent, never acted on unprompted. *Ripe*
-  means a key recurred or the organic process commits crossed a bar; pending captures
+  means a key recurred, a doc's cluster grew, or the organic process commits crossed a
+  bar; pending captures
   alone never make a review ripe.
 - **The review does not count itself.** Every commit the review lands carries a
   `Process-Review: <date>` trailer, and a commit that touched only the log or the ledger

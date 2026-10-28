@@ -3,7 +3,7 @@
 
   retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--live]
                     [--since DATE|REV] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
-                    [--log PATH] [--root DIR]
+                    [--placements [--since DATE|REV]] [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
 
 The log is append-only so that concurrent sessions merge by union; every state
@@ -130,6 +130,25 @@ every arc in the log with its key count and live/closed split — the write-side
 so attaching a key needs no sweep of the whole log. The arc's own landings are
 commits, not keys; they carry an `Arc: NAME` trailer and `marker-stream.py list --arc
 NAME` joins them.
+
+`--placements` prints, instead of the keys, every live key grouped by the file its
+occurrences are placed at — the first path after an occurrence's `Placement:` — as `<keys>
+<occurrences> <span> <n> new <command|doc> <path>`, command docs first, then most keys: a
+command doc is read on every run of its command. Only what a recurrence would count is
+counted: occurrences after the key's last closing status, none a `Caught:` line tags, and
+no key whose last occurrence is followed by an `ADJUDICATED … — count-only` line. A path
+as written resolves to the file it names — itself when it exists, else the one tracked file
+ending in it, preferring one under `processDocs` — and one that resolves to nothing, an
+upstream plugin's file or a deleted one, reads `(not in this repo)`. A file at `trigger.cluster` keys (default 3) or more **fires** and lists
+its keys: findings that each stayed at one occurrence and together say the doc is not
+being followed. `--since` (DATE or REV, as above) narrows firing, never counting: a
+cluster fires only on a key new in the window, so a cluster the last read weighed waits
+for new evidence. A doc that is the home of a whole class of findings gains a key nearly
+every window, so the review records a weighing instead: `ADJUDICATED <date> — cluster
+<path> weighed at <n>: <ruling>` on any key in it (the newest, which stays live longest).
+The highest such size per file holds, read from every key: that file fires again only at
+`<n> + trigger.cluster` keys, whatever the window, and its row says `weighed at <n>`. The
+other filters do not apply and are refused.
 """
 import argparse
 import datetime
@@ -658,6 +677,148 @@ def render_chain(shown, blocks, root, log, prs=False):
     return "\n".join(out) + "\n"
 
 
+PLACEMENT = re.compile(r"Placement:\s*(.*)")
+COMMANDS = re.compile(r"(?:^|/)commands/")
+WEIGHED = re.compile(r"^cluster (\S+?) weighed at (\d+)\b")
+
+
+def config(root):
+    cfg = root / ".claude" / "threads.json"
+    try:
+        return json.loads(cfg.read_text(encoding="utf-8")) if cfg.is_file() else {}
+    except (OSError, ValueError):
+        refuse([f"{cfg}: malformed"])
+
+
+def counted_placements(bs):
+    """(placement path or None, date, the occurrence line stripped) per occurrence the
+    cluster read counts: after the key's last closing status and no gate caught, none at
+    all when the review ruled the key count-only after its last occurrence."""
+    occ, last = [], -1
+    for i, b in enumerate(bs):
+        if b.status in CLOSED:
+            occ, last = [], -1
+            continue
+        if b.status:
+            continue
+        cur = None
+        for l in b.lines:
+            m = OCCURRENCE.match(l)
+            if m:
+                cur = [m.group(1), None, False, l.strip()]
+                occ.append(cur)
+            elif cur is not None and CAUGHT.match(l):
+                cur[2] = True
+            if cur is not None and cur[1] is None and PLACEMENT.search(l):
+                p = PATH.findall(PLACEMENT.search(l).group(1))
+                cur[1] = re.sub(r"^(?:\.\.?/)+", "", p[0]) if p else ""
+        last = i
+    if last >= 0 and any(b.status == "ADJUDICATED"
+                         and (b.lines[0].split("—", 1) + [""])[1].strip().startswith("count-only")
+                         for b in bs[last + 1:]):
+        return []
+    return [(p or None, d, line) for d, p, caught, line in occ if not caught]
+
+
+def resolver(root, cfg):
+    """A placement as written → (repo path, resolved?): itself when it exists, else the one
+    tracked file ending in it, preferring one under `processDocs` — a retro writes
+    `draft-brief.md` for `Plans/templates/draft-brief.md`."""
+    r = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True)
+    files = (r.stdout.splitlines() if r.returncode == 0 and r.stdout.strip()
+             else [p.relative_to(root).as_posix() for p in root.rglob("*")
+                   if p.is_file() and ".git" not in p.parts])
+    docs = [d.rstrip("/") for d in cfg.get("processDocs") or [] if isinstance(d, str)]
+    memo = {}
+
+    def resolve(p):
+        if p not in memo:
+            hits = [f for f in files if f == p or f.endswith("/" + p)]
+            if p in hits:
+                memo[p] = (p, True)
+            else:
+                under = [f for f in hits if any(f == d or f.startswith(d + "/") for d in docs)]
+                pick = under if len(under) == 1 else hits if len(hits) == 1 else []
+                memo[p] = (pick[0], True) if pick else (p, False)
+        return memo[p]
+    return resolve
+
+
+def render_placements(blocks, root, since=None, since_old=None):
+    """Live keys grouped by the file their counted occurrences are placed at, command docs
+    first: the read for findings that pile up on one doc a key at a time. With a since, a
+    cluster fires only on a key new in the window — one the last read already weighed
+    waits for new evidence. A cluster recorded as weighed at a size fires again only once
+    it has grown by the bar past it, whatever the window."""
+    cfg = config(root)
+    n = int((cfg.get("trigger") or {}).get("cluster", 3))
+    resolve = resolver(root, cfg)
+    workflow = [w.rstrip("/") for w in cfg.get("workflowDocs") or [] if isinstance(w, str)]
+
+    def command(p):
+        if workflow:
+            return any(p == w or p.startswith(w + "/") for w in workflow)
+        return bool(COMMANDS.search(p))
+
+    def new(d, line):
+        if since_old is not None:
+            return line not in since_old
+        return since is None or d >= since
+
+    weighed = {}
+    for b in blocks:
+        m = STATUS.match(b.lines[0]) if b.status == "ADJUDICATED" else None
+        w = WEIGHED.match(m.group(4) or "") if m else None
+        if w:
+            path = resolve(re.sub(r"^(?:\.\.?/)+", "", w.group(1)))[0]
+            weighed[path] = max(weighed.get(path, 0), int(w.group(2)))
+    by_path, unplaced, counted = {}, 0, 0
+    for key, bs in keys_in_order(blocks).items():
+        if state(bs) in CLOSED:
+            continue
+        occ = counted_placements(bs)
+        counted += bool(occ)
+        for p, d, line in occ:
+            if not p:
+                unplaced += 1
+                continue
+            path, ok = resolve(p)
+            c = by_path.setdefault(path, {"ok": ok, "keys": {}, "new": set()})
+            c["keys"].setdefault(key, []).append(d)
+            if new(d, line):
+                c["new"].add(key)
+    rows = []
+    for path, c in by_path.items():
+        dates = sorted(d for ds in c["keys"].values() for d in ds)
+        rows.append((not command(path), -len(c["keys"]), -len(dates), path, c, dates))
+    rows.sort()
+    def fires(k, path, c):
+        if path in weighed:
+            return k >= weighed[path] + n
+        return k >= n and bool(c["new"])
+
+    at = [r for r in rows if -r[1] >= n]
+    firing = [r for r in at if fires(-r[1], r[3], r[4])]
+    window = f" since {since}" if since else ""
+    out = [f"placements: {counted} live keys counted · {unplaced} occurrences unplaced · "
+           f"{len(rows)} files · {len(at)} at or above cluster {n}, {len(firing)} firing: a key "
+           f"new{window or ' (no since: every one)'}, or grown {n} past its weighing", ""]
+    for doc, k, o, path, c, dates in rows:
+        span = f"{dates[0]}..{dates[-1]}" if len(dates) > 1 else dates[0]
+        hot = fires(-k, path, c)
+        out.append(f"{-k}\t{-o}\t{span}\t{len(c['new'])} new\t{'doc' if doc else 'command'}\t"
+                   f"{path}" + ("" if c["ok"] else " (not in this repo)")
+                   + (f"\tweighed at {weighed[path]}" if path in weighed else "")
+                   + ("\tfires" if hot else ""))
+        if hot:
+            for key, ds in sorted(c["keys"].items(), key=lambda kv: min(kv[1])):
+                ds = sorted(ds)
+                out.append(f"\t\t{key}  ×{len(ds)}  "
+                           + (f"{ds[0]}..{ds[-1]}" if len(ds) > 1 else ds[0])
+                           + ("  new" if since and key in c["new"] else ""))
+    return "\n".join(out) + "\n"
+
+
 def entered(bs, name):
     """The date a key entered an arc: its ARC line's date, else its first occurrence."""
     dated = [b.arc_date for b in bs if b.arc == name and b.arc_date]
@@ -860,6 +1021,10 @@ def main():
                     help="view: every key carrying `ARC NAME`, by date entered, with detail")
     ap.add_argument("--arcs", action="store_true",
                     help="view: every arc in the log with its key count and live/closed split")
+    ap.add_argument("--placements", action="store_true",
+                    help="view: live keys grouped by the file they are placed at, command docs "
+                         "first; a file at trigger.cluster keys fires, with --since only on a "
+                         "key new since")
     ap.add_argument("--since", default=None, metavar="DATE|REV",
                     help="view: keys with an occurrence, status, or annotation dated on or after "
                          "DATE, or with a detail line the log at REV did not hold")
@@ -884,6 +1049,14 @@ def main():
             print(f"retro-log: warning: {v}", file=sys.stderr)
         if args.arcs:
             sys.stdout.write(render_arcs(blocks))
+            return 0
+        if args.placements:
+            narrowed = [f for f, on in (("--key", args.key), ("--held", args.held),
+                                        ("--recurred", args.recurred), ("--reached", args.reached),
+                                        ("--docs", args.docs), ("--chain", args.chain)) if on]
+            if narrowed:
+                refuse([f"--placements reads every live key; drop {', '.join(narrowed)}"])
+            sys.stdout.write(render_placements(blocks, root, args.since, since_old))
             return 0
         if args.arc:
             if not SLUG.match(args.arc):
