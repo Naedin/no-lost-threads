@@ -9,6 +9,28 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.22.0] — 2026-10-28
+
+### Added
+
+- **The review checks for a local maximum before ruling a patch.** A new read-only agent, `structure-explorer`, is spawned by `/threads:process-review` step 6 for the top three candidates that are a fired cluster, a `carve`, or a `tooling` candidate. It is handed the artifact, its job, and the keys as the new `retro-log.py view --occurrences --key <k>` prints them — the occurrences with every status, `ADJUDICATED`, `HELD`, and `ARC` block left out — and is told never to open the log, the ledger, or a review's record, so no ruling on those keys frames it. It returns the failure classes, which of them a doc edit can and cannot fix, two to four structures (at least one moving the work out of prose), and dated outside practice marked hypothesis, searched at least once when the job is a common one such as a pre-merge gate. The review names the structure chosen and the ones rejected; a candidate whose failure classes no doc edit fixes is not a `trim` or `amend`. Step 6's bar on restructures now applies to landing one, not to considering one. `test.sh` proves `--occurrences` prints no review line and refuses without `--key` or with another filter.
+
+- **An escaped finding ranks at one occurrence.** Retro writes a new continuation, `Escaped: <where it reached> — <cost>`, on an occurrence that got past the last gate (the default branch, a release, the user). `retro-log.py view --reached` ranks a key holding one since its last closing status at a single occurrence, the view sorts it after HELD keys and before count, and marks it `escaped to <where>`; one written before a landing does not count. One `Escaped:` key opens the review's depth gate and retro's ripeness read. `test.sh` proves the check accepts it, the single-occurrence rank and order, and the pre-landing case.
+- **The review states its direction and labels its mechanism.** The depth gate's direction is expected value — how far a finding got, how often its artifact is read, how likely it is to come back — with the count one input. The openers (recurrence, a fired cluster, one escape) and the ranking order are named as the current hypothesis. Each marker commit body carries an `Opened:` line naming what opened the run, so a later review can measure, from what is already recorded, how often each opener's landings recur or land nothing, and revise it.
+- **A `tooling` candidate states its rung.** A proposed check names the rung it starts at, the evidence for it, and its scope, measured by running it over the tree and counting what it would wrongly flag; it starts at `monitor` unless that count is near zero, and `guards run.py --monitor` is the evidence for promoting a monitored one.
+- **Building an approved candidate in the run is a named option.** An approved `tooling`, `carve`, or `motion` candidate that fits one pass may be built in the run instead of filed; the row says which, and the maintainer's answer decides. No config field and no default change.
+
+### Changed
+
+- **Retro writes `Caught:` in keys mode on the gate and the cost alone.** Under `retroPlacement: "keys"` nobody reads the placement, and the tag used to need the gate's output to cite the rule by file and section, which gates such as a pre-PR review rarely do. It is now written when a named gate stopped the slip and the catch was its whole cost; the review verifies the rule was present before counting an occurrence caught, and ranks a gate catching what no rule states.
+- **A gate catching an agent's slip is the gate working.** Step 0b defines a gate (a named step whose job is to stop defects before a boundary; a red test, a tool refusal, or a passing notice is the work itself) and the boundary (the last gate before merge or hand-off as ready), then classes each occurrence of every key and cluster it rules on: in-work, caught (rework before the gate's first catch included), gate-run (about how a gate ran — a misfire, a skipped step, a finding dropped or misjudged, rounds after its first catch — winning over escaped when the gate is the subject), or escaped (past the boundary, a report's form the user received included). A step rerunning checks just before merge is a gate, not the boundary, and an occurrence that does not say where it was stopped is named unclassed, never guessed; retro now writes that sentence on every occurrence. A mixed occurrence takes its worst class. Escaped and gate-run rank; caught and in-work are telemetry. The classing reads the occurrence's prose, so it needs no rule citation from the gate, and the split, over occurrences and over keys, rides the ruling's `ADJUDICATED` line or a cluster's weighing.
+- **Word count is one reason a rule slips, not the target.** Step 0a reads each core doc's window for growth, conflict (a rule disagreeing with or narrowing another reachable at the same moment), and reach (a rule stated where its reader never arrives), each a finding with its own remedy. Prose growth in the economics block is a signal for that read, not a number to drive down.
+
+### Contract
+
+- **One new retro-log continuation, `Escaped:`.** Free continuation text to the `guards` retro-log check, so no grammar change is enforced. Adopter-side edit: none.
+- **One new marker commit body line, `Opened:`.** Adopter-side edit: none.
+
 ## threads [0.21.0] — 2026-10-28
 
 ### Added
@@ -18,6 +40,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Contract
 
 - **`trigger.cluster` is a new config field.** Unset is the adoption state: the next review reads the whole cluster backlog once, without `--since`, and records the value. Adopter-side edit: none.
+
+## guards [0.16.0] — 2026-10-28
+
+### Added
+
+- **A third rung, `monitor`.** A check at `monitor` is not run by a plain `run.py` — the gate an agent commits through — so its findings never reach the agent it watches, and the stderr summary names it `<id> monitor not run`. `run.py --monitor` runs only the monitor checks, prints their findings prefixed `monitor `, and exits non-zero only on a refusal (with none configured it says nothing was judged): the read for whoever decides promotion, `/threads:process-review` among them. The README states the climb as evidence-driven: up a rung when findings show real slips below and the scope is narrow enough that what it flags is what it means to, `block` kept for a narrow check whose misses cost more than its false flags, those bars named the current hypothesis. `test.sh` proves a monitor check is not run or printed at the gate and is named in the summary, `--monitor` says so when no check is at monitor, prefixes its findings and passes, runs no block check, and refuses on a refused check.
+
+### Contract
+
+- **`rung` accepts `monitor`.** Existing configs are unchanged. Adopter-side edit: none.
 
 ## slices [0.10.0] — 2026-10-27
 

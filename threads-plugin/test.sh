@@ -296,7 +296,35 @@ python3 "$check" --root "$tmp" --paths arc2.md 2>/dev/null | grep -q 'an arc nam
 python3 "$rl" view --keys --root "$tmp" --log arc2.md 2>"$tmp/err" >/dev/null; grep -q 'an arc name is a slug' "$tmp/err" || fail "view did not warn on a non-slug arc name"
 ok "ARC is transparent to state and count, outlives a closing status; --arc derives the trajectory by date entered; --arcs lists them"
 
-# 11. --placements: live keys clustered by resolved placement file, command docs first; caught,
+# 11. Escaped: is a continuation the check accepts; one escaped occurrence ranks under
+#     --reached and sorts after HELD; one before a landing does not
+cat > "$tmp/esc.md" <<'EOF'
+## Entries
+
+drift/e1
+  2026-10-01 | s1 | reached master.
+    Escaped: the default branch — a revert commit
+drift/e2
+  2026-10-02 | s1 | plain single.
+drift/e3
+  2026-09-01 | s0 | escaped, then fixed.
+    Escaped: a release — hotfix
+drift/e3
+  LANDED abc1234 — the fix.
+drift/e4
+  2026-10-03 | s1 | one.
+drift/e4
+  2026-10-04 | s2 | two.
+EOF
+python3 "$check" --root "$tmp" --paths esc.md >/dev/null 2>&1 || fail "an Escaped: continuation fails the retro-log check"
+python3 "$rl" view --keys --reached --root "$tmp" --log esc.md 2>/dev/null > "$tmp/esc.out"
+grep -q '^drift/e1  ×1  2026-10-01  escaped to the default branch$' "$tmp/esc.out" || fail "a single Escaped: occurrence did not rank or lacks its marker: $(cat "$tmp/esc.out")"
+grep -q '^drift/e2' "$tmp/esc.out" && fail "a plain single occurrence ranked under --reached"
+grep -q '^drift/e3' "$tmp/esc.out" && fail "an Escaped: before a landing ranked"
+[ "$(grep -n '^drift/e1' "$tmp/esc.out" | cut -d: -f1)" -lt "$(grep -n '^drift/e4' "$tmp/esc.out" | cut -d: -f1)" ] || fail "an escaped key did not sort before a higher count"
+ok "Escaped: is accepted; one escaped occurrence ranks under --reached and sorts first; one before a landing does not"
+
+# 12. --placements: live keys clustered by resolved placement file, command docs first; caught,
 #     count-only, and pre-landing occurrences uncounted; --since narrows firing, never counting
 P="$tmp/pl"; mkdir -p "$P/.claude/commands" "$P/docs" "$P/other"
 touch "$P/.claude/commands/run.md" "$P/docs/rules.md" "$P/other/rules.md"
@@ -364,7 +392,13 @@ grep -q $'\tcommand\t.claude/commands/run.md\tweighed at 3$' "$P/w.out" || fail 
 grep -q $'^4\t.*\tdocs/rules.md\tweighed at 3$' "$P/w.out" || fail "a cluster one key past its weighing fired below the bar: $(cat "$P/w.out")"
 printf 'b/r4\n  2026-10-06 | s4 | r4. Placement: rules.md §R\nb/r5\n  2026-10-06 | s4 | r5. Placement: rules.md §R\n' >> "$P/weighed.md"
 python3 "$rl" view --placements --root "$P" --log weighed.md 2>/dev/null | grep -q $'^6\t.*\tdocs/rules.md\tweighed at 3\tfires$' || fail "a cluster grown the bar past its weighing did not fire"
-ok "--placements: clusters by resolved file, command docs first, gate-caught/count-only/landed uncounted; --since narrows firing only; a weighed cluster fires again only the bar past its size"
+python3 "$rl" view --occurrences --key a/seven --key b/r3 --root "$P" --log weighed.md 2>/dev/null > "$P/occ.out"
+grep -q '^a/seven  ×2  2026-09-01..2026-10-03$' "$P/occ.out" || fail "--occurrences key line carries a marker or a wrong count: $(cat "$P/occ.out")"
+grep -q 'came\|before\. Placement' "$P/occ.out" || fail "--occurrences dropped an occurrence: $(cat "$P/occ.out")"
+grep -qE 'LANDED|ADJUDICATED|weighed' "$P/occ.out" && fail "--occurrences printed a review's line: $(cat "$P/occ.out")"
+python3 "$rl" view --occurrences --root "$P" --log weighed.md >/dev/null 2>&1; [ $? -eq 2 ] || fail "--occurrences ran without --key"
+python3 "$rl" view --occurrences --key a/one --live --root "$P" --log weighed.md >/dev/null 2>&1; [ $? -eq 2 ] || fail "--occurrences accepted another filter"
+ok "--placements: clusters by resolved file, command docs first, gate-caught/count-only/landed uncounted; --since narrows firing only; a weighed cluster fires again only the bar past its size; --occurrences prints no review line"
 
 # ---- scripts/marker-stream.py: the marker stream classified — organic, review (the
 # Process-Review trailer), bookkeeping (log/ledger-only) — so the trigger and the tally

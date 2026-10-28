@@ -193,6 +193,22 @@ python3 "$here/run.py" --root "$r" 2>/dev/null | grep -q '^warn anchors: ' \
   || { echo "FAIL  runner: warn finding is printed with its prefix"; exit 1; }
 printf 'ok    %-52s\n' "runner: warn finding is printed with its prefix"
 
+says 0 "runner: --monitor with no monitor check says nothing was judged" "nothing judged" \
+  python3 "$here/run.py" --root "$r" --monitor
+printf '{"checks": {"anchors": {"rung": "monitor"}}}' > "$r/.claude/guards.json"
+expect 0 "runner: monitor finding is not run at the gate" python3 "$here/run.py" --root "$r"
+python3 "$here/run.py" --root "$r" 2>/dev/null | grep -q . \
+  && { echo "FAIL  runner: a monitor check printed at the gate"; exit 1; }
+python3 "$here/run.py" --root "$r" 2>&1 >/dev/null | grep -q 'anchors monitor not run' \
+  || { echo "FAIL  runner: the gate did not name the monitor check it skipped"; exit 1; }
+expect 0 "runner: --monitor finding passes" python3 "$here/run.py" --root "$r" --monitor
+python3 "$here/run.py" --root "$r" --monitor 2>/dev/null | grep -q '^monitor anchors: ' \
+  || { echo "FAIL  runner: --monitor finding lacks the monitor prefix"; exit 1; }
+printf '{"checks": {"anchors": {"rung": "block"}, "war-stories": {"rung": "monitor", "paths": ["*.md"]}}}' > "$r/.claude/guards.json"
+python3 "$here/run.py" --root "$r" --monitor 2>/dev/null | grep -q '^anchors' \
+  && { echo "FAIL  runner: --monitor ran a block check"; exit 1; }
+printf '{"checks": {"anchors": {"rung": "monitor", "exclude": ["*.md"]}}}' > "$r/.claude/guards.json"
+expect 2 "runner: a refused monitor check refuses under --monitor" python3 "$here/run.py" --root "$r" --monitor
 printf '{"checks": {"anchors": {"rung": "warn", "exclude": ["*.md"]}}}' > "$r/.claude/guards.json"
 expect 2 "runner: refused check refuses regardless of rung" python3 "$here/run.py" --root "$r"
 

@@ -245,9 +245,13 @@ rebase.
    predicate, a scope boundary, a named exception, a decision-relevant why) or **prose**
    (narration, a symbol enumeration, a restated why, a worked case restating a rule
    already present). A slice PR's squash lands a paragraph in a core doc and no marker
-   names it; a doc read whole every run can still double unread. A core doc whose window
-   is prose-only, or whose prose growth outruns its rule growth, is a **finding** under
-   cull, beside the churn findings of step 4: its remedy is a trim, and a trim of an
+   names it; a doc read whole every run can still double unread. **Word count is one
+   reason a written rule slips, never the target.** Read each window for three, each a
+   **finding** beside step 4's: **growth** — prose-only, or prose outrunning rules (remedy:
+   a trim); **conflict** — a rule that disagrees with or silently narrows another reachable
+   at the same moment (one rule kept, the other deleted or scoped); **reach** — a rule
+   stated where the agent at its firing moment never arrives (moved to where it fires, or
+   out of prose, step 6). A trim of an
    enforced doc lands only after a fresh-context read comparing old and new, handed both
    files and the exclusion list (wording, order, examples restating a present rule,
    symbols, generic rationale) and never the trimmer's account. Each moved predicate it
@@ -255,9 +259,8 @@ rebase.
    doc it was routed to and the reader's real path to the moment the rule fires — who
    reaches that moment, whether their command or doc already carries the rule, what
    missing it costs. A confirmed loss is restored; a refuted one is overridden, with that
-   measured reason in the trim's commit. **A core doc that bore on nothing is grounds to ask why — a doc twice its
-   size bearing on nothing is the prose finding above — never grounds to leave the
-   core**; only a doc that has stopped stating the repo's authority order or this
+   measured reason in the trim's commit. **A core doc that bore on nothing is grounds to ask why — growth, conflict,
+   or reach above — never grounds to leave the core**; only a doc that has stopped stating the repo's authority order or this
    review's contract leaves it — to `windowOnlyDocs` when its churn still needs
    watching, out of the config when it does not. A `windowOnlyDocs` entry is read here
    **as its `core-diff.py` row and, when the row shows a window, its diff**, classed
@@ -281,11 +284,9 @@ rebase.
      present) left out of the test, so a shape a check keeps catching is counted and not
      re-ruled, and any key whose untagged occurrence follows a tagged one ranks
      regardless of count — the key line says `escaped <gate>`, and that is the shape
-     reaching implementation. The summary line carries both counts. The tag is retro's
-     and the stream takes no continuation under an entry already there, so an occurrence
-     written before retro wrote tags carries none: a gate-caught occurrence among those
-     is ruled count-only by one `ADJUDICATED` line, as before, and `--reached` reads only
-     the tags. Until the first retro that writes one, `--reached` equals `--recurred`.
+     reaching implementation. The summary line carries both counts. `--reached` reads only
+     the tags; an untagged occurrence a gate caught is classed below and ruled count-only
+     by one `ADJUDICATED` line.
    - `view --keys --since <markTag>` — what this window touched, to the commit: a line
      the log at the mark did not hold. A date would read the mark's whole day, the last
      run's own rulings included. The re-key sweep reads these plus the `(uncold)` ones.
@@ -347,16 +348,41 @@ rebase.
      landed status line — is read against that rule before it ranks: an occurrence the rule
      would not have fired on is a sibling matched on shape alone, re-keyed, not a failed
      landing.
-   - **Count occurrences per key** from the view, read by the chain. A key with two or
-     more occurrences is the promotion the log exists to make visible — rank those first,
-     a burst as one incident, and carry the count as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
+   - **Class each occurrence before ranking on it.** A gate that stopped an agent's slip
+     is the gate working, not a defect to fix. A **gate** is a named step whose job is to
+     stop defects before a boundary — a check, a hook, a review or gap-check command, a
+     suite run as a step; a red test while writing, a tool refusal, or another agent's
+     passing notice is the work itself. The **boundary** is the merge, or the hand-on as
+     ready; a step rerunning checks just before it is a gate, not the boundary. Class each occurrence of every key and
+     cluster this run rules on, from its text:
+     - **in-work** — stopped by the work itself before any gate;
+     - **caught** — stopped by a named gate before the boundary, rework before the gate's
+       first catch included. A `Caught:` tag claims this on the gate and the cost; verify the rule was
+       present at the placement before counting it, since a gate catching what no rule
+       states is a rule-absent finding and ranks;
+     - **gate-run** — about how a gate itself ran: a misfire, a skipped step, a stop path
+       that failed, a finding it dropped or misjudged, rounds after its first catch. It wins over escaped when the
+       occurrence's subject is the gate, after merge included;
+     - **escaped** — reached past the boundary: the default branch, a release, the user —
+       a report's form or order the user received included.
+     An occurrence whose text does not say where it was stopped is classed from its cost
+     and named unclassed in the record, never guessed.
+     An occurrence holding several slips takes its worst class, in the order escaped,
+     gate-run, caught, in-work. Escaped and gate-run rank; caught and in-work are
+     telemetry, never ruled on alone. The ruling's `ADJUDICATED` line, or a cluster's
+     weighing, carries the split over occurrences and the keys it touches —
+     `<n> occurrences: <a> escaped · <b> gate-run · <c> caught · <d> in-work; <k> of <m>
+     keys with an escape or gate-run` — so the next run reads it.
+   - **Count occurrences per key** from the view, read by the chain and the classes. A key
+     with two or more occurrences, not all caught or in-work, is the promotion the log exists
+     to make visible — rank those first, a burst as one incident, and carry the count and
+     the split as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
      count-only: the `Caught:` tags are the ruling, and the count they build is the
      evidence a rule is cited past, read when the key escapes.
    - **A fired cluster is one candidate, not a rule per key.** Read its keys together
-     (`view --key`, repeated) against the sections they name: the question is why the doc
-     is not being followed — too long, a step buried, two sections stating one rule, a
-     stop path nothing exercises — and the expected answer cuts or restructures, never
-     appends one clause per key. A key the cut answers gets `LANDED`; one it does not stays
+     (`view --key`, repeated) against the sections they name, classed as above: the
+     question is why the doc is not being followed, and step 6's structure read asks it
+     cold. The expected answer cuts or restructures, never appends one clause per key. A key the cut answers gets `LANDED`; one it does not stays
      live. A cluster the run weighs and does not cut gets one `ADJUDICATED <date> —
      cluster <path> weighed at <n>: <ruling>` line on its newest key: it fires again only
      at `<n> + trigger.cluster` keys, so a doc that is the home of a whole class of
@@ -407,19 +433,27 @@ rebase.
    lint class or `amend` for a review-prompt line. Absent → narrate and skip.
 
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
-expensive path and they are *conditional*, not automatic:
+expensive path and they are *conditional*, not automatic. **Its direction is expected
+value**: open the funnel, and rank inside it, by what a finding is likely to cost if left —
+how far it got, how often its artifact is read, how likely it is to come back — of which the
+occurrence count is one input. **The mechanism below is the current hypothesis**, not the
+definition: a recurrence, a fired cluster, or one `Escaped:` occurrence opens the gate, and
+ranking puts escapes first, then targets read on every run, then count. Each marker commit
+body carries `Opened: <recurrence | escape | cluster | ledger | deep> — <the keys or files>`
+beside `Tally:`, and a later review tests the hypothesis from what is already recorded: of
+the keys landed by runs each opener started, how many came back after `LANDED` (`view
+--recurred`), and how many runs it opened landed nothing. An opener whose landings recur, or
+that opens runs with nothing to land, is revised on that evidence.
 
-- **Nothing recurred** in 0b, 0c, or 0d (no key `--reached` shows after re-keying, no
-  placement cluster fires, no shape routed), and no ledger signal fired → **stop and say
-  so.** Report the pending
+- **Nothing recurred** in 0b, 0c, or 0d (no key `--reached` shows after re-keying — an
+  `Escaped:` key shows at one occurrence — no placement cluster fires, no shape routed), and
+  no ledger signal fired → **stop and say so.** Report the pending
   captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
   the complete answer for the price of step 0; running the full funnel against it burns
   wall-clock and tokens to rediscover that. This is the expected outcome in a young or healthy repo, not a failed run.
 - **Something recurred, or a ledger signal fired** → run the funnel, scoped to what fired.
 - **A bare `deep` argument** overrides the gate: the maintainer asked for the sweep.
 
-Measurement cost rises with repo size, so a fixed-depth funnel gets more expensive exactly
-as its yield thins. The gate is what keeps the review affordable at scale.
 1. **Free** — list the stream: `marker-stream.py list`, then `files` (Telemetry). **The
    organic markers are the stream**; the review's own landings and the bookkeeping
    commits are two counts in the narration and are never ranked — a cluster made of the
@@ -487,8 +521,16 @@ as its yield thins. The gate is what keeps the review affordable at scale.
    stalest sections,
    weighting load-bearing files (referenced by other process docs, or amended by past
    marker commits). Reason about reconcile-into-one-rule vs a structural process /
-   repo / tooling move vs *leave — not yet ripe*. High bar: eagerly proposing grand
-   restructures is worse than none. Entries a retro appended fast (`add
+   repo / tooling move vs *leave — not yet ripe*.
+   **Before ruling a patch, check for a local maximum.** For the top three candidates that
+   are a fired cluster, a `carve`, or a `tooling` candidate, spawn `structure-explorer`
+   (`subagent_type: threads:structure-explorer`), one per artifact, in parallel, handed the
+   artifact, its job (who runs it, when, what failing costs them), and its keys as
+   `retro-log.py view --occurrences --key <k>` prints them (repeat `--key`) — the
+   occurrences without a review ruling on them — **never this run's ruling or leaning**. Choose among the structures it returns and name
+   the one chosen and the ones rejected in the record; a candidate whose failure classes no
+   doc edit fixes is not a `trim` or `amend`. The high bar is on **landing** a restructure,
+   never on **considering** one. No `Agent` tool → narrate the skip. Entries a retro appended fast (`add
    (unconsolidated)`) are expected raw material here — that's the division of labor, not
    a defect to report.
 7. **Placement** — for candidates that survive as reconcile-into-X or
@@ -544,7 +586,10 @@ Every candidate carries a **class** so the block and the log can sort it without
 it: `trim` (a net removal, or a cross-reference clause into existing text), `amend` (wording
 inside an existing rule, a consolidation), `rule` (a new rule or bullet), `carve` (a new doc,
 a split with its routing), `config` (a field in a config file), `tooling` (a script, a check,
-a capability), `motion` (a backlog motion — a stub filed, a field re-formed, a plan moved or
+a capability — a check names the rung it starts at, the evidence for that rung, and its
+scope, measured by running it over the tree and counting what it flags that it should not;
+it starts at `monitor` unless that count is near zero, and for a monitor check already
+configured `guards run.py --monitor` is the evidence for the next rung), `motion` (a backlog motion — a stub filed, a field re-formed, a plan moved or
 deleted — which is not a doc edit at all). `trim` and `amend` are the mechanical sentence by
 default; the rest are rows. The class predicts where judgment is likely; it groups, it does
 not gate — a `rule` the maintainer waves through is still a row, answered in a word.
@@ -599,8 +644,8 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   goes. Numbers first, one line each, every one from a command this run already ran:
   core docs read / core docs that bore on a ruling (count and words); **core prose
   growth** — per core doc with a window, words added classed prose / words added, from
-  `core-diff.py` and the hunk read (a doc bearing on nothing and growing in prose is a
-  cull finding, not a question); keyed docs opened
+  `core-diff.py` and the hunk read, a signal for 0a's slip read and never a number to
+  drive down; keyed docs opened
   whole / keyed docs that bore (count and words — a keyed set larger than the core is
   the bound in step 6 failing); markers read — organic / review / bookkeeping; keys read (the
   view's summary line) / keys that recurred; keys ruled burst / patched / unpatched, and
@@ -609,8 +654,7 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   the harness shows it (tool calls, wall clock). Then **questions to the maintainer**,
   never findings: *what should the next run stop reading?* — a ledger watch that has
   not woken in several windows, a class of capture the retro should stop appending (a
-  core doc that bore on nothing is not on this list: 0a asks why, and the answer is a
-  trim or nothing) — and any miss of this run's own, phrased as the question
+  core doc that bore on nothing is not on this list: 0a asks why) — and any miss of this run's own, phrased as the question
   it raises. **Each goes out answered**: the review's recommendation and the default it
   acts on absent a reply — one this run applies, or records where the next run reads it
   (a `HELD` line, a ledger watch) — or the one clause saying why only the maintainer can
@@ -624,6 +668,9 @@ not gate — a `rule` the maintainer waves through is still a row, answered in a
   lands as this run's marker commit.
 
 Nothing is applied without recorded consent. Under `read-only`, present candidates only.
+An approved `tooling`, `carve`, or `motion` candidate that fits one pass may be **built in
+the run** rather than filed as a stub; the row says which, and the maintainer's answer
+decides.
 Under `apply-on-approval`, land each **approved** edit as its own `<markerPattern>` commit —
 never folded into unrelated work. Under `apply-mechanical`, the same, and a run the
 maintainer is not answering lands the mechanical line — `trim` and `amend` only, each its

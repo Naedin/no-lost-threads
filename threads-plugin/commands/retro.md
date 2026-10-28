@@ -164,11 +164,11 @@ Under `"keys"`:
 - **You write the pointer**, `Placement: <file> §<section>` — the home you would name,
   no quote and no edit. It routes the review's keyed read (`retro-log.py view --docs`),
   and the review's placer writes the edit. No home you can name → `Placement: none`.
-- **`Caught:`** needs the rule present at the placement, and nobody read it. Write it only
-  when the gate's own output cited the rule by file and section — that citation is the
-  read; a numbered class or item in a doc `processDocs` covers counts as its section when
-  the citation carries the item's name (`check-brief.md *Real-gate vs proxy*`), never its
-  number alone. Otherwise the occurrence goes untagged and ranks.
+- **`Caught:`** is written on the gate and the cost alone: a named gate stopped the slip
+  and its catch was the whole cost. Nobody read the placement, so whether the rule was
+  present is the review's to verify when it rules on the key; name the rule's place when
+  the gate's output cited it, by file and section or a numbered item's name, never its
+  number alone.
 - **The escape hatch** needs an edit this run never specified: spawn the full placer
   over the accepted findings first, then apply what it returns.
 
@@ -302,13 +302,21 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
 - **A finding a gate caught with its rule already present** → the ordinary key +
   occurrence, with one continuation line `Caught: <gate> — <where the rule is>` (the
   gate that stopped it: `/slices:check`, the guards, a review round; the rule's file and
-  section, by name, as the placer quoted it). Written only when both hold: the placer reports the
-  rule **present** at the placement (§3b; key-only, the gate's output cited it, §3c), and
-  the finding's whole cost was the gate's own catch. Any cost spent past the gate — a maintainer question the finding raised, a
+  section, by name, as the placer quoted it). Written only when the finding's whole cost was
+  the gate's own catch, and — full placement — the placer reports the rule **present**
+  (§3b); key-only, the gate and the cost suffice and the review verifies the rule (§3c). Any cost spent past the gate — a maintainer question the finding raised, a
   fix batch, a revision, code that ran — is the shape reaching implementation, and the
   occurrence goes untagged so it ranks. The view counts the occurrence and `--reached` does not rank it, so the
   review reads the count without re-ruling the doctrine each window; the next occurrence
   no gate catches ranks the key regardless of count. It counts against the eight.
+- **Every occurrence says where it was stopped** — by the work itself, by a named gate
+  (and which round), or past the merge — in its text or in the tag below; the review
+  classes occurrences from that sentence and cannot class one without it.
+- **A finding that got past the last gate** — onto the default branch, into a release, or
+  to the user → the ordinary key + occurrence, with one continuation line `Escaped: <where
+  it reached> — <what it cost>`. It ranks at one occurrence, so write it only for what
+  measurably got there (a commit on the default branch, a report from the user), never
+  for a slip a gate caught late. It counts against the eight.
 - **A finding whose artifact was fixed under §4b** → the ordinary key + occurrence, with
   one continuation line `Fixed: <artifact> — <sha>`. It counts against the eight, so
   compress the moment or the cost to make room — never the placement. No status line:
@@ -425,8 +433,8 @@ skip the fetch):
   --keys --reached --since <markTag>`: the keys with a line the log at the mark did not
   hold, to the commit — a date reads every capture of the mark's own day, the ones the
   review just ruled on included, as new. A key at two or more occurrences no gate caught,
-  back after its rule landed, or past a gate that had caught it, is what opens the
-  review's depth gate.
+  back after its rule landed, past a gate that had caught it, or holding one `Escaped:`
+  occurrence, is what opens the review's depth gate.
 - **Volume and concentration** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py
   files`: the **organic** markers since the mark and how many files `trigger.concentration`
   or more of them touched. The review's own landings (the `Process-Review:` trailer) and

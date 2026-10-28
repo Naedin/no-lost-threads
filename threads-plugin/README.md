@@ -202,6 +202,7 @@ threads-plugin/
   commands/process-review.md      The /threads:process-review command — bootstrap, funnel, output
   agents/retro-auditor.md         Read-only sub-agent for the fresh-context audit (its brief)
   agents/finding-placer.md        Read-only sub-agent that sites findings in your process docs (both commands)
+  agents/structure-explorer.md    Read-only sub-agent that asks whether a doc's whole approach is the problem (review step 6)
   commands/adherence.md           The /threads:adherence command — a declared rule's sample (a review phase, or standalone)
   agents/adherence-judge.md       Read-only sub-agent that rules each drawn block against the tree
   agents/adherence-refuter.md     Read-only sub-agent that tries to show each flagged block true

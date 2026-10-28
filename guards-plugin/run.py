@@ -2,8 +2,14 @@
 """guards runner — reads .claude/guards.json at the root, runs each enabled check,
 and maps its findings through the check's rung.
 
-  run.py [--root DIR] [--diff-range RANGE]
+  run.py [--root DIR] [--diff-range RANGE] [--monitor]
                              DIR defaults to the git top level, else the cwd.
+
+A check at rung monitor is not run by a plain run — the gate an agent commits through —
+so its findings never reach the agent it watches; the summary names it `not run`.
+--monitor runs only the monitor checks, for a reader deciding whether one has earned
+warn: their findings print prefixed `monitor `, and only a refusal makes the exit
+non-zero.
 
 --diff-range hands the checks the diff of RANGE in DIR's checkout (any range
 `git diff` takes, e.g. `origin/main...HEAD`) as GUARDS_DIFF, written the way the git
@@ -36,7 +42,7 @@ import tempfile
 
 PLUGIN = pathlib.Path(__file__).resolve().parent
 CHECKS = PLUGIN / "checks"
-RUNGS = ("warn", "block")
+RUNGS = ("monitor", "warn", "block")
 
 
 def err(msg):
@@ -76,7 +82,7 @@ def load_config(path):
     out = {}
     for cid, spec in data["checks"].items():
         if not isinstance(spec, dict) or spec.get("rung") not in RUNGS:
-            raise ValueError(f'malformed: "{cid}" needs "rung": "warn" or "block"')
+            raise ValueError(f'malformed: "{cid}" needs "rung": "monitor", "warn", or "block"')
         for key in ("paths", "exclude"):
             v = spec.get(key, [])
             if not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
@@ -94,6 +100,8 @@ def main():
                     help="repo root holding .claude/guards.json (default: git top level)")
     ap.add_argument("--diff-range", default=None, metavar="RANGE",
                     help="hand the checks the diff of RANGE as GUARDS_DIFF")
+    ap.add_argument("--monitor", action="store_true",
+                    help="run only the monitor checks; findings never fail the run")
     args = ap.parse_args()
     root = pathlib.Path(args.root or git_toplevel()).resolve()
     config = root / ".claude" / "guards.json"
@@ -112,8 +120,14 @@ def main():
     if missing:
         return 2
 
+    skipped = [cid for cid, spec in checks.items() if (spec["rung"] == "monitor") != args.monitor]
+    checks = {cid: spec for cid, spec in checks.items() if cid not in skipped}
+    unrun = [] if args.monitor else skipped
+    if args.monitor and not checks:
+        err("no check at rung monitor, nothing judged")
+        return 0
     if args.diff_range is None:
-        return run_checks(root, checks,
+        return run_checks(root, checks, unrun,
                           {k: v for k, v in os.environ.items() if k != "GUARDS_RANGE"})
     try:
         diff = range_diff(root, args.diff_range)
@@ -124,11 +138,11 @@ def main():
                                      suffix=".diff") as f:
         f.write(diff)
         f.flush()
-        return run_checks(root, checks, dict(os.environ, GUARDS_DIFF=f.name,
+        return run_checks(root, checks, unrun, dict(os.environ, GUARDS_DIFF=f.name,
                                              GUARDS_RANGE=args.diff_range))
 
 
-def run_checks(root, checks, env):
+def run_checks(root, checks, unrun, env):
     refused = blocked = False
     summary = []
     for cid, spec in checks.items():
@@ -140,7 +154,7 @@ def run_checks(root, checks, env):
         r = subprocess.run(cmd, capture_output=True, text=True, env=env)
         findings = [line for line in r.stdout.splitlines() if line.strip()]
         if r.returncode == 1:
-            prefix = "warn " if spec["rung"] == "warn" else ""
+            prefix = "" if spec["rung"] == "block" else spec["rung"] + " "
             for line in findings:
                 print(f"{prefix}{cid}: {line}")
             if spec["rung"] == "block":
@@ -153,6 +167,7 @@ def run_checks(root, checks, env):
             sys.stderr.write(r.stderr)
             err(f"{cid}: refused (exit {r.returncode})")
             summary.append(f"{cid} {spec['rung']} refused")
+    summary += [f"{cid} monitor not run" for cid in unrun]
     if summary:
         err("; ".join(summary))
     return 2 if refused else 1 if blocked else 0

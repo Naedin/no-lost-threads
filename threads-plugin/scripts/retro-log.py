@@ -3,7 +3,8 @@
 
   retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--live]
                     [--since DATE|REV] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
-                    [--placements [--since DATE|REV]] [--log PATH] [--root DIR]
+                    [--placements [--since DATE|REV]] [--occurrences --key KEY...]
+                    [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
 
 The log is append-only so that concurrent sessions merge by union; every state
@@ -24,6 +25,12 @@ The entry grammar (the guards `retro-log` check enforces the same one):
                                                   already present at the named place.
                                                   Retro writes it; `--reached` drops such
                                                   occurrences from the recurrence test
+      Escaped: <where it reached> — <cost>        continuation the view reads: the
+                                                  occurrence got past the last gate (the
+                                                  default branch, a release, the user).
+                                                  Retro writes it; `--reached` ranks a
+                                                  key holding one after its last closing
+                                                  status at a single occurrence
     LANDED <sha> — <where it landed, one line>    status line — one physical line,
                                                   however long; a wrapped one reads as
                                                   continuation prose
@@ -64,7 +71,9 @@ A key's state is its last block in stream order, annotation blocks skipped: an
 occurrence, or a REOPENED, FILED, or HELD status, is live; LANDED, RETIRED, UPSTREAM,
 NOTED is closed. An occurrence appended after a closing status therefore reopens the
 key by itself — the rule landed and the shape came back — and the view says so. The
-view lists HELD keys first, each with the date it was held and its age in days.
+view lists HELD keys first, each with the date it was held and its age in days, then
+keys with an `Escaped:` occurrence since their last closing status, each marked `escaped to
+<where>`.
 Compaction keeps every block of a live key, merging only runs of occurrence blocks
 under one key line; a status or annotation block keeps its own key line, since a
 status inside an occurrence entry is invisible to the grammar. A closed key keeps its
@@ -149,6 +158,12 @@ every window, so the review records a weighing instead: `ADJUDICATED <date> — 
 The highest such size per file holds, read from every key: that file fires again only at
 `<n> + trigger.cluster` keys, whatever the window, and its row says `weighed at <n>`. The
 other filters do not apply and are refused.
+
+`--occurrences` prints, for each `--key`, its occurrences and nothing a review wrote: the
+key line with its count and span, then every occurrence block's lines — no status,
+`ADJUDICATED`, `HELD`, or `ARC` block, and no marker on the key line. It is the read a
+cold reader is handed, so a ruling already on the key never frames it. It takes `--key`
+and nothing else.
 """
 import argparse
 import datetime
@@ -169,6 +184,7 @@ STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DETAIL = re.compile(r"^  ")
 CAUGHT = re.compile(r"^\s{2,}Caught: (\S.*?)(?:\s+[—-]+\s.*)?$")
+ESCAPED = re.compile(r"^\s{2,}Escaped: (\S.*?)(?:\s+[—-]+\s.*)?$")
 HEADING = re.compile(r"^## ")
 PATH = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w-][\w.-]*\.(?:md|json|py|sh|ya?ml|toml|txt))"
                   r"(?![\w/])")
@@ -388,6 +404,17 @@ def caught_split(blocks_for_key):
     return sorted(free), caught
 
 
+def escapes(blocks_for_key):
+    """Where each `Escaped:` occurrence after the key's last closing status reached."""
+    out = []
+    for b in deciding(blocks_for_key):
+        if b.status in CLOSED:
+            out = []
+        elif not b.status:
+            out += [ESCAPED.match(l).group(1).strip() for l in b.lines if ESCAPED.match(l)]
+    return out
+
+
 def reached(blocks_for_key):
     """Under --reached: the key ranks when its uncaught occurrences recur, an uncaught
     one follows a closing status, or an uncaught one follows a caught one in the stream
@@ -400,7 +427,7 @@ def reached(blocks_for_key):
             elif gate:
                 return gate
     free, _ = caught_split(blocks_for_key)
-    if len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True):
+    if len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True) or escapes(blocks_for_key):
         return True
     return False
 
@@ -872,6 +899,25 @@ def render_arc(blocks, name):
     return "\n".join(out) + "\n"
 
 
+def render_occurrences(blocks, only):
+    """Each key's occurrences, verbatim, without a status or annotation block: the record
+    the sessions wrote, with every review ruling left out."""
+    by_key = keys_in_order(blocks)
+    missing = [k for k in only if k not in by_key]
+    if missing:
+        refuse([f"no such key: {k}" for k in missing])
+    out = []
+    for key in only:
+        bs = [b for b in by_key[key] if not b.status]
+        dates = sorted(d for b in bs for d in b.dates)
+        span = f"{dates[0]}..{dates[-1]}" if len(dates) > 1 else (dates[0] if dates else "-")
+        out.append(f"{key}  ×{len(dates)}  {span}")
+        for b in bs:
+            out.extend(b.lines)
+        out.append("")
+    return "\n".join(out)
+
+
 def arc_tags(bs):
     return "".join(f"  arc:{a}" for a in dict.fromkeys(b.arc for b in bs if b.arc))
 
@@ -892,7 +938,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         dates = sorted(d for b in bs for d in b.dates)
         rec = (key, bs, st, dates)
         (closed if st in CLOSED else live).append(rec)
-    live.sort(key=lambda r: (r[2] != "HELD", -len(r[3]), r[3][0] if r[3] else ""))
+    live.sort(key=lambda r: (r[2] != "HELD", not escapes(r[1]), -len(r[3]),
+                             r[3][0] if r[3] else ""))
     n_recurred = sum(1 for r in live + closed if len(r[3]) >= 2)
     n_gated = sum(1 for r in live + closed if len(r[3]) >= 2 and not reached(r[1]))
     n_closed = {s: sum(1 for r in closed if r[2] == s) for s in sorted(CLOSED)}
@@ -933,7 +980,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         out.append(f"showing {len(shown_live) + len(shown_closed)} of {len(by_key)} keys ({crit})")
     out.append("")
     out.append(f"## Live ({len(shown_live)}{'' if not filtered else f' of {len(live)}'})"
-               " — HELD first, then most occurrences")
+               " — HELD first, then escaped, then most occurrences")
     for key, bs, st, dates in shown_live:
         span = f"{dates[0]}..{dates[-1]}" if len(dates) > 1 else (dates[0] if dates else "-")
         flag = " (uncold)" if any(b.uncold for b in bs) else ""
@@ -951,6 +998,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         esc = reached(bs)
         if isinstance(esc, str):
             marker += f"  escaped {esc}"
+        for where in dict.fromkeys(escapes(bs)):
+            marker += f"  escaped to {where}"
         marker += arc_tags(bs)
         out.append(f"{key}{flag}  {count}  {span}{marker}")
         if not keys_only:
@@ -1025,6 +1074,8 @@ def main():
                     help="view: live keys grouped by the file they are placed at, command docs "
                          "first; a file at trigger.cluster keys fires, with --since only on a "
                          "key new since")
+    ap.add_argument("--occurrences", action="store_true",
+                    help="view --key: the key's occurrences only, no review ruling, status, or arc")
     ap.add_argument("--since", default=None, metavar="DATE|REV",
                     help="view: keys with an occurrence, status, or annotation dated on or after "
                          "DATE, or with a detail line the log at REV did not hold")
@@ -1049,6 +1100,17 @@ def main():
             print(f"retro-log: warning: {v}", file=sys.stderr)
         if args.arcs:
             sys.stdout.write(render_arcs(blocks))
+            return 0
+        if args.occurrences:
+            other = [f for f, on in (("--held", args.held), ("--recurred", args.recurred),
+                                     ("--reached", args.reached), ("--since", args.since),
+                                     ("--docs", args.docs), ("--chain", args.chain),
+                                     ("--placements", args.placements), ("--keys", args.keys),
+                                     ("--live", args.live)) if on]
+            if other or not args.key:
+                refuse(["--occurrences takes --key and nothing else"
+                        + (f"; drop {', '.join(other)}" if other else "")])
+            sys.stdout.write(render_occurrences(blocks, args.key))
             return 0
         if args.placements:
             narrowed = [f for f, on in (("--key", args.key), ("--held", args.held),

@@ -3,7 +3,7 @@
 
 A Claude Code plugin carrying checks a repo turns on one at a time, each a plain
 script with a stable id, run by a gate that refuses a commit on a finding. Rung is
-config, so a repo starts a check at `warn`, promotes it to `block` when its evidence
+config, so a repo starts a check at `monitor` or `warn`, promotes it when its evidence
 justifies, and never migrates: the ids, the config shape, the exit codes, and the
 output format below are the contract, and later versions only add to them.
 
@@ -70,10 +70,20 @@ what survived and pass. An export that drops a config the gate steers by —
 check runs, naming the file: past a missing config a check judges nothing and says
 nothing, so the list is verified rather than trusted.
 
-**`run.py [--root DIR] [--diff-range RANGE]`** reads that config (root defaults to the
+**`run.py [--root DIR] [--diff-range RANGE] [--monitor]`** reads that config (root defaults to the
 git top level), runs each enabled check, and prints one line per finding as `<id>: <path>:<line>: <message>`,
 prefixed `warn ` when the check's rung is `warn`. One summary line on stderr names each
-check run, its rung, and its finding count. Exit **0** when no `block` check found
+check run, its rung, and its finding count.
+
+**Three rungs, climbed on evidence.** `monitor` watches without the agent seeing: a plain
+run, the gate an agent commits through, does not run it and the summary names it `not
+run`, so an agent never routes around a check still being measured. `--monitor` runs only
+the monitor checks, printing findings prefixed `monitor ` and exiting non-zero only on a
+refusal — the read for whoever decides promotion (`/threads:process-review` reads it). `warn`
+prints at the gate and passes; `block` refuses the commit. A check climbs a rung when its
+findings show real slips at the rung below and a scope narrow enough that what it flags
+is what it means to; block is reserved for a narrow check whose misses cost more than its
+false flags. Those bars are the current hypothesis, revised on what promoted checks did. Exit **0** when no `block` check found
 anything and no check refused; **1** when a `block` check found something; **2** when
 the config is unreadable or malformed, names a check id that does not exist, or any
 check exited 2, regardless of rung. `--diff-range` hands the checks the diff of
