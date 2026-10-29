@@ -9,6 +9,16 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.22.1] — 2026-10-29
+
+### Fixed
+
+- **A cluster weighing outlives the key it sits on.** `retro-log.py compact` reduced a closed key to its closing status and dropped an `ADJUDICATED … cluster <path> weighed at <n>` line written before it, so the cluster fired again as if never weighed. Compaction now keeps a weighing on either side of a closing status, as it keeps `ARC`. A weighed cluster fires again once `trigger.cluster` of its keys have an occurrence dated after the newest weighing, replacing `<n> + trigger.cluster` keys from the highest: keys closing after a weighing no longer raise the bar, and a later weighing replaces an earlier one. `test.sh` proves compaction keeps it, the newest holds over a larger older one, and the firing count.
+
+### Changed
+
+- **A log count is a floor; a script's run over history is the rate.** The depth gate's direction names the occurrence count as a floor, since a frequent, cheap, quietly fixed slip is rarely captured, and a `tooling` check candidate's census over the tree and history counts what it rightly flags as well as what it would wrongly flag: the shape's true rate, the evidence for its next rung. On the reference adopter one commit-message shape occurred in about 67 of 284 commits carrying the trailer, and the retro log recorded 3.
+
 ## threads [0.22.0] — 2026-10-28
 
 ### Added

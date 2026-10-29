@@ -49,7 +49,10 @@ The entry grammar (the guards `retro-log` check enforces the same one):
                                                   count-only ruling, or build trigger
                                                   on a key. Changes neither the key's
                                                   state nor its count; the view shows
-                                                  it in detail, compaction keeps it
+                                                  it in detail, compaction keeps it.
+                                                  A cluster weighing is about a file,
+                                                  not the key: compaction keeps it
+                                                  before or after a closing status
     ARC <name> [<date>] — <one line>              annotation: the key rides a named
                                                   trajectory. <name> is a slug; the date
                                                   is when the key entered the arc, written
@@ -155,9 +158,10 @@ cluster fires only on a key new in the window, so a cluster the last read weighe
 for new evidence. A doc that is the home of a whole class of findings gains a key nearly
 every window, so the review records a weighing instead: `ADJUDICATED <date> — cluster
 <path> weighed at <n>: <ruling>` on any key in it (the newest, which stays live longest).
-The highest such size per file holds, read from every key: that file fires again only at
-`<n> + trigger.cluster` keys, whatever the window, and its row says `weighed at <n>`. The
-other filters do not apply and are refused.
+The newest weighing per file holds, read from every key, live or closed: that file fires
+again only once `trigger.cluster` of its keys have an occurrence dated after the weighing,
+whatever the window, so keys closing after it never raise the bar. Its row says `weighed at
+<n>`, the size the ruling was made at. The other filters do not apply and are refused.
 
 `--occurrences` prints, for each `--key`, its occurrences and nothing a review wrote: the
 key line with its count and span, then every occurrence block's lines — no status,
@@ -709,6 +713,13 @@ COMMANDS = re.compile(r"(?:^|/)commands/")
 WEIGHED = re.compile(r"^cluster (\S+?) weighed at (\d+)\b")
 
 
+def weighing(b):
+    """(path as written, date, size) when the block is a cluster weighing, else None."""
+    m = STATUS.match(b.lines[0]) if b.status == "ADJUDICATED" else None
+    w = WEIGHED.match(m.group(4) or "") if m and DATE.match(m.group(2)) else None
+    return (w.group(1), m.group(2), int(w.group(2))) if w else None
+
+
 def config(root):
     cfg = root / ".claude" / "threads.json"
     try:
@@ -775,8 +786,8 @@ def render_placements(blocks, root, since=None, since_old=None):
     """Live keys grouped by the file their counted occurrences are placed at, command docs
     first: the read for findings that pile up on one doc a key at a time. With a since, a
     cluster fires only on a key new in the window — one the last read already weighed
-    waits for new evidence. A cluster recorded as weighed at a size fires again only once
-    it has grown by the bar past it, whatever the window."""
+    waits for new evidence. A weighed cluster fires again only once the bar's worth of its
+    keys have an occurrence after the newest weighing, whatever the window."""
     cfg = config(root)
     n = int((cfg.get("trigger") or {}).get("cluster", 3))
     resolve = resolver(root, cfg)
@@ -792,13 +803,12 @@ def render_placements(blocks, root, since=None, since_old=None):
             return line not in since_old
         return since is None or d >= since
 
-    weighed = {}
+    weighed = {}                 # path -> (date, size) of its newest weighing
     for b in blocks:
-        m = STATUS.match(b.lines[0]) if b.status == "ADJUDICATED" else None
-        w = WEIGHED.match(m.group(4) or "") if m else None
+        w = weighing(b)
         if w:
-            path = resolve(re.sub(r"^(?:\.\.?/)+", "", w.group(1)))[0]
-            weighed[path] = max(weighed.get(path, 0), int(w.group(2)))
+            path = resolve(re.sub(r"^(?:\.\.?/)+", "", w[0]))[0]
+            weighed[path] = max(weighed.get(path, ("", 0)), w[1:])
     by_path, unplaced, counted = {}, 0, 0
     for key, bs in keys_in_order(blocks).items():
         if state(bs) in CLOSED:
@@ -810,10 +820,12 @@ def render_placements(blocks, root, since=None, since_old=None):
                 unplaced += 1
                 continue
             path, ok = resolve(p)
-            c = by_path.setdefault(path, {"ok": ok, "keys": {}, "new": set()})
+            c = by_path.setdefault(path, {"ok": ok, "keys": {}, "new": set(), "after": set()})
             c["keys"].setdefault(key, []).append(d)
             if new(d, line):
                 c["new"].add(key)
+            if path in weighed and d > weighed[path][0]:
+                c["after"].add(key)
     rows = []
     for path, c in by_path.items():
         dates = sorted(d for ds in c["keys"].values() for d in ds)
@@ -821,7 +833,7 @@ def render_placements(blocks, root, since=None, since_old=None):
     rows.sort()
     def fires(k, path, c):
         if path in weighed:
-            return k >= weighed[path] + n
+            return len(c["after"]) >= n
         return k >= n and bool(c["new"])
 
     at = [r for r in rows if -r[1] >= n]
@@ -829,13 +841,13 @@ def render_placements(blocks, root, since=None, since_old=None):
     window = f" since {since}" if since else ""
     out = [f"placements: {counted} live keys counted · {unplaced} occurrences unplaced · "
            f"{len(rows)} files · {len(at)} at or above cluster {n}, {len(firing)} firing: a key "
-           f"new{window or ' (no since: every one)'}, or grown {n} past its weighing", ""]
+           f"new{window or ' (no since: every one)'}, or {n} after its weighing", ""]
     for doc, k, o, path, c, dates in rows:
         span = f"{dates[0]}..{dates[-1]}" if len(dates) > 1 else dates[0]
         hot = fires(-k, path, c)
         out.append(f"{-k}\t{-o}\t{span}\t{len(c['new'])} new\t{'doc' if doc else 'command'}\t"
                    f"{path}" + ("" if c["ok"] else " (not in this repo)")
-                   + (f"\tweighed at {weighed[path]}" if path in weighed else "")
+                   + (f"\tweighed at {weighed[path][1]}" if path in weighed else "")
                    + ("\tfires" if hot else ""))
         if hot:
             for key, ds in sorted(c["keys"].items(), key=lambda kv: min(kv[1])):
@@ -1026,8 +1038,8 @@ def render_compact(header, blocks):
         if st in CLOSED:
             closing = max(i for i, b in enumerate(bs) if b.status not in ANNOTATIONS)
             out += [key_line, one_line(bs[closing])]
-            for b in bs[:closing]:       # an arc outlives the key's closing
-                if b.status == "ARC":
+            for b in bs[:closing]:       # an arc and a weighing outlive the key's closing
+                if b.status == "ARC" or weighing(b):
                     out += [key_line, one_line(b)]
             for b in bs[closing + 1:]:
                 out += [key_line, one_line(b)]

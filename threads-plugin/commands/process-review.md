@@ -293,8 +293,8 @@ rebase.
    - `view --placements --since <markTag>` — every live key grouped by the file its
      occurrences are placed at, command docs first (read on every run of the command),
      resolved the way `--docs` paths are. A file at `trigger.cluster` keys **fires** when one
-     of them is new since the mark, or, once weighed, when it has grown the bar past the
-     weighed size: findings that each stayed at one occurrence, so no key recurs, and
+     of them is new since the mark, or, once weighed, when `trigger.cluster` of its keys
+     have an occurrence after the newest weighing: findings that each stayed at one occurrence, so no key recurs, and
      together say the doc is not being followed. Counted like `--reached`:
      a `Caught:` occurrence, a key ruled count-only after its last occurrence, and an
      occurrence before a landing are left out, so a gate catching with its rule present is
@@ -385,8 +385,11 @@ rebase.
      cold. The expected answer cuts or restructures, never appends one clause per key. A key the cut answers gets `LANDED`; one it does not stays
      live. A cluster the run weighs and does not cut gets one `ADJUDICATED <date> —
      cluster <path> weighed at <n>: <ruling>` line on its newest key: it fires again only
-     at `<n> + trigger.cluster` keys, so a doc that is the home of a whole class of
-     findings is not re-asked every window it gains one. A backlog read fires more
+     once `trigger.cluster` of its keys have an occurrence dated after that line, so a doc
+     that is the home of a whole class of findings is not re-asked every window it gains
+     one. The weighing is about the file: compaction keeps it when its key closes, the
+     newest per file holds, and keys closing after it never raise the bar, so a shrunken
+     cluster needs no re-weighing. A backlog read fires more
      clusters than a run can rule; take them in the view's order, name the rest in the
      record, and they fire on their next new key.
    - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
@@ -436,7 +439,8 @@ rebase.
 expensive path and they are *conditional*, not automatic. **Its direction is expected
 value**: open the funnel, and rank inside it, by what a finding is likely to cost if left —
 how far it got, how often its artifact is read, how likely it is to come back — of which the
-occurrence count is one input. **The mechanism below is the current hypothesis**, not the
+occurrence count is one input, and a floor: a slip that is frequent, cheap, and quietly fixed
+is rarely captured, so where a script can detect the shape, its run over history is the rate. **The mechanism below is the current hypothesis**, not the
 definition: a recurrence, a fired cluster, or one `Escaped:` occurrence opens the gate, and
 ranking puts escapes first, then targets read on every run, then count. Each marker commit
 body carries `Opened: <recurrence | escape | cluster | ledger | deep> — <the keys or files>`
@@ -587,7 +591,9 @@ it: `trim` (a net removal, or a cross-reference clause into existing text), `ame
 inside an existing rule, a consolidation), `rule` (a new rule or bullet), `carve` (a new doc,
 a split with its routing), `config` (a field in a config file), `tooling` (a script, a check,
 a capability — a check names the rung it starts at, the evidence for that rung, and its
-scope, measured by running it over the tree and counting what it flags that it should not;
+scope, measured by running it over the tree and history and counting both what it flags
+that it should not and what it rightly flags — the second is the shape's true rate, which a
+retro-log count undercounts;
 it starts at `monitor` unless that count is near zero, and for a monitor check already
 configured `guards run.py --monitor` is the evidence for the next rung), `motion` (a backlog motion — a stub filed, a field re-formed, a plan moved or
 deleted — which is not a doc edit at all). `trim` and `amend` are the mechanical sentence by

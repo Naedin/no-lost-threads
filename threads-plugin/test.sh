@@ -325,7 +325,8 @@ grep -q '^drift/e3' "$tmp/esc.out" && fail "an Escaped: before a landing ranked"
 ok "Escaped: is accepted; one escaped occurrence ranks under --reached and sorts first; one before a landing does not"
 
 # 12. --placements: live keys clustered by resolved placement file, command docs first; caught,
-#     count-only, and pre-landing occurrences uncounted; --since narrows firing, never counting
+#     count-only, and pre-landing occurrences uncounted; --since narrows firing, never counting;
+#     a weighed cluster fires on the bar's worth of keys after its newest weighing
 P="$tmp/pl"; mkdir -p "$P/.claude/commands" "$P/docs" "$P/other"
 touch "$P/.claude/commands/run.md" "$P/docs/rules.md" "$P/other/rules.md"
 printf '{ "processDocs": ["docs", ".claude/commands"], "trigger": { "cluster": 3 } }\n' > "$P/.claude/threads.json"
@@ -376,7 +377,7 @@ a/two
   ADJUDICATED 2026-10-05 — cluster .claude/commands/run.md weighed at 3: read, not cut.
 EOF
 python3 "$rl" view --placements --root "$P" --log log.md 2>/dev/null > "$P/all.out"
-head -1 "$P/all.out" | grep -q '^placements: 9 live keys counted · 1 occurrences unplaced · 3 files · 2 at or above cluster 3, 2 firing: a key new (no since: every one), or grown 3 past its weighing$' || fail "--placements summary: $(head -1 "$P/all.out")"
+head -1 "$P/all.out" | grep -q '^placements: 9 live keys counted · 1 occurrences unplaced · 3 files · 2 at or above cluster 3, 2 firing: a key new (no since: every one), or 3 after its weighing$' || fail "--placements summary: $(head -1 "$P/all.out")"
 grep -q $'^3\t3\t2026-10-01..2026-10-20\t3 new\tcommand\t.claude/commands/run.md\tfires$' "$P/all.out" || fail "run.md cluster (basename resolved; caught, count-only, landed excluded): $(cat "$P/all.out")"
 grep -q $'^4\t4\t2026-09-05..2026-10-03\t4 new\tdoc\tdocs/rules.md\tfires$' "$P/all.out" || fail "rules.md cluster (processDocs preferred over other/rules.md; post-LANDED occurrence counted): $(cat "$P/all.out")"
 grep -q $'^1\t1\t2026-09-08\t1 new\tdoc\tnowhere.md (not in this repo)$' "$P/all.out" || fail "an unresolvable placement is not marked: $(cat "$P/all.out")"
@@ -391,7 +392,35 @@ python3 "$rl" view --placements --since 2026-09-01 --root "$P" --log weighed.md 
 grep -q $'\tcommand\t.claude/commands/run.md\tweighed at 3$' "$P/w.out" || fail "a cluster weighed at its size fired on new keys: $(cat "$P/w.out")"
 grep -q $'^4\t.*\tdocs/rules.md\tweighed at 3$' "$P/w.out" || fail "a cluster one key past its weighing fired below the bar: $(cat "$P/w.out")"
 printf 'b/r4\n  2026-10-06 | s4 | r4. Placement: rules.md §R\nb/r5\n  2026-10-06 | s4 | r5. Placement: rules.md §R\n' >> "$P/weighed.md"
-python3 "$rl" view --placements --root "$P" --log weighed.md 2>/dev/null | grep -q $'^6\t.*\tdocs/rules.md\tweighed at 3\tfires$' || fail "a cluster grown the bar past its weighing did not fire"
+python3 "$rl" view --placements --root "$P" --log weighed.md 2>/dev/null | grep -q $'^6\t.*\tdocs/rules.md\tweighed at 3$' || fail "a cluster two keys past its weighing fired below the bar"
+printf 'b/r6\n  2026-10-07 | s5 | r6. Placement: rules.md §R\n' >> "$P/weighed.md"
+python3 "$rl" view --placements --root "$P" --log weighed.md 2>/dev/null | grep -q $'^7\t.*\tdocs/rules.md\tweighed at 3\tfires$' || fail "a cluster with the bar's worth of keys after its weighing did not fire"
+# a weighing outlives the key it sits on; the newest holds, so keys closing after it never raise the bar
+cat > "$P/shrunk.md" <<'EOF'
+## Entries
+
+d/w1
+  2026-09-01 | s1 | w1. Placement: rules.md §R
+d/w1
+  ADJUDICATED 2026-09-10 — cluster rules.md weighed at 9: home by design.
+d/w1
+  LANDED abc1236 — rules.md §R.
+d/w2
+  2026-09-02 | s1 | w2. Placement: rules.md §R
+d/w3
+  2026-09-03 | s1 | w3. Placement: rules.md §R
+d/w4
+  2026-09-11 | s2 | w4. Placement: rules.md §R
+d/w5
+  2026-09-11 | s2 | w5. Placement: rules.md §R
+EOF
+python3 "$rl" compact --root "$P" --log shrunk.md 2>/dev/null || fail "compact refused a log with a weighing on a closed key"
+grep -q '^  ADJUDICATED 2026-09-10 — cluster rules.md weighed at 9' "$P/shrunk.md" || fail "compact dropped a weighing written before its key closed"
+python3 "$rl" view --placements --root "$P" --log shrunk.md 2>/dev/null | grep -q $'^4\t.*\tdocs/rules.md\tweighed at 9$' || fail "a compacted closed key's weighing was lost, or two keys after it fired"
+printf 'd/w2\n  ADJUDICATED 2026-09-12 — cluster rules.md weighed at 4: re-weighed after w1 landed.\nd/w6\n  2026-09-12 | s3 | w6. Placement: rules.md §R\n' >> "$P/shrunk.md"
+python3 "$rl" view --placements --root "$P" --log shrunk.md 2>/dev/null | grep -q $'^5\t.*\tdocs/rules.md\tweighed at 4$' || fail "the newest weighing did not hold over a larger older one, or a same-day key counted after it"
+printf 'd/w7\n  2026-09-13 | s4 | w7. Placement: rules.md §R\nd/w8\n  2026-09-13 | s4 | w8. Placement: rules.md §R\nd/w9\n  2026-09-14 | s5 | w9. Placement: rules.md §R\n' >> "$P/shrunk.md"
+python3 "$rl" view --placements --root "$P" --log shrunk.md 2>/dev/null | grep -q $'^8\t.*\tdocs/rules.md\tweighed at 4\tfires$' || fail "three keys after the newest weighing did not fire"
 python3 "$rl" view --occurrences --key a/seven --key b/r3 --root "$P" --log weighed.md 2>/dev/null > "$P/occ.out"
 grep -q '^a/seven  ×2  2026-09-01..2026-10-03$' "$P/occ.out" || fail "--occurrences key line carries a marker or a wrong count: $(cat "$P/occ.out")"
 grep -q 'came\|before\. Placement' "$P/occ.out" || fail "--occurrences dropped an occurrence: $(cat "$P/occ.out")"
