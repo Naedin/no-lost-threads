@@ -623,6 +623,51 @@ python3 "$rl" view --keys --since no-such-rev --root "$C" >/dev/null 2>"$C/err" 
 grep -q 'takes YYYY-MM-DD or a commit' "$C/err" || fail "a bad --since was not named: $(cat "$C/err")"
 ok "view --chain: occurrences and the placement's organic markers on one clock, in order; a same-day pair one burst; a broad marker bracketed; an open PR in flight; the window's unkeyed patch named; an uncommitted line dated by its own; --since REV to the commit, a re-key and a compaction not new"
 
+# ---- retro-log.py view --outside --since REV: a key a retro, slice, or release closed or filed
+# in the window, written by no review commit — the self-landed patch the review must judge
+O="$tmp/outside"; mkdir -p "$O/.claude" "$O/docs"
+git init -q -b main "$O"; o_() { git -C "$O" "$@"; }
+o_ config user.email t@t; o_ config user.name t
+oat() { d="$1"; shift; GIT_AUTHOR_DATE="$d" GIT_COMMITTER_DATE="$d" git -C "$O" commit -q "$@"; }
+printf '{ "markerPattern": "^docs(process", "retroLogPath": ".claude/log.md" }\n' > "$O/.claude/threads.json"
+printf '# a\n' > "$O/docs/a.md"
+printf '## Entries\n\no/old\n  2026-09-01 | s0 | before the mark.\no/old\n  LANDED 1111111 — docs/a.md §old.\n' > "$O/.claude/log.md"
+o_ add -A; oat "2026-09-01T09:00:00+00:00" -m base; o_ tag process-review-mark
+printf 'o/self\n  2026-09-02 | s1 | hit it.\n    Placement: docs/a.md §x\n' >> "$O/.claude/log.md"; o_ add -A; oat "2026-09-02T09:00:00+00:00" -m "capture self"
+printf 'cap\n' >> "$O/docs/a.md"; o_ add -A; oat "2026-09-02T10:00:00+00:00" -m "docs(process/a): a cap on the rounds"
+printf 'o/self\n  LANDED %s — docs/a.md §x: a cap\n' "$(o_ rev-parse --short HEAD)" >> "$O/.claude/log.md"; o_ add -A; oat "2026-09-02T11:00:00+00:00" -m "docs(process/retro): LANDED — self"
+printf 'o/reviewed\n  2026-09-03 | s2 | ruled.\no/reviewed\n  LANDED 2222222 — docs/a.md §y.\n' >> "$O/.claude/log.md"; o_ add -A
+oat "2026-09-03T09:00:00+00:00" -m "docs(process/retro): review" -m "Process-Review: 2026-09-03"
+printf 'o/filed\n  2026-09-04 | s3 | carried.\no/filed\n  FILED Plans/inbox/x.md — the stub.\n' >> "$O/.claude/log.md"; o_ add -A; oat "2026-09-04T09:00:00+00:00" -m "slice files it"
+printf 'o/live\n  2026-09-05 | s4 | open.\n' >> "$O/.claude/log.md"; o_ add -A; oat "2026-09-05T09:00:00+00:00" -m "capture live"
+printf 'o/wip\n  2026-09-06 | s5 | landed, not yet committed.\no/wip\n  RETIRED 2026-09-06 — moot.\n' >> "$O/.claude/log.md"
+python3 "$rl" view --keys --reached --since process-review-mark --root "$O" 2>/dev/null | grep -q '^o/self ' && fail "--reached now shows a closed key: the fixture no longer tests the gap"
+python3 "$rl" view --keys --outside --since process-review-mark --root "$O" > "$O/k" 2>&1 || fail "--outside failed: $(cat "$O/k")"
+grep -q "^o/self  ×1  LANDED .*  closed outside a review by $(o_ log -1 --format=%h --grep='LANDED — self')\$" "$O/k" || fail "a self-landed key was not shown with the commit that closed it: $(cat "$O/k")"
+grep -q '^o/filed  ×1  2026-09-04  FILED  closed outside a review by ' "$O/k" || fail "a key a slice filed was not shown: $(cat "$O/k")"
+grep -q '^o/wip  ×1  RETIRED .*closed outside a review by uncommitted$' "$O/k" || fail "an uncommitted closing was not shown: $(cat "$O/k")"
+grep -q '^o/reviewed \|^o/old \|^o/live ' "$O/k" && fail "--outside showed a review's closing, one before the mark, or a live key: $(cat "$O/k")"
+python3 "$rl" view --chain --outside --since process-review-mark --key o/self --root "$O" > "$O/c" 2>&1 || fail "--chain --outside failed: $(cat "$O/c")"
+grep -q '^  chain: 1 occurrence in 1 burst · placement touched after the last: ' "$O/c" || fail "the self-landed key's chain did not order its patch: $(cat "$O/c")"
+python3 "$rl" view --outside --root "$O" >/dev/null 2>&1 && fail "--outside ran without --since REV"
+python3 "$rl" view --outside --reached --since process-review-mark --root "$O" >/dev/null 2>&1 && fail "--outside composed with --reached"
+# an occurrence and its patch in one commit: answered, not recurred
+printf 'tie\n' >> "$O/docs/a.md"; printf 'o/tie\n  2026-09-07 | s6 | fixed in the same commit.\n    Placement: docs/a.md §t\no/tie\n  LANDED 3333333 — docs/a.md §t.\n' >> "$O/.claude/log.md"
+o_ add -A; oat "2026-09-07T09:00:00+00:00" -m "docs(process/a): the fix and its capture"
+python3 "$rl" view --chain --outside --since process-review-mark --key o/tie --root "$O" > "$O/t" 2>&1
+grep -q '^  chain: 1 occurrence in 1 burst · placement touched after the last: ' "$O/t" || fail "an occurrence in its patch's own commit read as a recurrence: $(cat "$O/t")"
+# a closing sha with no marker on the placement is named as the patch to judge
+printf 'b\n' > "$O/docs/b.md"; o_ add -A; oat "2026-09-08T09:00:00+00:00" -m "docs(process/b): a fix in another file"
+printf 'o/elsewhere\n  2026-09-08 | s7 | no placement.\no/elsewhere\n  LANDED %s — docs/b.md.\n' "$(o_ rev-parse --short HEAD)" >> "$O/.claude/log.md"; o_ add -A; oat "2026-09-08T10:00:00+00:00" -m "retro lands it"
+python3 "$rl" view --chain --outside --since process-review-mark --key o/elsewhere --root "$O" 2>&1 | grep -q "^  chain: .*closed citing $(o_ rev-parse --short HEAD^), not on the placement: judge that patch\$" || fail "a closing sha off the placement was not named"
+# the footer reads REV, not the tag, once the mark has moved
+base="$(o_ rev-parse process-review-mark)"; o_ tag -f process-review-mark HEAD >/dev/null
+python3 "$rl" view --chain --outside --since "$base" --root "$O" 2>&1 | grep -q "^## Organic markers since $base: 3 " || fail "the footer did not read --since REV: $(python3 "$rl" view --chain --outside --since "$base" --root "$O" 2>&1 | grep '^##')"
+# a key reopened by a ruling after compaction dropped its occurrences still ranks
+printf '## Entries\n\nr/open\n  LANDED abc1234 — x.md.\nr/open\n  REOPENED 2026-09-09 — patched in part by abc1234; open: the driver.\n' > "$tmp/reopen.md"
+python3 "$rl" view --keys --reached --root "$tmp" --log reopen.md 2>/dev/null | grep -q '^r/open  ×0  -  REOPENED$' || fail "a REOPENED key at ×0 did not rank: $(python3 "$rl" view --keys --reached --root "$tmp" --log reopen.md 2>&1)"
+ok "view --outside: a key closed or filed in the window by a retro, a slice, or an uncommitted line is shown with its closer and its chain; a review's closing, one before the mark, and a live key are not; a same-commit patch is not a recurrence; a closing sha off the placement is named; the footer reads REV; a REOPENED key ranks at ×0"
+
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.
 cd_="$here/scripts/core-diff.py"

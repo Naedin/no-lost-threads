@@ -323,18 +323,37 @@ rebase.
      key's occurrences with the organic markers that touched its placement since the
      first, all on author time — what the session knew when it wrote — and names the open
      PRs touching the placement (without `gh`, the header says it could not, and the run
-     narrates the tier drop). Read it **before this run appends a status line or
-     compacts**: `compact` reduces a landed key to its status line, and the chain it was
-     ruled on cannot be re-derived after. A marker wider than 30 files is bracketed as
+     narrates the tier drop). **Then `view --chain --prs --outside --since <markTag>`**:
+     every key a retro, a slice, or a release closed or filed in the window — its LANDED,
+     RETIRED, UPSTREAM, or FILED line new since the mark and written by no review commit,
+     each row naming the commit that wrote it. `--reached` reads live keys only, so a
+     session that hit a finding and landed its own fix hands the review a closed key
+     nothing else shows; each is ruled here exactly like the patched case below, and when
+     its chain shows no marker answering it — no placement, or a fix that landed upstream
+     or in another file — the sha on its closing line is the patch to judge (the chain
+     line says `closed citing <sha>`). Read
+     both **before this run appends a status line or compacts**: `compact` reduces a
+     landed key to its status line, and the chain it was ruled on cannot be re-derived
+     after. A marker wider than 30 files is bracketed as
      broad — a relink touches every chain — and its placement hunk is read before it is
      ruled anyone's patch. Every ruling names which of three the chain is:
      - **burst** — near-simultaneous occurrences, nothing landed between: one incident
        for ranking, the count kept — `ADJUDICATED <date> — burst: <n> occurrences, <dates>,
        one incident`.
      - **patched** — a marker between or after the occurrences answers the key. Judge
-       the patch: **structural** → `LANDED <its sha> — <where, by name>`, so a later occurrence
-       reads recurred after LANDED; **partial** → `ADJUDICATED <date> — patched in part by
-       <sha>; open: <the half still open>`, and the key ranks on the open half. An
+       the patch on two questions: will the occurrences stop recurring, and did it remove
+       what they recorded costing. Recurrence alone cannot tell them apart, since a patch
+       that bounds the cost stops the shape too. **Structural** — yes to both →
+       `LANDED <its sha> — <where, by name>`, so a later occurrence reads recurred after
+       LANDED. **Partial** — no to either, and always a bound on the cost (a cap, a stop
+       rule, a timeout, a rule that the cap is a decision) rather than the end of its
+       driver → `ADJUDICATED <date> — patched in part by <sha>; open: <the half still
+       open>`, the open half naming the cost driver, and the key ranks on the open half.
+       A key `--outside` showed closed keeps its closer's status line when structural;
+       partial reopens it — `REOPENED <date> — patched in part by <sha>; open: <the cost
+       driver>` — since an annotation leaves a closed key closed and `compact` would
+       drop the open half with its occurrences. `--reached` ranks a REOPENED key at any
+       count, so an open half survives a compaction that ran before its ruling. An
        occurrence after a patch is evidence that patch did not hold, and outranks the same
        count with nothing between. A marker that touched the file and does not answer the
        key is not its patch; the ruling says so.

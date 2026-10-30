@@ -2,7 +2,7 @@
 """retro-log — the retro log as an append-only stream, read through a view.
 
   retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--ripe] [--live] [--untagged]
-                    [--since DATE|REV] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
+                    [--since DATE|REV] [--outside --since REV] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
                     [--placements [--since DATE|REV]] [--occurrences --key KEY...]
                     [--log PATH] [--root DIR]
   retro-log.py compact [--dry-run] [--log PATH] [--root DIR]
@@ -103,7 +103,8 @@ rule present, which ranks with the repeats), `--reached` (the ranking read: `--r
 counted over the occurrences no gate caught, so a shape a check keeps catching with its
 rule present is counted and never ranked — plus any key with a `Caught:` occurrence and
 one without, which reached past the gate that had caught it and ranks regardless of
-count; the key line says `escaped <gate>`), `--since DATE` (keys with an occurrence,
+count; the key line says `escaped <gate>`; and a key whose state is REOPENED, a ruling's open
+half, at any count, since a compaction before the ruling may have dropped its occurrences), `--since DATE` (keys with an occurrence,
 status, or annotation dated on or after DATE), `--since REV` (keys with a detail line the
 log at REV did not hold — what was appended after that commit, to the commit and not to
 the day; compaction and re-keying move no line into it: the read for "since the mark";
@@ -111,7 +112,13 @@ a REV naming a local tag the remote holds elsewhere refuses, naming the fetch th
 `--ripe` (what retro's ripeness nudge reads: keys holding an occurrence tagged `Escaped:`
 or `Gate-run:` after their last closing status — with `--since`, that occurrence itself
 new in the window — since a caught or in-work occurrence never changes a ruling alone),
-`--live` (no closed section). Filters compose; the summary line counts the whole log and names how many keys the filter
+`--live` (no closed section), `--outside` (with `--since REV`: keys whose deciding status —
+a LANDED, RETIRED, UPSTREAM, or FILED line — is new since REV and was written by a commit
+with no `Process-Review` trailer, or is not yet committed: what a retro, a slice, or a release
+closed or filed in the window, a patch no review has judged; each row names the commit that
+wrote it, `closed outside a review by <sha>`, and `--chain` orders its occurrences, which
+`compact` drops; a closing line citing a sha no marker on the placement matches reads `closed
+citing <sha>, not on the placement`, the patch to judge). Filters compose; the summary line counts the whole log and names how many keys the filter
 shows. Without `--keys` a filtered view carries each shown key's detail, so the
 recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` prints,
 instead of the keys, the files the shown keys name in their detail — a `Placement:`, a
@@ -128,12 +135,14 @@ file's `+added -removed` and the commit's file count; a marker wider than 30 fil
 `broad` — a relink touches every chain — and is kept out of the reading below. Then one
 line per key, `<n> occurrences in <b> bursts` — consecutive occurrences within 24 hours
 with no marker between are one burst — plus the markers that touched the placement after
-the last occurrence and those it occurred again after, or that nothing touched it, and
+the last occurrence and those it occurred again after — an occurrence written in the marker's
+own commit is answered by it, not after it, whatever the clock — or that nothing touched it, and
 the broad ones. `--prs` adds the open PRs (`gh pr list`) touching the placement, `in
 flight`; when `gh` cannot say, the header says why and the chain is read without them. A
 compacted closed key has no occurrence left to order. A file is not a fix: the chain is
 what the review reads before ruling a key burst, patched, or unpatched, never the
-ruling. It closes with every organic marker since the mark, one line each and
+ruling. It closes with every organic marker since the mark (`--since REV`'s REV when given),
+one line each and
 tab-separated: the shown chains it is in, the live keys placed at a file it touched with
 a first occurrence on or before it, then `<time>  <sha>  <subject>` — fewest first, and
 under a marker in no shown chain its keys named when there are three or fewer. A marker
@@ -491,8 +500,9 @@ def ripe(blocks_for_key):
 def reached(blocks_for_key):
     """Under --reached: the key ranks when its uncaught occurrences recur, an uncaught
     one follows a closing status, or an uncaught one follows a caught one in the stream
-    (it escaped the gate), or it holds an `Escaped:` or `Gate-run:` one. Returns the
-    escaped gate, True, or False."""
+    (it escaped the gate), or it holds an `Escaped:` or `Gate-run:` one, or a ruling
+    REOPENED it — a partial patch's open half, whose occurrences a compaction before the
+    ruling may have dropped. Returns the escaped gate, True, or False."""
     gate = None
     for b in blocks_for_key:
         for _, g in b.occurrences:
@@ -501,7 +511,8 @@ def reached(blocks_for_key):
             elif gate:
                 return gate
     free, _ = caught_split(blocks_for_key)
-    if len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True) or ripe(blocks_for_key):
+    if (len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True) or ripe(blocks_for_key)
+            or state(blocks_for_key) == "REOPENED"):
         return True
     return False
 
@@ -659,13 +670,45 @@ def open_prs(root):
         return [], f"gh output unreadable ({e})"
 
 
-def render_chain(shown, blocks, root, log, prs=False):
+OUTSIDE = {"LANDED", "RETIRED", "UPSTREAM", "FILED"}
+
+
+def closed_outside(blocks, root, log, since_old):
+    """{key: the short sha that wrote its deciding status, or 'uncommitted'} for every key
+    whose deciding status is in OUTSIDE, new since the mark, and not a review commit's."""
+    times = capture_times(root, log)
+    shas = sorted({sha for sha, _ in times.values()})
+    review = set()
+    if shas:
+        r = subprocess.run(["git", "log", "--no-walk=unsorted",
+                            f"--format=%h%x1f%(trailers:key={marker_stream().TRAILER},valueonly)%x1e",
+                            *shas], cwd=root, capture_output=True, text=True)
+        for rec in r.stdout.split("\x1e"):
+            short, _, trailer = rec.strip().partition("\x1f")
+            if trailer.strip():
+                review.add(short)
+    out = {}
+    for key, bs in keys_in_order(blocks).items():
+        last = deciding(bs)
+        if not last or last[-1].status not in OUTSIDE:
+            continue
+        b = last[-1]
+        if b.lines[0].strip() in since_old:
+            continue
+        sha = times.get(b.nums[0], (None, None))[0]
+        if sha not in review:
+            out[key] = sha or "uncommitted"
+    return out
+
+
+def render_chain(shown, blocks, root, log, prs=False, since_rev=None, outside=None):
     """Each shown key's occurrences and the organic markers touching a file it is placed at
     since its first occurrence, in time order, with the chain read; then the window's
     organic markers, each with the shown chains it appears in and the live keys placed at a
     file it touched, named when there are few enough to check by hand."""
     ms = marker_stream()
     cfg, marker, mark, bookkeeping = ms.stream_config(root)
+    mark = since_rev or mark
     times = capture_times(root, log)
     occs = {}
     for key, bs, st, dates in shown:
@@ -698,7 +741,8 @@ def render_chain(shown, blocks, root, log, prs=False):
     joined, churn = {}, {}
     for key, bs, st, dates in shown:
         rows, placed = occs[key], placed_paths(bs)
-        out.append(f"{key}  ×{len(dates)}" + (f"  {st}" if st else ""))
+        out.append(f"{key}  ×{len(dates)}" + (f"  {st}" if st else "")
+                   + (f"  closed outside a review by {outside[key]}" if outside else ""))
         if not rows:
             out += ["  chain: no occurrence in the log to order — a compacted closed key; "
                     "rule its chain before its status line is compacted", ""]
@@ -735,8 +779,11 @@ def render_chain(shown, blocks, root, log, prs=False):
         for n, title, hit in flight:
             out.append(f"  open PR #{n}  {title}  ({', '.join(hit)})")
         scoped = [p for p in pats if not p[4]]
-        after = [p[1] for p in scoped if p[0] > last]
-        between = [p[1] for p in scoped if p[0] <= last]
+        # an occurrence in the patch's own commit is answered by it, never after it
+        again = {p[1] for p in scoped
+                 if any(r[0] > p[0] or (r[0] == p[0] and r[2] != p[1]) for r in rows)}
+        after = [p[1] for p in scoped if p[1] not in again]
+        between = [p[1] for p in scoped if p[1] in again]
         broad = [p[1] for p in pats if p[4]]
         parts = [f"{len(rows)} occurrence{'s' * (len(rows) != 1)} in {bursts} "
                  f"burst{'s' * (bursts != 1)}"]
@@ -749,6 +796,10 @@ def render_chain(shown, blocks, root, log, prs=False):
                          + (" but by broad markers" if broad else ""))
         if broad:
             parts.append(f"broad: {', '.join(broad)}")
+        closer = [b for b in deciding(bs) if b.status][-1:] if outside else []
+        if closer and re.match(r"^[0-9a-f]{7,40}$", closer[0].ref or "") and not any(
+                closer[0].ref.startswith(p[1]) or p[1].startswith(closer[0].ref) for p in pats):
+            parts.append(f"closed citing {closer[0].ref}, not on the placement: judge that patch")
         if flight:
             parts.append(f"in flight: {', '.join(f'#{n}' for n, _, _ in flight)}")
         out += ["  chain: " + " · ".join(parts), ""]
@@ -1012,7 +1063,7 @@ def arc_tags(bs):
 
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
                 live_only=False, since=None, today=None, docs=False, past_gate=False,
-                chain=None, since_old=None, ripe_only=False):
+                chain=None, since_old=None, ripe_only=False, outside=None):
     today = today or datetime.date.today()
     by_key = keys_in_order(blocks)
     if only:
@@ -1037,6 +1088,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         key, bs, st, dates = rec
         if held and st != "HELD":
             return False
+        if outside is not None and key not in outside:
+            return False
         if ripe_only:
             occ = ripe(bs)
             if since_old is not None:
@@ -1058,13 +1111,13 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         return True
 
     recurred = recurred or past_gate
-    filtered = held or recurred or since or ripe_only
+    filtered = held or recurred or since or ripe_only or outside is not None
     shown_live = [r for r in live if keep(r)]
     shown_closed = [] if (live_only or held) else [r for r in closed if keep(r)]
     if docs:
         return render_docs(shown_live + shown_closed)
     if chain:
-        return render_chain(shown_live + shown_closed, blocks, *chain)
+        return render_chain(shown_live + shown_closed, blocks, *chain, outside=outside)
     out = [f"{len(by_key)} keys · {len(live)} live · {n_held} held · "
            + " · ".join(f"{v} {k.lower()}" for k, v in n_closed.items())
            + f" · {n_recurred} recurred (two or more occurrences"
@@ -1072,6 +1125,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
     if filtered:
         crit = " ".join(f for f, on in (("--held", held), ("--recurred", recurred),
                                         ("--reached", past_gate), ("--ripe", ripe_only),
+                                        ("--outside", outside is not None),
                                         (f"--since {since}", since)) if on)
         out.append(f"showing {len(shown_live) + len(shown_closed)} of {len(by_key)} keys ({crit})")
     out.append("")
@@ -1099,6 +1153,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         for where in dict.fromkeys(w for _, _, c, w in ripe(bs) if c == "gate-run"):
             marker += f"  gate-run at {where}"
         marker += arc_tags(bs)
+        if outside:
+            marker += f"  closed outside a review by {outside[key]}"
         out.append(f"{key}{flag}  {count}  {span}{marker}")
         if not keys_only:
             for b in bs:
@@ -1108,7 +1164,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         out.append(f"## Closed ({len(shown_closed)}{'' if not filtered else f' of {len(closed)}'})")
         for key, bs, st, dates in shown_closed:
             last = [b for b in deciding(bs) if b.status][-1]
-            out.append(f"{key}  ×{len(dates)}  {one_line(last).strip()}{arc_tags(bs)}")
+            out.append(f"{key}  ×{len(dates)}  {one_line(last).strip()}{arc_tags(bs)}"
+                       + (f"  closed outside a review by {outside[key]}" if outside else ""))
     return "\n".join(out) + "\n"
 
 
@@ -1161,6 +1218,9 @@ def main():
                          "closing status, new in the --since window; with --placements, the "
                          "cluster read over those occurrences only")
     ap.add_argument("--live", action="store_true", help="view: live keys only, no closed section")
+    ap.add_argument("--outside", action="store_true",
+                    help="view --since REV: keys a LANDED, RETIRED, UPSTREAM, or FILED line new "
+                         "since REV closed or filed, written by no review commit")
     ap.add_argument("--untagged", action="store_true",
                     help="view: each occurrence naming a gate stop in prose with no Caught:, "
                          "Gate-run:, or Escaped: line, `<date>\\t<key>\\t<phrase>`, instead of the view")
@@ -1221,7 +1281,7 @@ def main():
         if args.occurrences:
             other = [f for f, on in (("--held", args.held), ("--recurred", args.recurred),
                                      ("--reached", args.reached), ("--ripe", args.ripe),
-                                     ("--since", args.since),
+                                     ("--since", args.since), ("--outside", args.outside),
                                      ("--docs", args.docs), ("--chain", args.chain),
                                      ("--placements", args.placements), ("--keys", args.keys),
                                      ("--live", args.live)) if on]
@@ -1233,6 +1293,7 @@ def main():
         if args.placements:
             narrowed = [f for f, on in (("--key", args.key), ("--held", args.held),
                                         ("--recurred", args.recurred), ("--reached", args.reached),
+                                        ("--outside", args.outside),
                                         ("--docs", args.docs), ("--chain", args.chain)) if on]
             if narrowed:
                 refuse([f"--placements reads every live key; drop {', '.join(narrowed)}"])
@@ -1243,13 +1304,24 @@ def main():
                 refuse([f"--arc takes a slug, not {args.arc}"])
             sys.stdout.write(render_arc(blocks, args.arc))
             return 0
+        outside = None
+        if args.outside:
+            other = [f for f, on in (("--held", args.held), ("--recurred", args.recurred),
+                                     ("--reached", args.reached), ("--ripe", args.ripe),
+                                     ("--live", args.live)) if on]
+            if other or since_old is None:
+                refuse(["--outside takes --since REV and reads closed keys; "
+                        + (f"drop {', '.join(other)}" if other else "name the mark")])
+            outside = closed_outside(blocks, root, path, since_old)
         today = datetime.date.fromisoformat(args.today) if args.today else None
         sys.stdout.write(render_view(blocks, args.keys, args.key, held=args.held,
                                      recurred=args.recurred, live_only=args.live,
                                      since=args.since, today=today, docs=args.docs,
                                      past_gate=args.reached, ripe_only=args.ripe,
-                                     chain=(root, path, args.prs) if args.chain else None,
-                                     since_old=since_old))
+                                     chain=(root, path, args.prs,
+                                            args.since if since_old is not None else None)
+                                     if args.chain else None,
+                                     since_old=since_old, outside=outside))
         return 0
     if violations:
         refuse(violations + [f"{len(violations)} violations; repair by hand, then rerun"])

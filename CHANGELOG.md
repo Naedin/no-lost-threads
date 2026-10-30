@@ -9,6 +9,21 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.24.0] — 2026-10-30
+
+### Changed
+
+- **The review judges a patch the session that hit it landed.** `/threads:process-review` step 0b now also reads `retro-log.py view --chain --prs --outside --since <markTag>`: every key a retro, a slice, or a release closed or filed in the window, ruled structural or partial before `compact` drops its occurrences. `--reached` reads live keys only, so a self-landed key never reached the chain read. A patch is structural only if the occurrences will stop and what they recorded costing is gone; a bound on the cost (a cap, a stop rule, a timeout, "the cap is a decision") is partial, its open half naming the cost driver, and partial on a closed key is `REOPENED`, not `ADJUDICATED`, so the open half stays live. On the reference adopter, all 5 keys closed in one window were closed by their own sessions or releases, and one, a cap on gap-check rounds, left the round cost it recorded untouched.
+
+### Added
+
+- **`retro-log.py view --outside --since REV`.** Keys whose deciding LANDED, RETIRED, UPSTREAM, or FILED line is new since REV and was written by a commit with no `Process-Review` trailer, or not yet committed, each named `closed outside a review by <sha>`; composes with `--chain`, `--keys`, `--docs`, and `--key`. `test.sh` proves a self-landed, a filed, and an uncommitted closing are shown with their chain, and a review's closing, one before the mark, and a live key are not.
+
+### Fixed
+
+- **A REOPENED key ranks at any count.** `--reached` ranks a key a ruling reopened even at ×0, since a compaction before the ruling may have dropped its occurrences, and the open half would otherwise never rank.
+- **A chain reads its patch right.** An occurrence written in the patch's own commit is answered by it, never "occurred again after" it. A closing line citing a sha no marker on the placement matches reads `closed citing <sha>, not on the placement: judge that patch`. The chain's closing marker list reads `--since REV`'s REV, not the mark tag, once the mark has moved. `test.sh` proves each.
+
 ## slices [0.11.2] — 2026-10-29
 
 ### Changed

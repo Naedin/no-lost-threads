@@ -155,10 +155,11 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
 - **It reads a key's chain before counting it.** Sessions patch what they hit before a
   review comes round, and parallel sessions hit one condition at once, so a count is not
   a recurrence by itself. `retro-log.py view --chain` orders each key's occurrences, at
-  their capture time, with the process commits that touched its placement; the review
-  rules each key a burst (one incident), patched (its status line cites the patch, and a
-  partial one names the open half), or unpatched, and names any process commit that
-  answers no key, since nothing else counts its recurrence.
+  their capture time, with the process commits that touched its placement, and `--outside`
+  adds every key a session closed itself in the window; the review rules each key a burst
+  (one incident), patched (its status line cites the patch; one that only bounds the cost
+  is partial and names the cost driver as the open half), or unpatched, and names any
+  process commit that answers no key, since nothing else counts its recurrence.
 - **It closes with its own economics**, as questions to you, each carrying the review's
   own answer and the default it acts on, or why only you can answer it: what it read
   against what bore on a ruling, how much of the marker stream was its own weight, how
