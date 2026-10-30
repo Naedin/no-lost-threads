@@ -9,6 +9,23 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.23.0] — 2026-10-29
+
+### Changed
+
+- **Retro's ripeness nudge reads only what can change a ruling.** A key makes the review ripe when it holds an `Escaped:` or `Gate-run:` occurrence the log at the mark did not hold, and a placement cluster fires only on keys holding one; a recurrence all caught at a gate with its rule present, or stopped inside the work, is counted and never ripe by itself. The marker bars are unchanged. The new `retro-log.py view --ripe` is the read, on `--keys` and on `--placements`. On the reference adopter, a review was recommended on a key at ×2 whose every occurrence a gate caught with its rule present.
+- **A gate's stop is a tag, never prose.** Retro writes `Caught:` on every occurrence whose text says a named gate stopped it and whose cost was that catch, and the new `Gate-run: <gate> — <what went wrong>` on one about how a gate ran: a misfire, a skipped step, a dropped finding, rounds after its first catch. `--reached` ranks a `Gate-run:` occurrence at one, as it ranks an escape, and the view marks it `gate-run at <gate>`. `test.sh` proves a caught or in-work recurrence is not ripe, one escaped or gate-run occurrence since the mark is, an escape before the mark or a landing is not, and the cluster read counts only those.
+
+### Added
+
+- **A prose gate stop with no tag warns.** `retro-log.py view` warns on stderr about an occurrence whose text says a named gate stopped it (*stopped by `/slices:check`*, *caught only by the pre-commit hook*, *caught by lens E*) with no `Caught:`, `Gate-run:`, or `Escaped:` line, since its class is unread: by key and date up to three, past that one counting line, and `--untagged` lists each as `<date>\t<key>\t<phrase>`. A negated stop, the work itself, and the maintainer are not gates. The exit never changes. On the reference adopter's log it flags 16 of 365 occurrences, every one a gate stop written as prose. `test.sh` proves a wrapped stop warns, and a tagged, negated, or non-gate stop does not.
+
+## guards [0.17.0] — 2026-10-29
+
+### Added
+
+- **`retro-log` warns on a `Caught:` occurrence naming more than one round.** Text such as `rounds 1, 2 and 4`, `rounds 3 and 4`, or `three rounds` under a `Caught:` tag is a gate past its first catch, which retro writes as `Gate-run:`; the check prints a stderr warning naming the line and never a finding, so the exit and the rung are unchanged. `run.py` now passes on a check's `<id>: warning: ` stderr lines. On the reference adopter's log it flags 0: its 7 multi-round occurrences carry no tag. `test.sh` proves the warning, its pass-through, and that one round or an untagged occurrence does not warn.
+
 ## threads [0.22.1] — 2026-10-29
 
 ### Fixed

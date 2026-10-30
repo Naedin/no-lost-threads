@@ -615,4 +615,34 @@ else
   exit 1
 fi
 
+# retro-log warns, never finds, on a Caught: occurrence naming more than one round; the
+# runner passes the warning on and keeps its exit
+rw="$tmp/rw"; mkdir -p "$rw/.claude"
+printf '{"checks": {"retro-log": {"rung": "block"}}}\n' > "$rw/.claude/guards.json"
+cat > "$rw/.claude/threads-retro-log.md" <<'EOF2'
+## Entries
+
+drift/multi
+  2026-10-01 | s1 | the check found misses one round at a time. Stopped by /slices:check
+    rounds 1, 2 and 4.
+    Caught: /slices:check — doc.md §X
+drift/single
+  2026-10-02 | s1 | stopped at the first round. Stopped by /slices:check round 1.
+    Caught: /slices:check — doc.md §X
+drift/untagged
+  2026-10-03 | s1 | rounds 3 and 4 each found more; no tag.
+EOF2
+says 0 "retro-log: a Caught: naming rounds 1, 2 and 4 warns" \
+  "threads-retro-log.md:4: a Caught: occurrence names rounds 1, 2 and 4" \
+  python3 "$here/checks/retro-log/check.py" --root "$rw"
+says 0 "run.py: passes a check's warning on, exit unchanged" "retro-log: warning: " \
+  python3 "$here/run.py" --root "$rw"
+n="$(python3 "$here/checks/retro-log/check.py" --root "$rw" 2>&1 | grep -c 'warning:')"
+if [ "$n" -eq 1 ]; then
+  printf 'ok    %-52s\n' "retro-log: one round, or rounds untagged, never warn"
+else
+  printf 'FAIL  %-52s warned %s times\n' "retro-log: one round, or rounds untagged, never warn" "$n"
+  exit 1
+fi
+
 echo "all cases passed"

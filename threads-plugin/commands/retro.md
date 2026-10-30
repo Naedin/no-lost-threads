@@ -310,8 +310,18 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   review reads the count without re-ruling the doctrine each window; the next occurrence
   no gate catches ranks the key regardless of count. It counts against the eight.
 - **Every occurrence says where it was stopped** — by the work itself, by a named gate
-  (and which round), or past the merge — in its text or in the tag below; the review
-  classes occurrences from that sentence and cannot class one without it.
+  (and which round), or past the merge; the review classes occurrences from that sentence
+  and cannot class one without it. **A named gate's stop is a tag, never prose alone**:
+  an occurrence whose text says a gate stopped it — *stopped by `/slices:check`*, *caught
+  by the pre-commit hook* — carries `Caught:` when the bullet above licenses it, `Gate-run:`
+  when the gate cost more than its first catch, and otherwise names the rule absent at the
+  placement. Prose saying a gate caught it, with no tag, is read as untagged: `--reached`
+  ranks it as a repeat.
+- **A finding about how a gate ran** — a misfire, a skipped step, a stop path that failed,
+  a finding it dropped or misjudged, rounds after its first catch → the ordinary key +
+  occurrence, with one continuation line `Gate-run: <gate> — <what went wrong>`. It ranks
+  at one occurrence, as an escape does; a gate that caught the slip at its first round and
+  cost nothing past it is `Caught:`, not this. It counts against the eight.
 - **A finding that got past the last gate** — onto the default branch, into a release, or
   to the user → the ordinary key + occurrence, with one continuation line `Escaped: <where
   it reached> — <what it cost>`. It ranks at one occurrence, so write it only for what
@@ -429,22 +439,23 @@ skip the fetch):
   working tree so this run's own appends count. Oldest: the date on the first such line.
   **Never count the whole file** — a whole-file count is the lifetime total, and reporting
   it as pending calls a clean review a backlog.
-- **Recurred since the mark** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view
-  --keys --reached --since <markTag>`: the keys with a line the log at the mark did not
-  hold, to the commit — a date reads every capture of the mark's own day, the ones the
-  review just ruled on included, as new. A key at two or more occurrences no gate caught,
-  back after its rule landed, past a gate that had caught it, or holding one `Escaped:`
-  occurrence, is what opens the review's depth gate.
+- **Escaped or gate-run since the mark** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py
+  view --keys --ripe --since <markTag>`: the keys holding an `Escaped:` or `Gate-run:`
+  occurrence the log at the mark did not hold, to the commit — a date reads every capture
+  of the mark's own day, the ones the review just ruled on included, as new. Those are the
+  classes a ruling turns on; a caught or in-work occurrence is telemetry, so a key that
+  recurred only at a gate or inside the work is counted and never makes the review ripe.
 - **Volume and concentration** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py
   files`: the **organic** markers since the mark and how many files `trigger.concentration`
   or more of them touched. The review's own landings (the `Process-Review:` trailer) and
   commits that touched only the log and the ledger are classified out — counting them is
   how a review comes out ripe on its own output the next morning.
-- **Clusters** — `retro-log.py view --placements --since <markTag>`: a file placed at by
-  `trigger.cluster` or more live keys, one of them new since the mark, fires — single
-  findings that together say one doc is not being followed.
+- **Clusters** — `retro-log.py view --placements --ripe --since <markTag>`: a file placed
+  at by `trigger.cluster` or more live keys with an escaped or gate-run occurrence, one of
+  them new since the mark, fires — single findings that together say one doc is not being
+  followed past its gates.
 
-**Ripe** means one of: a key recurred since the mark; a placement cluster fires; organic
+**Ripe** means one of: a key escaped or gate-run since the mark; a placement cluster fires; organic
 markers at or above `trigger.n`; a file at or above `trigger.concentration`. Pending captures alone are not
 ripe — they are the substrate waiting to recur, and a review run on volume pays for the
 funnel to learn that nothing recurred. Say something only when pending is non-zero or a
@@ -493,4 +504,7 @@ backlog earns a sentence on each run.
 - **Appending below the bar.** A nil-cost finding that matches nothing is a line in the
   report, not a key the next review carries; a positive is never a key at all.
 - **Calling a review ripe on pending captures**, or on a marker count that includes the
-  last review's own landings — ripe is a recurrence since the mark or an organic bar.
+  last review's own landings — ripe is an escape or gate-run since the mark, a fired
+  cluster of them, or an organic bar.
+- **Writing a gate's catch as prose.** *Stopped by `/slices:check`* with no `Caught:` or
+  `Gate-run:` line ranks as a repeat the gate already handled.

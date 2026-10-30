@@ -120,9 +120,10 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   thread is the natural next move. No hooks ship: a nudge at session start would compete
   with the task you just asked for. It always points you at a *fresh* session, since the
   review can't run in the one it reviews. Never urgent, never acted on unprompted. *Ripe*
-  means a key recurred, a doc's cluster grew, or the organic process commits crossed a
-  bar; pending captures
-  alone never make a review ripe.
+  means a finding escaped past the last gate or a gate itself misran since the last
+  review, a doc's cluster of those grew, or the organic process commits crossed a bar;
+  pending captures, and a shape a gate keeps catching with its rule present, never make a
+  review ripe alone.
 - **The review does not count itself.** Every commit the review lands carries a
   `Process-Review: <date>` trailer, and a commit that touched only the log or the ledger
   is bookkeeping; `scripts/marker-stream.py` classifies the stream into organic, review,

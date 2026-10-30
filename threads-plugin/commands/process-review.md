@@ -51,8 +51,9 @@ convention in the moment. Fields:
   and that changed something beyond the log and the ledger (Telemetry, below) — and the
   placement-cluster bar: live keys placed at one file (step 0b). Read by
   `/threads:retro` for its closing ripeness nudge, which calls a review *ripe* on a key
-  recurred since the mark, on a cluster with a key new since it, or on either marker bar,
-  and never on pending captures alone. `cluster` unset is the adoption state: the next
+  with an `Escaped:` or `Gate-run:` occurrence since the mark, on a cluster of such keys
+  with one new since it (`view --ripe`), or on either marker bar, and never on pending
+  captures alone: a caught or in-work recurrence is telemetry and never ripe by itself. `cluster` unset is the adoption state: the next
   review reads the whole cluster backlog once (0b) and records the value.
 - `applyMode` — `read-only` | `apply-on-approval` | `apply-mechanical`. Starts
   `read-only`. Once the user has approved candidates in two or more reviews, offer **once**
@@ -284,7 +285,8 @@ rebase.
      present) left out of the test, so a shape a check keeps catching is counted and not
      re-ruled, and any key whose untagged occurrence follows a tagged one ranks
      regardless of count — the key line says `escaped <gate>`, and that is the shape
-     reaching implementation. The summary line carries both counts. `--reached` reads only
+     reaching implementation; a key holding one `Escaped:` or `Gate-run:` occurrence since
+     its last closing status ranks at one. The summary line carries both counts. `--reached` reads only
      the tags; an untagged occurrence a gate caught is classed below and ruled count-only
      by one `ADJUDICATED` line.
    - `view --keys --since <markTag>` — what this window touched, to the commit: a line
@@ -357,7 +359,8 @@ rebase.
      cluster this run rules on, from its text:
      - **in-work** — stopped by the work itself before any gate;
      - **caught** — stopped by a named gate before the boundary, rework before the gate's
-       first catch included. A `Caught:` tag claims this on the gate and the cost; verify the rule was
+       first catch included. A `Caught:` tag claims this on the gate and the cost, as
+       `Gate-run:` and `Escaped:` claim theirs; verify the rule was
        present at the placement before counting it, since a gate catching what no rule
        states is a rule-absent finding and ranks;
      - **gate-run** — about how a gate itself ran: a misfire, a skipped step, a stop path
@@ -441,7 +444,7 @@ value**: open the funnel, and rank inside it, by what a finding is likely to cos
 how far it got, how often its artifact is read, how likely it is to come back — of which the
 occurrence count is one input, and a floor: a slip that is frequent, cheap, and quietly fixed
 is rarely captured, so where a script can detect the shape, its run over history is the rate. **The mechanism below is the current hypothesis**, not the
-definition: a recurrence, a fired cluster, or one `Escaped:` occurrence opens the gate, and
+definition: a recurrence, a fired cluster, or one `Escaped:` or `Gate-run:` occurrence opens the gate, and
 ranking puts escapes first, then targets read on every run, then count. Each marker commit
 body carries `Opened: <recurrence | escape | cluster | ledger | deep> — <the keys or files>`
 beside `Tally:`, and a later review tests the hypothesis from what is already recorded: of
@@ -450,7 +453,7 @@ the keys landed by runs each opener started, how many came back after `LANDED` (
 that opens runs with nothing to land, is revised on that evidence.
 
 - **Nothing recurred** in 0b, 0c, or 0d (no key `--reached` shows after re-keying — an
-  `Escaped:` key shows at one occurrence — no placement cluster fires, no shape routed), and
+  `Escaped:` or `Gate-run:` key shows at one occurrence — no placement cluster fires, no shape routed), and
   no ledger signal fired → **stop and say so.** Report the pending
   captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
   the complete answer for the price of step 0; running the full funnel against it burns

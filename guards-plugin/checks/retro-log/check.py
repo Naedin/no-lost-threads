@@ -35,6 +35,11 @@ is normalized (`./docs/*.md` is `docs/*.md`); one outside the root refuses. With
 `--paths`, the log is discovered — `retroLogPath` in `.claude/threads.json`, default
 `.claude/threads-retro-log.md`. `--exclude` removes fnmatch patterns after.
 
+Warnings, never findings: an occurrence carrying `Caught:` whose text names more than one
+round of a gate (`rounds 1, 2 and 4`, `rounds 3 and 4`, `three rounds`) — rounds past a
+gate's first catch are `Gate-run:`, not `Caught:` — one stderr line each,
+`retro-log: warning: <path>:<line>: …`. They never change the exit; `run.py` passes them on.
+
 Findings on stdout, one per line: `<path>:<line>: <message>`.
 Exit 0 pass; 1 findings; 2 refused (root missing, unreadable, no files in scope).
 """
@@ -58,6 +63,9 @@ SLUG = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?: (\d{4}-\d{2}-\d{2}))?"
                     r"(?:\s+[—-]+\s+(.*))?$")
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
+CAUGHT = re.compile(r"^\s{2,}Caught: ")
+ROUNDS = re.compile(r"\brounds \d+(?:\s*(?:,|and|&|to|–|-)\s*\d+)+"
+                    r"|\b(?:two|three|four|five|six|several|multiple|[2-9]) (?:more )?rounds\b", re.I)
 DETAIL = re.compile(r"^  ")
 HEADING = re.compile(r"^## ")
 ENTRIES = "## Entries"
@@ -249,6 +257,31 @@ def check(rel, text):
     return out
 
 
+def multi_round_catches(text):
+    """(line, rounds phrase) per occurrence tagged `Caught:` whose text names more than one
+    round: the shape `Gate-run:` exists for."""
+    out, cur = [], None
+    def close():
+        if cur and cur[2]:
+            hit = ROUNDS.search(" ".join(cur[1]))
+            if hit:
+                out.append((cur[0], hit.group(0)))
+    for n, line in enumerate(text.splitlines(), 1):
+        if OCCURRENCE.match(line):
+            close()
+            cur = [n, [OCCURRENCE.match(line).group(3)], False]
+        elif cur and DETAIL.match(line) and not STATUS.match(line):
+            if CAUGHT.match(line):
+                cur[2] = True
+            else:
+                cur[1].append(line.strip())
+        else:
+            close()
+            cur = None
+    close()
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -278,6 +311,9 @@ def main():
         except (OSError, UnicodeDecodeError) as e:
             refuse(f"unreadable: {rel}: {e}")
         findings += [(rel, n, msg) for n, msg in check(rel, body)]
+        for n, phrase in multi_round_catches(body):
+            print(f"{ID}: warning: {rel}:{n}: a Caught: occurrence names {phrase}; rounds past "
+                  "a gate's first catch are Gate-run:, not Caught:", file=sys.stderr)
     for rel, n, msg in findings:
         print(f"{rel}:{n}: {msg}")
     if findings:

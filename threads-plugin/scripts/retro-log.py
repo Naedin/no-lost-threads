@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """retro-log — the retro log as an append-only stream, read through a view.
 
-  retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--live]
+  retro-log.py view [--keys] [--key KEY]... [--held] [--recurred] [--reached] [--ripe] [--live] [--untagged]
                     [--since DATE|REV] [--docs] [--chain [--prs]] [--arc NAME] [--arcs]
                     [--placements [--since DATE|REV]] [--occurrences --key KEY...]
                     [--log PATH] [--root DIR]
@@ -31,6 +31,12 @@ The entry grammar (the guards `retro-log` check enforces the same one):
                                                   Retro writes it; `--reached` ranks a
                                                   key holding one after its last closing
                                                   status at a single occurrence
+      Gate-run: <gate> — <what went wrong>        continuation the view reads: the
+                                                  occurrence is about how a gate ran (a
+                                                  misfire, a skipped step, a dropped
+                                                  finding, rounds after its first catch).
+                                                  Retro writes it; `--reached` ranks it
+                                                  as it ranks an `Escaped:` one
     LANDED <sha> — <where it landed, one line>    status line — one physical line,
                                                   however long; a wrapped one reads as
                                                   continuation prose
@@ -102,6 +108,9 @@ status, or annotation dated on or after DATE), `--since REV` (keys with a detail
 log at REV did not hold — what was appended after that commit, to the commit and not to
 the day; compaction and re-keying move no line into it: the read for "since the mark";
 a REV naming a local tag the remote holds elsewhere refuses, naming the fetch that moves it),
+`--ripe` (what retro's ripeness nudge reads: keys holding an occurrence tagged `Escaped:`
+or `Gate-run:` after their last closing status — with `--since`, that occurrence itself
+new in the window — since a caught or in-work occurrence never changes a ruling alone),
 `--live` (no closed section). Filters compose; the summary line counts the whole log and names how many keys the filter
 shows. Without `--keys` a filtered view carries each shown key's detail, so the
 recurred set's bodies are one read; `--key` repeats for a chosen set. `--docs` prints,
@@ -155,13 +164,21 @@ upstream plugin's file or a deleted one, reads `(not in this repo)`. A file at `
 its keys: findings that each stayed at one occurrence and together say the doc is not
 being followed. `--since` (DATE or REV, as above) narrows firing, never counting: a
 cluster fires only on a key new in the window, so a cluster the last read weighed waits
-for new evidence. A doc that is the home of a whole class of findings gains a key nearly
+for new evidence. `--ripe` counts only occurrences tagged `Escaped:` or `Gate-run:`: the
+cluster read retro's ripeness nudge makes. A doc that is the home of a whole class of findings gains a key nearly
 every window, so the review records a weighing instead: `ADJUDICATED <date> — cluster
 <path> weighed at <n>: <ruling>` on any key in it (the newest, which stays live longest).
 The newest weighing per file holds, read from every key, live or closed: that file fires
 again only once `trigger.cluster` of its keys have an occurrence dated after the weighing,
 whatever the window, so keys closing after it never raise the bar. Its row says `weighed at
 <n>`, the size the ruling was made at. The other filters do not apply and are refused.
+
+A view warns on stderr about an occurrence whose text says a named gate stopped it —
+*stopped by `/slices:check`*, *caught only by the pre-commit hook*, *caught by lens E* —
+with no `Caught:`, `Gate-run:`, or `Escaped:` line: its class is unread, so `--reached`
+ranks it as a repeat and `--ripe` never counts it. Up to three are named by key and date;
+past that one line counts them, and `--untagged` prints, instead of the view, each one as
+`<date>\t<key>\t<the phrase>`. A warning never changes the exit.
 
 `--occurrences` prints, for each `--key`, its occurrences and nothing a review wrote: the
 key line with its count and span, then every occurrence block's lines — no status,
@@ -189,6 +206,14 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DETAIL = re.compile(r"^  ")
 CAUGHT = re.compile(r"^\s{2,}Caught: (\S.*?)(?:\s+[—-]+\s.*)?$")
 ESCAPED = re.compile(r"^\s{2,}Escaped: (\S.*?)(?:\s+[—-]+\s.*)?$")
+GATE_RUN = re.compile(r"^\s{2,}Gate-run: (\S.*?)(?:\s+[—-]+\s.*)?$")
+RIPE = (("escaped", ESCAPED), ("gate-run", GATE_RUN))
+TAGGED = re.compile(r"^\s{2,}(?:Caught|Gate-run|Escaped): ")
+GATE_STOP = re.compile(
+    r"(?<!not )(?<!never )\b(?:stopped|caught)(?: only)? (?:by|at) (?:(?:the|a) )?(?:[\w-]+ ){0,2}?"
+    r"(?:/[a-z][\w:-]*|(?:pre-commit|commit-msg|pre-push)(?: hook| doc-lint)?|hook|guards?"
+    r"|gap[- ]check(?:er)?|cold (?:check|audit)|lens(?:es)? [a-z]|(?:check|review) round|gate)\b",
+    re.I)
 HEADING = re.compile(r"^## ")
 PATH = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w-][\w.-]*\.(?:md|json|py|sh|ya?ml|toml|txt))"
                   r"(?![\w/])")
@@ -419,10 +444,55 @@ def escapes(blocks_for_key):
     return out
 
 
+def untagged_stops(blocks):
+    """(date, key, phrase) per occurrence whose text names a gate that stopped it and
+    that carries no `Caught:`, `Gate-run:`, or `Escaped:` line: a stop left unclassed."""
+    out = []
+    for b in blocks:
+        if b.status:
+            continue
+        occ = []
+        for l in b.lines:
+            m = OCCURRENCE.match(l)
+            if m:
+                occ.append([m.group(1), [m.group(3)], False])
+            elif occ and TAGGED.match(l):
+                occ[-1][2] = True
+            elif occ:
+                occ[-1][1].append(l.strip())
+        for d, text, tagged in occ:
+            hit = GATE_STOP.search(" ".join(text))
+            if hit and not tagged:
+                out.append((d, b.key, hit.group(0)))
+    return out
+
+
+def ripe(blocks_for_key):
+    """The occurrences after the key's last closing status a ruling turns on — tagged
+    `Escaped:` or `Gate-run:` — as (date, occurrence line stripped, class, where)."""
+    out = []
+    for b in deciding(blocks_for_key):
+        if b.status in CLOSED:
+            out = []
+        elif not b.status:
+            cur = None
+            for l in b.lines:
+                m = OCCURRENCE.match(l)
+                if m:
+                    cur = (m.group(1), l.strip())
+                    continue
+                for cls, rx in RIPE:
+                    t = rx.match(l)
+                    if t and cur:
+                        out.append((*cur, cls, t.group(1).strip()))
+    return out
+
+
 def reached(blocks_for_key):
     """Under --reached: the key ranks when its uncaught occurrences recur, an uncaught
     one follows a closing status, or an uncaught one follows a caught one in the stream
-    (it escaped the gate). Returns the escaped gate, True, or False."""
+    (it escaped the gate), or it holds an `Escaped:` or `Gate-run:` one. Returns the
+    escaped gate, True, or False."""
     gate = None
     for b in blocks_for_key:
         for _, g in b.occurrences:
@@ -431,7 +501,7 @@ def reached(blocks_for_key):
             elif gate:
                 return gate
     free, _ = caught_split(blocks_for_key)
-    if len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True) or escapes(blocks_for_key):
+    if len(free) >= 2 or recurred_after(blocks_for_key, uncaught=True) or ripe(blocks_for_key):
         return True
     return False
 
@@ -728,10 +798,11 @@ def config(root):
         refuse([f"{cfg}: malformed"])
 
 
-def counted_placements(bs):
+def counted_placements(bs, ripe_only=False):
     """(placement path or None, date, the occurrence line stripped) per occurrence the
-    cluster read counts: after the key's last closing status and no gate caught, none at
-    all when the review ruled the key count-only after its last occurrence."""
+    cluster read counts: after the key's last closing status and no gate caught — with
+    `ripe_only`, tagged `Escaped:` or `Gate-run:` — none at all when the review ruled the
+    key count-only after its last occurrence."""
     occ, last = [], -1
     for i, b in enumerate(bs):
         if b.status in CLOSED:
@@ -743,10 +814,12 @@ def counted_placements(bs):
         for l in b.lines:
             m = OCCURRENCE.match(l)
             if m:
-                cur = [m.group(1), None, False, l.strip()]
+                cur = [m.group(1), None, False, l.strip(), False]
                 occ.append(cur)
             elif cur is not None and CAUGHT.match(l):
                 cur[2] = True
+            elif cur is not None and any(rx.match(l) for _, rx in RIPE):
+                cur[4] = True
             if cur is not None and cur[1] is None and PLACEMENT.search(l):
                 p = PATH.findall(PLACEMENT.search(l).group(1))
                 cur[1] = re.sub(r"^(?:\.\.?/)+", "", p[0]) if p else ""
@@ -755,7 +828,8 @@ def counted_placements(bs):
                          and (b.lines[0].split("—", 1) + [""])[1].strip().startswith("count-only")
                          for b in bs[last + 1:]):
         return []
-    return [(p or None, d, line) for d, p, caught, line in occ if not caught]
+    return [(p or None, d, line) for d, p, caught, line, tagged in occ
+            if not caught and (tagged or not ripe_only)]
 
 
 def resolver(root, cfg):
@@ -782,7 +856,7 @@ def resolver(root, cfg):
     return resolve
 
 
-def render_placements(blocks, root, since=None, since_old=None):
+def render_placements(blocks, root, since=None, since_old=None, ripe_only=False):
     """Live keys grouped by the file their counted occurrences are placed at, command docs
     first: the read for findings that pile up on one doc a key at a time. With a since, a
     cluster fires only on a key new in the window — one the last read already weighed
@@ -813,7 +887,7 @@ def render_placements(blocks, root, since=None, since_old=None):
     for key, bs in keys_in_order(blocks).items():
         if state(bs) in CLOSED:
             continue
-        occ = counted_placements(bs)
+        occ = counted_placements(bs, ripe_only)
         counted += bool(occ)
         for p, d, line in occ:
             if not p:
@@ -839,7 +913,9 @@ def render_placements(blocks, root, since=None, since_old=None):
     at = [r for r in rows if -r[1] >= n]
     firing = [r for r in at if fires(-r[1], r[3], r[4])]
     window = f" since {since}" if since else ""
-    out = [f"placements: {counted} live keys counted · {unplaced} occurrences unplaced · "
+    out = [f"placements: {counted} live keys counted"
+           + (" (escaped and gate-run occurrences only)" if ripe_only else "")
+           + f" · {unplaced} occurrences unplaced · "
            f"{len(rows)} files · {len(at)} at or above cluster {n}, {len(firing)} firing: a key "
            f"new{window or ' (no since: every one)'}, or {n} after its weighing", ""]
     for doc, k, o, path, c, dates in rows:
@@ -936,7 +1012,7 @@ def arc_tags(bs):
 
 def render_view(blocks, keys_only, only=None, held=False, recurred=False,
                 live_only=False, since=None, today=None, docs=False, past_gate=False,
-                chain=None, since_old=None):
+                chain=None, since_old=None, ripe_only=False):
     today = today or datetime.date.today()
     by_key = keys_in_order(blocks)
     if only:
@@ -961,7 +1037,15 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         key, bs, st, dates = rec
         if held and st != "HELD":
             return False
-        if past_gate:
+        if ripe_only:
+            occ = ripe(bs)
+            if since_old is not None:
+                occ = [o for o in occ if o[1] not in since_old]
+            elif since:
+                occ = [o for o in occ if o[0] >= since]
+            if not occ:
+                return False
+        elif past_gate:
             if not reached(bs):
                 return False
         elif recurred and len(dates) < 2 and not recurred_after(bs):
@@ -974,7 +1058,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
         return True
 
     recurred = recurred or past_gate
-    filtered = held or recurred or since
+    filtered = held or recurred or since or ripe_only
     shown_live = [r for r in live if keep(r)]
     shown_closed = [] if (live_only or held) else [r for r in closed if keep(r)]
     if docs:
@@ -987,7 +1071,7 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
            + (f", {n_gated} only at a gate" if n_gated else "") + ")"]
     if filtered:
         crit = " ".join(f for f, on in (("--held", held), ("--recurred", recurred),
-                                        ("--reached", past_gate),
+                                        ("--reached", past_gate), ("--ripe", ripe_only),
                                         (f"--since {since}", since)) if on)
         out.append(f"showing {len(shown_live) + len(shown_closed)} of {len(by_key)} keys ({crit})")
     out.append("")
@@ -1012,6 +1096,8 @@ def render_view(blocks, keys_only, only=None, held=False, recurred=False,
             marker += f"  escaped {esc}"
         for where in dict.fromkeys(escapes(bs)):
             marker += f"  escaped to {where}"
+        for where in dict.fromkeys(w for _, _, c, w in ripe(bs) if c == "gate-run"):
+            marker += f"  gate-run at {where}"
         marker += arc_tags(bs)
         out.append(f"{key}{flag}  {count}  {span}{marker}")
         if not keys_only:
@@ -1070,7 +1156,14 @@ def main():
     ap.add_argument("--reached", action="store_true",
                     help="view: --recurred over the occurrences no gate caught (a `Caught:` line "
                          "drops one), plus any key that escaped a gate that had caught it")
+    ap.add_argument("--ripe", action="store_true",
+                    help="view: keys with an `Escaped:` or `Gate-run:` occurrence since their last "
+                         "closing status, new in the --since window; with --placements, the "
+                         "cluster read over those occurrences only")
     ap.add_argument("--live", action="store_true", help="view: live keys only, no closed section")
+    ap.add_argument("--untagged", action="store_true",
+                    help="view: each occurrence naming a gate stop in prose with no Caught:, "
+                         "Gate-run:, or Escaped: line, `<date>\\t<key>\\t<phrase>`, instead of the view")
     ap.add_argument("--docs", action="store_true",
                     help="view: the files the shown keys name, `<keys>\\t<path>`, instead of the keys")
     ap.add_argument("--chain", action="store_true",
@@ -1110,12 +1203,25 @@ def main():
     if args.mode == "view":
         for v in violations:
             print(f"retro-log: warning: {v}", file=sys.stderr)
+        stops = untagged_stops(blocks)
+        if args.untagged:
+            sys.stdout.write("".join(f"{d}\t{k}\t{p}\n" for d, k, p in stops))
+            return 0
+        if 0 < len(stops) <= 3:
+            for d, k, _ in stops:
+                print(f"retro-log: warning: {k} {d}: a gate stop in prose with no Caught:, "
+                      "Gate-run:, or Escaped: line; its class is unread", file=sys.stderr)
+        elif stops:
+            print(f"retro-log: warning: {len(stops)} occurrences name a gate stop in prose with "
+                  "no Caught:, Gate-run:, or Escaped: line; their class is unread "
+                  "(--untagged lists them)", file=sys.stderr)
         if args.arcs:
             sys.stdout.write(render_arcs(blocks))
             return 0
         if args.occurrences:
             other = [f for f, on in (("--held", args.held), ("--recurred", args.recurred),
-                                     ("--reached", args.reached), ("--since", args.since),
+                                     ("--reached", args.reached), ("--ripe", args.ripe),
+                                     ("--since", args.since),
                                      ("--docs", args.docs), ("--chain", args.chain),
                                      ("--placements", args.placements), ("--keys", args.keys),
                                      ("--live", args.live)) if on]
@@ -1130,7 +1236,7 @@ def main():
                                         ("--docs", args.docs), ("--chain", args.chain)) if on]
             if narrowed:
                 refuse([f"--placements reads every live key; drop {', '.join(narrowed)}"])
-            sys.stdout.write(render_placements(blocks, root, args.since, since_old))
+            sys.stdout.write(render_placements(blocks, root, args.since, since_old, args.ripe))
             return 0
         if args.arc:
             if not SLUG.match(args.arc):
@@ -1141,7 +1247,7 @@ def main():
         sys.stdout.write(render_view(blocks, args.keys, args.key, held=args.held,
                                      recurred=args.recurred, live_only=args.live,
                                      since=args.since, today=today, docs=args.docs,
-                                     past_gate=args.reached,
+                                     past_gate=args.reached, ripe_only=args.ripe,
                                      chain=(root, path, args.prs) if args.chain else None,
                                      since_old=since_old))
         return 0

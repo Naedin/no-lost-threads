@@ -21,7 +21,8 @@ of every standing claim; the other checks read the whole tree either way. Withou
 
 Output: one line per finding on stdout, `<id>: <path>:<line>: <message>`, prefixed
 `warn ` when the check's rung is warn. One summary line on stderr names each check
-run, its rung, and its finding count.
+run, its rung, and its finding count. A check's stderr line beginning `<id>: warning: `
+is passed on to stderr; a warning never changes the exit.
 
 Exit 0: no block check found anything and no check refused.
 Exit 1: a block check found something.
@@ -153,6 +154,9 @@ def run_checks(root, checks, unrun, env):
             cmd += ["--exclude", g]
         r = subprocess.run(cmd, capture_output=True, text=True, env=env)
         findings = [line for line in r.stdout.splitlines() if line.strip()]
+        if r.returncode in (0, 1):
+            sys.stderr.writelines(l + "\n" for l in r.stderr.splitlines()
+                                  if l.startswith(f"{cid}: warning: "))
         if r.returncode == 1:
             prefix = "" if spec["rung"] == "block" else spec["rung"] + " "
             for line in findings:

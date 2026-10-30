@@ -324,6 +324,86 @@ grep -q '^drift/e3' "$tmp/esc.out" && fail "an Escaped: before a landing ranked"
 [ "$(grep -n '^drift/e1' "$tmp/esc.out" | cut -d: -f1)" -lt "$(grep -n '^drift/e4' "$tmp/esc.out" | cut -d: -f1)" ] || fail "an escaped key did not sort before a higher count"
 ok "Escaped: is accepted; one escaped occurrence ranks under --reached and sorts first; one before a landing does not"
 
+# 11b. --ripe: only an Escaped: or Gate-run: occurrence new since the mark makes a key or a
+#      cluster ripe; a recurrence all caught, or in-work, is telemetry
+R="$tmp/ripe"; mkdir -p "$R/docs"; touch "$R/docs/a.md" "$R/docs/b.md"
+printf '{ "processDocs": ["docs"], "trigger": { "cluster": 3 } }\n' > "$R/threads.json"
+git init -q -b main "$R"; r_() { git -C "$R" "$@"; }
+mkdir -p "$R/.claude"; mv "$R/threads.json" "$R/.claude/"
+cat > "$R/log.md" <<'EOF2'
+## Entries
+
+r/old-escape
+  2026-10-01 | s0 | reached main before the mark.
+    Escaped: the default branch — a revert
+r/landed
+  2026-10-01 | s0 | escaped, then fixed.
+    Escaped: a release — hotfix
+r/landed
+  LANDED abc1234 — the fix.
+EOF2
+r_ add -A; r_ -c user.name=t -c user.email=t@t commit -q -m mark; r_ tag mark
+cat >> "$R/log.md" <<'EOF2'
+r/caught
+  2026-10-10 | s1 | stopped by /slices:check. Placement: docs/a.md §X
+    Caught: /slices:check — docs/a.md §X ("the rule")
+r/caught
+  2026-10-11 | s2 | stopped by /slices:check again. Placement: docs/a.md §X
+    Caught: /slices:check — docs/a.md §X ("the rule")
+r/in-work
+  2026-10-10 | s1 | a red test while writing. Placement: docs/a.md §X
+r/in-work
+  2026-10-12 | s3 | again, the work itself. Placement: docs/a.md §X
+r/old-escape
+  2026-10-12 | s3 | caught this time.
+    Caught: /pre-pr — docs/b.md §Y
+r/escaped
+  2026-10-13 | s4 | reached the user. Placement: docs/b.md §Y
+    Escaped: the user — a wrong report
+r/gate-run
+  2026-10-13 | s4 | the check skipped its sweep. Placement: docs/b.md §Y
+    Gate-run: /slices:check — dropped a finding
+r/gate-run2
+  2026-10-14 | s5 | three rounds after the first catch. Placement: docs/b.md §Y
+    Gate-run: review — rounds after its first catch
+EOF2
+python3 "$check" --root "$tmp" --paths ripe/log.md >/dev/null 2>&1 || fail "a Gate-run: continuation fails the retro-log check"
+python3 "$rl" view --keys --ripe --since mark --root "$R" --log log.md 2>/dev/null > "$R/k.out"
+grep -q 'showing 3 of 7 keys (--ripe --since mark)' "$R/k.out" || fail "--ripe shows the wrong set: $(cat "$R/k.out")"
+grep -q '^r/escaped  ×1  2026-10-13  escaped to the user$' "$R/k.out" || fail "one escaped occurrence since the mark is not ripe: $(cat "$R/k.out")"
+grep -q '^r/gate-run  ×1  2026-10-13  gate-run at /slices:check$' "$R/k.out" || fail "one gate-run occurrence is not ripe or lacks its marker: $(cat "$R/k.out")"
+grep -qE '^r/(caught|in-work|old-escape|landed)' "$R/k.out" && fail "a caught or in-work recurrence, or an escape before the mark or a landing, was ripe"
+python3 "$rl" view --keys --reached --since mark --root "$R" --log log.md 2>/dev/null | grep -q '^r/gate-run  ' || fail "--reached did not rank a single Gate-run: occurrence"
+python3 "$rl" view --placements --ripe --since mark --root "$R" --log log.md 2>/dev/null > "$R/p.out"
+grep -q 'docs/a.md' "$R/p.out" && fail "--ripe counted caught or in-work occurrences in a cluster: $(cat "$R/p.out")"
+grep -q $'^3\t3\t2026-10-13..2026-10-14\t3 new\tdoc\tdocs/b.md\tfires$' "$R/p.out" || fail "--ripe did not fire a cluster of escaped and gate-run keys: $(cat "$R/p.out")"
+python3 "$rl" view --placements --since mark --root "$R" --log log.md 2>/dev/null | grep -q $'^1\t2\t.*\tdocs/a.md' || fail "without --ripe the cluster read dropped the in-work occurrences"
+ok "--ripe: a recurrence all caught or in-work is not ripe; one escaped or gate-run occurrence since the mark is; clusters count only those"
+
+# 11c. a gate stop in prose with no Caught:, Gate-run:, or Escaped: line warns, never
+#      changes the exit; more than three collapse to a count, and --untagged lists them
+cat > "$tmp/stop.md" <<'EOF2'
+## Entries
+
+s/prose
+  2026-10-01 | s1 | the regex missed shapes. Stopped by
+    /slices:check round 1. Cost: one round.
+s/tagged
+  2026-10-02 | s1 | caught by the pre-commit hook.
+    Caught: the pre-commit hook — doc.md §X
+s/negated
+  2026-10-03 | s1 | not caught by the landed rule; stopped by the work itself.
+s/maintainer
+  2026-10-04 | s1 | caught only by the maintainer asking why.
+EOF2
+python3 "$rl" view --keys --root "$tmp" --log stop.md 2>"$tmp/stop.err" >/dev/null || fail "an untagged gate stop changed the view's exit"
+grep -q '^retro-log: warning: s/prose 2026-10-01: a gate stop in prose' "$tmp/stop.err" || fail "a wrapped prose gate stop did not warn: $(cat "$tmp/stop.err")"
+[ "$(grep -c 'gate stop' "$tmp/stop.err")" -eq 1 ] || fail "a tagged, negated, work-itself, or maintainer stop warned: $(cat "$tmp/stop.err")"
+for i in 2 3 4; do printf 's/more%s\n  2026-10-1%s | s | caught by lens E.\n' "$i" "$i" >> "$tmp/stop.md"; done
+python3 "$rl" view --keys --root "$tmp" --log stop.md 2>&1 >/dev/null | grep -q '^retro-log: warning: 4 occurrences name a gate stop in prose .*(--untagged lists them)$' || fail "more than three untagged stops did not collapse to a count"
+[ "$(python3 "$rl" view --untagged --root "$tmp" --log stop.md | grep -c $'^2026-10-[01][0-9]\ts/')" -eq 4 ] || fail "--untagged did not list each untagged stop"
+ok "a prose gate stop with no tag warns on view, by key up to three and by count past; --untagged lists them; tagged, negated, and non-gate stops do not"
+
 # 12. --placements: live keys clustered by resolved placement file, command docs first; caught,
 #     count-only, and pre-landing occurrences uncounted; --since narrows firing, never counting;
 #     a weighed cluster fires on the bar's worth of keys after its newest weighing
