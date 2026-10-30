@@ -191,7 +191,7 @@ command makes to a stub it does not promote:
   - <claim> — `<generating command>` — <its output line>
 - value: <the sentence>
 - states walked: <each state the walk reached, `; `-separated, today's behaviour in each>
-- shape A: <the shape> — mechanism: <how it works: what it derives or decides, from what, through which existing machinery>[ — kinds: <the registry's kind ids it is, or none>] — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>[; risk: <classes it enters, or unclassified>]; states: <n, of those walked>; regresses: <each, by state, or none>
+- shape A: <the shape> — mechanism: <how it works: what it derives or decides, from what, through which existing machinery>[ — kinds: <the registry's kind ids it is, or none>] — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>[; risk: <classes it enters, or unclassified>[; suggested <class>: confirmed | dismissed — <why>]…]; states: <n, of those walked>; regresses: <each, by state, or none>
 - shape B: …
 - drafter's pick: <shape> — <one line: why, on value and cost>
 ```
@@ -202,6 +202,12 @@ and its cost carries `risk:`, the classes it enters:
 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile.py match --paths <its seams> --kinds <its
 kinds>`, the record line's `classes:` and `predicted:`. A class a shape enters is scrutiny it
 buys, so a shape entering fewer can win on cost; a kind the vocabulary lacks reads novel.
+A class the stub's words only name — `profile.py match <stub>`'s `suggested:`, matched by a
+symbol and nothing else — is not entered: a word names the topic, not the risk. Decide each
+on every shape it bears on, `suggested <class>: confirmed — <why>` when the shape does what
+the class's check exists for (declaring the class's kind confirms it by itself), or
+`dismissed — <why>` when the word is ordinary prose; the cold review checks the decision as
+it checks the cost line.
 Write the `- framed at` line first, then every row — premise corrections, the harm, the
 since-capture logs, the declared block — through the writer, as the ledger's are (§1's
 site-opening pass): `ledger-row.py add <stub> '<claim>' '<command>'` writes under a stub's
@@ -421,9 +427,12 @@ that most need the reviewer>
 The record is written with `0 sites opened (unverified: 0)`, and the rows under it come
 from `ledger-row.py add`, which keeps the counts (§1). With `riskRegistry` set, the
 profile follows once the rows are in: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile.py match
-<plan> --kinds <the standing shape's kinds> --write` appends its `profiled at` record — the
-classes, predicted classes, and novel areas the plan touches, each with the signal that put
-it there — at the end of the ledger, and every later stage reads the newest one: the check's
+<plan> --kinds <the standing shape's kinds> [--confirm <class>:<why>]… [--dismiss
+<class>:<why>]… --write`, passing the standing shape's suggestion decisions, appends its
+`profiled at` record — the classes entered, predicted classes, suggestions still undecided
+or dismissed, and novel areas, each with the signal or decision that put it there — at the
+end of the ledger. A suggestion the plan's own text raises that the frame did not decide is
+decided now the same way; and every later stage reads the newest one: the check's
 round budget, an adopter's pre-pr tier. The digest (§4) names its `classes:`.
 
 `<version>` is the `version` field of `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`,

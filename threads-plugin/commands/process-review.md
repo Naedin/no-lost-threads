@@ -460,8 +460,12 @@ rebase.
    **0e — the risk registry** (`riskRegistry` in `.claude/slices.json`, the slices
    plugin's; its schema is that plugin's `scripts/profile.py --help`). Free:
    `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/risk-review.py --since <markTag>` joins the
-   window's plan profiles with its escapes — `escaped at` lines in plans, `Escaped-class:`
-   trailers on fixes with no plan — per class, and groups the unclassified ones by area. The
+   window's plan profiles with its class rounds and its escapes — `escaped at` lines in
+   plans, `Escaped-class:` trailers on fixes with no plan — per class, with how each plan
+   entered it (path, kind, a confirmed suggestion, an entering symbol) beside the
+   suggestions dismissed, and groups the unclassified escapes by area. An escape is what a
+   check missed; an empty class round — `0 defects` — is what a check cost and found nothing
+   for, and nothing else counts it. The
    registry is the repo's prediction of where scrutiny pays; this read tests it, and every
    ruling is about what the work touched, never about time. One proposal per class or area,
    each a registry edit landed like any candidate:
@@ -473,6 +477,12 @@ rebase.
      ran and missed them. The revision names what the escapes needed that the check did not
      ask for; a `plan` check that keeps missing what a render or a replay finds moves its
      `at`, since another round of reading cannot buy it.
+   - **narrow the signals, or revise the check** — a class whose rounds in the window were
+     mostly empty, two or more of them, with no escape against it: it is buying rounds on
+     work outside it. The entry split says where — rounds bought by one signal type, a
+     suggestion confirmed on prose — and the proposal narrows that signal; when the entries
+     are right and the rounds still find nothing, the check is revised or moves its `at`.
+     Suggestions dismissed far more often than confirmed are a symbol to tighten.
    - **leave dormant** — a class no plan entered (`dormant`): no proposal, only a line in the
      record. Dormancy is never evidence; a class idle for a year still matches the day work
      returns to it.

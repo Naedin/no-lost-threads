@@ -9,6 +9,16 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.12.1] — 2026-10-30
+
+### Changed
+
+- **A symbol suggests a class; only a path, a kind, or a decision enters it.** A symbol names the topic, not the risk, and buys a plan-level round on vocabulary that drifts. `profile.py` now records a class matched by symbols alone as `suggested:`, which buys no round. `--confirm ID:WHY` enters it and `--dismiss ID:WHY` records why not, and a re-profile keeps both. A symbol written `{"re": …, "enters": true}` enters on its own. `/slices:draft` decides each suggestion on the shape's `risk:` field and passes the decisions to the plan's profile, and the cold frame-checker corrects a decision the walk contradicts. On the reference adopter's tightened seed, about a dozen of the 103 inbox stubs profiling into state-machine matched on a symbol alone, about half of them on ordinary prose. `test.sh` proves a symbol alone buys no round, that confirm and dismiss survive a re-profile, and that `enters` enters.
+
+### Contract
+
+- **`profiled at` gains `; suggested: <id>, …` and `; dismissed: <id>, …`, and rows `<id> — confirmed: <why>` and `<id> — dismissed: <why>`.** `classes:` and `predicted:` still name only what was entered. Adopter edit: none. The reference adopter had not adopted the registry before this release.
+
 ## slices [0.12.0] — 2026-10-30
 
 ### Added
@@ -24,6 +34,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Contract
 
 - **Three new plan-ledger lines and one commit trailer**, a stable grammar adopters read: `profiled at … — classes: <id>, … | unclassified[; predicted: …][; novel: …]` (written by `profile.py`), `changed at … — <who>: <what>`, `escaped at … — found by <stage>: <defect> — at <path>; class: <id> | none`, and the trailer `Escaped-class: <id | none> — found by <stage>: <defect> — at <path>`. All are opt-in behind `riskRegistry`; with none, nothing changes. Adopter edit, reference adopter: `riskRegistry` and its seed registry in `.claude/slices.json`, and escape writers in its pre-pr fix batches, walkthrough pass, maintainer-feedback fixes, and post-merge fix PRs. Owed by the adopter after this release, not made before it.
+
+## threads [0.25.1] — 2026-10-30
+
+### Changed
+
+- **Step 0e counts what a class round cost, not only what it missed.** `risk-review.py` now prints, per class, how plans entered it (path, kind, a confirmed suggestion, an entering symbol) beside suggestions and dismissals, and its class rounds in the window with the empty ones (`0 defects`). A class whose rounds are mostly empty, with no escape against it, proposes narrowing its signals or revising its check: over-matching costs rounds and produces no escape, so the escape read alone never sees it. `test.sh` proves the entry split, the round and empty counts, and that a suggested or dismissed class never counts as entered.
 
 ## threads [0.25.0] — 2026-10-30
 

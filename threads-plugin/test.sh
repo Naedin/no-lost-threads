@@ -689,23 +689,38 @@ cat > "$K/Plans/a.md" <<PLAN
 
 ## Verification ledger
 
-- profiled at $w, 2026-10-30, slices 0.12.0 — classes: state-machine
+- profiled at $w, 2026-10-30, slices 0.12.0 — classes: state-machine; suggested: copy
+  - state-machine — path: src/policy/Pause.swift
+  - copy — symbol: headline
+- gap-checked at $w, 2026-10-30, slices 0.12.0 — 3 defects (addressed: 3), 0 questions (open: 0), class: state-machine
+- gap-checked at $w, 2026-10-30, slices 0.12.0 — 0 defects (addressed: 0), 0 questions (open: 0), class: state-machine
 - escaped at $w, 2026-10-30 — found by walkthrough: a pause never resumed — at src/policy/Pause.swift; class: state-machine
 - escaped at $w, 2026-10-30 — found by pre-pr: rounding off by one — at src/math/Dose.swift; class: none
 - escaped at $in1, 2026-10-01 — found by pre-pr: before the window — at src/x.swift; class: state-machine
+PLAN
+cat > "$K/Plans/b.md" <<PLAN
+# b
+
+## Verification ledger
+
+- profiled at $w, 2026-10-30, slices 0.12.0 — classes: state-machine; dismissed: copy
+  - state-machine — symbol: pauses
+  - state-machine — confirmed: the toggle pauses a schedule
+  - copy — symbol: banner
+  - copy — dismissed: ordinary prose
 PLAN
 k_ add -A; k_ commit -q -m plan
 printf 'y\n' > "$K/g"; k_ add -A; k_ commit -q -m "fix: dose rounding" -m "Escaped-class: none — found by after merge: dose rounds down — at src/math/Solver.swift"
 printf 'z\n' > "$K/h"; k_ add -A; k_ commit -q -m "fix: odd" -m "Escaped-class: ghost — found by maintainer: x — at src/y.swift"
 python3 "$rr" --root "$K" > "$K/out" 2>&1 || fail "risk-review failed: $(cat "$K/out")"
-head -1 "$K/out" | grep -q '^risk: .claude/risk.json · mark..HEAD · 1 plans profiled · 4 escapes (2 from trailers)$' || fail "summary wrong: $(head -1 "$K/out")"
-grep -q $'^state-machine\tactive\tplan\t1 plans\t1 escapes$' "$K/out" || fail "a class's escape in the window was not counted, or one before it was: $(cat "$K/out")"
-grep -q $'^copy\tactive\tpre-pr\t0 plans\t0 escapes\tdormant$' "$K/out" || fail "a class profiled only before the window did not read dormant"
-grep -q $'^sync\tpredicted\tplan\t0 plans\t0 escapes\tdormant$' "$K/out" || fail "a predicted class with no plan did not read dormant"
+head -1 "$K/out" | grep -q '^risk: .claude/risk.json · mark..HEAD · 2 plans profiled · 2 class rounds · 4 escapes (2 from trailers)$' || fail "summary wrong: $(head -1 "$K/out")"
+grep -q $'^state-machine\tactive\tplan\t2 plans (path 1, kind 0, confirmed 1, symbol 0; suggested 0, dismissed 0)\t2 rounds (1 empty)\t1 escapes$' "$K/out" || fail "a class's entries, rounds, or escapes miscounted: $(cat "$K/out")"
+grep -q $'^copy\tactive\tpre-pr\t0 plans (path 0, kind 0, confirmed 0, symbol 0; suggested 1, dismissed 1)\t0 rounds (0 empty)\t0 escapes\tdormant$' "$K/out" || fail "a class only suggested or dismissed was counted as entered, or not dormant: $(cat "$K/out")"
+grep -q $'^sync\tpredicted\tplan\t0 plans (.*)\t0 rounds (0 empty)\t0 escapes\tdormant$' "$K/out" || fail "a predicted class with no plan did not read dormant"
 grep -q $'^2\tsrc/math$' "$K/out" || fail "unclassified escapes from a plan and a trailer were not grouped by area: $(cat "$K/out")"
 grep -q $'^ghost\tmaintainer: x' "$K/out" || fail "an unknown class was not listed apart"
 mv "$K/.claude/slices.json" "$K/.claude/off.json"; python3 "$rr" --root "$K" >/dev/null 2>&1; [ $? -eq 3 ] || fail "no registry did not exit 3"
-ok "risk-review: escapes in the window from plan lines and trailers, per class and unclassified by area; a class no plan entered reads dormant; an unknown class apart"
+ok "risk-review: escapes from plan lines and trailers, class rounds and empty ones, entries by path/kind/confirmed apart from suggested/dismissed; unclassified by area; dormant; an unknown class apart"
 
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.

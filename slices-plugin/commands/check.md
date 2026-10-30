@@ -53,7 +53,8 @@ round of that change alone, outside the budget and the cap: the checker is told 
 checks only the change since `<the newest gap-checked sha>`: `git diff <that sha>..<the
 changed sha> -- <plan>`."*, and the record says `change: <sha>`. **The budget, under a
 profile:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile.py rounds <plan>` prints it —
-round 1 the base, then one line per round an active or predicted class's `plan` check buys.
+round 1 the base, then one line per round an active or predicted class's `plan` check buys;
+a class the profile only suggests buys none.
 Round 1 runs the full check, with the novelty note when the line names one; round `<r>` past
 1 runs only the check its line names, and the record says `class: <id>`. A round the budget
 does not list is past the cap. An unclassified plan's budget is round 1. **Cap:** under a

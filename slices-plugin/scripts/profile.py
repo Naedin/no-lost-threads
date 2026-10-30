@@ -3,7 +3,7 @@
 profile.py — match a slice's work against the adopter's risk registry, so the scrutiny a
 plan gets follows what it touches.
 
-    python3 profile.py match PLAN [--kinds K,...] [--write]
+    python3 profile.py match PLAN [--kinds K,...] [--confirm ID:WHY]... [--dismiss ID:WHY]... [--write]
     python3 profile.py match --paths P,... [--kinds K,...]
     python3 profile.py rounds PLAN
     python3 profile.py check
@@ -14,6 +14,7 @@ The registry is `riskRegistry` in `.claude/slices.json`, a JSON file the adopter
     kinds      {id: one line}: the change kinds a drafter may declare on a shape line
     novelty    {roots: [regex], commits: N, check: prose}
     classes    [{id, status, signals: {paths, symbols, kinds}, check: {at, text, rounds},
+                 # a symbol is a regex, or {"re": regex, "enters": true}
                  evidence: [ref], retired?: "<ref> — <the evidence it was wrong>"}]
 
 `status` is `active`, `predicted`, or `retired`; a retired class never matches. Dormant is
@@ -28,8 +29,13 @@ ending in it, a directory (matched as itself, `<dir>/`, never as every file unde
 file whose stem is the identifier; a path that resolves to nothing is new. A class's `paths` regexes are `re.search`ed over the resolved
 paths and the new ones. **Symbols**: a class's `symbols` regexes over the file's text.
 **Kinds**: `--kinds`, else the kinds the newest `profiled at` record carries, else the
-`kinds:` field of the shape the frame record's `drafter's pick` names. Any one signal joins
-the class. `--paths` matches a shape's seams with no file, for its cost line.
+`kinds:` field of the shape the frame record's `drafter's pick` names. A path or a kind
+enters the class. **A symbol only suggests it**: a symbol names the topic, not the risk, and
+an adopter's vocabulary drifts, so a class matched by symbols alone is `suggested:` and buys
+no round until the drafter decides — `--confirm ID:WHY` enters it, `--dismiss ID:WHY` records
+why not. A decision the newest record carries is kept on a re-profile unless overridden. A
+symbol written `{"re": …, "enters": true}` enters on its own, for vocabulary precise enough.
+`--paths` matches a shape's seams with no file, for its cost line.
 
 Novelty: a path under `novelty.roots` (every path when unset) whose directory, or anything
 below it, no commit
@@ -39,9 +45,12 @@ unset; merges skipped) is novel, as is a declared kind the vocabulary lacks.
 The record, which `--write` appends at the end of the plan's ledger section (`## Verification
 ledger`, or the heading carrying `<!-- slices: ledger -->`):
 
-    - profiled at <sha>, <date>, slices <version> — classes: <id>, … | unclassified[; predicted: <id>, …][; novel: <path|kind>, …]
+    - profiled at <sha>, <date>, slices <version> — classes: <id>, … | unclassified[; predicted: <id>, …][; suggested: <id>, …][; dismissed: <id>, …][; novel: <path|kind>, …]
       - <id> — path: <file> | symbol: <match> | kind: <kind>[ (+<n> more)]
+      - <id> — confirmed: <why> | dismissed: <why>
       - novel — path: <dir> | kind: <kind>
+
+`classes:` and `predicted:` are the classes entered, and only they buy rounds.
 
 `rounds` prints the gap-check budget the newest record buys: round 1 is the base, carrying
 `novelty.check` when the record names anything novel; then one round per `rounds` of each
@@ -57,6 +66,7 @@ IDENT = re.compile(r"\b([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+)\b")
 RECORD = re.compile(r"^- profiled at ")
 LEDGER = re.compile(r"^#+ .*(Verification ledger|<!-- slices: ledger -->)")
 KIND_ROW = re.compile(r"^  - \S+ — kind: ([\w-]+)")
+DECISION_ROW = re.compile(r"^  - (\S+) — (confirmed|dismissed): (.*)$")
 SLUG = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 STATUSES = ("active", "predicted", "retired")
 ATS = ("plan", "build", "pre-pr")
@@ -122,6 +132,13 @@ def errors(reg):
         sig = c.get("signals") or {}
         for field in ("paths", "symbols"):
             for rx in sig.get(field) or []:
+                if field == "symbols" and isinstance(rx, dict):
+                    if set(rx) - {"re", "enters"} or not isinstance(rx.get("enters", False), bool):
+                        out.append(f"{where}: a symbol object takes `re` and a boolean `enters`")
+                    rx = rx.get("re")
+                if not isinstance(rx, str):
+                    out.append(f"{where}: signals.{field} holds a non-regex {rx!r}")
+                    continue
                 try:
                     re.compile(rx)
                 except re.error as e:
@@ -226,37 +243,56 @@ def picked_kinds(text):
     return [k.strip() for k in shape.group(1).split(",") if k.strip() and k.strip() != "none"]
 
 
-def recorded_kinds(lines):
+def newest_rows(lines):
     at = max((i for i, l in enumerate(lines) if RECORD.match(l)), default=None)
     if at is None:
         return None
-    out, i = [], at + 1
+    i = at + 1
     while i < len(lines) and lines[i].startswith("  - "):
-        m = KIND_ROW.match(lines[i])
-        if m and m.group(1) not in out:
-            out.append(m.group(1))
         i += 1
-    return out
+    return lines[at + 1:i]
 
 
-def match(reg, root, text, paths, kinds):
+def recorded_kinds(lines):
+    rows = newest_rows(lines)
+    if rows is None:
+        return None
+    return list(dict.fromkeys(m.group(1) for m in map(KIND_ROW.match, rows) if m))
+
+
+def recorded_decisions(lines):
+    """{id: (confirmed|dismissed, why)} from the newest record."""
+    return {m.group(1): (m.group(2), m.group(3)) for m in map(DECISION_ROW.match, newest_rows(lines) or []) if m}
+
+
+def match(reg, root, text, paths, kinds, decisions):
     tracked = [l for l in git(root, "ls-files").splitlines() if l]
     tokens = PATHLIKE.findall(text) + list(paths)
     found, new = resolve(tracked, tokens, IDENT.findall(text))
     every = sorted(found | new)
-    hits, predicted = {}, {}
+    hits, predicted, suggested, dismissed = {}, {}, {}, {}
     for c in reg.get("classes") or []:
         if c["status"] == "retired":
             continue
         sig = c.get("signals") or {}
-        rows = []
+        entering, merely = [], []
         for rx in sig.get("paths") or []:
-            rows += [f"path: {p}" for p in every if re.search(rx, p)]
-        for rx in sig.get("symbols") or []:
-            rows += [f"symbol: {m.group(0)}" for m in re.finditer(rx, text, re.I)]
-        rows += [f"kind: {k}" for k in kinds if k in (sig.get("kinds") or [])]
-        rows = list(dict.fromkeys(rows))
-        if rows:
+            entering += [f"path: {p}" for p in every if re.search(rx, p)]
+        entering += [f"kind: {k}" for k in kinds if k in (sig.get("kinds") or [])]
+        for sym in sig.get("symbols") or []:
+            rx, enters = (sym["re"], sym.get("enters", False)) if isinstance(sym, dict) else (sym, False)
+            (entering if enters else merely).extend(f"symbol: {m.group(0)}" for m in re.finditer(rx, text, re.I))
+        rows = list(dict.fromkeys(entering + merely))
+        verdict, why = decisions.get(c["id"], (None, None))
+        if verdict == "confirmed":
+            rows.append(f"confirmed: {why}")
+        elif not entering and merely:
+            if verdict == "dismissed":
+                dismissed[c["id"]] = rows + [f"dismissed: {why}"]
+            else:
+                suggested[c["id"]] = rows
+            continue
+        if entering or verdict == "confirmed":
             (predicted if c["status"] == "predicted" else hits)[c["id"]] = rows
     nov = reg.get("novelty") or {}
     roots = nov.get("roots") or []
@@ -269,7 +305,7 @@ def match(reg, root, text, paths, kinds):
                   if not any(r == d or r.startswith(d + "/") for r in recent)]
     vocab = reg.get("kinds") or {}
     novel += [f"kind: {k}" for k in kinds if k not in vocab]
-    return hits, predicted, novel
+    return hits, predicted, suggested, dismissed, novel
 
 
 def version():
@@ -281,24 +317,25 @@ def version():
         return "?"
 
 
-def record(root, hits, predicted, novel):
+def record(root, hits, predicted, suggested, dismissed, novel):
     sha = git(root, "rev-parse", "--short", "HEAD").strip() or "?"
     head = (f"- profiled at {sha}, {datetime.date.today().isoformat()}, slices {version()} — "
             f"classes: {', '.join(hits) or 'unclassified'}")
-    if predicted:
-        head += f"; predicted: {', '.join(predicted)}"
+    for name, group in (("predicted", predicted), ("suggested", suggested), ("dismissed", dismissed)):
+        if group:
+            head += f"; {name}: {', '.join(group)}"
     if novel:
         head += f"; novel: {', '.join(n.split(': ', 1)[1] for n in novel)}"
     rows = []
-    for group in (hits, predicted):
+    for group in (hits, predicted, suggested, dismissed):
         for cid, rs in group.items():
-            kind = [r for r in rs if r.startswith("kind: ")]
-            other = [r for r in rs if not r.startswith("kind: ")]
-            # kind rows are all kept: the next re-profile reads its kinds from them
-            for r in other[:SHOWN] + kind:
+            # kind and decision rows are all kept: a re-profile reads them back
+            kept = [r for r in rs if r.split(": ", 1)[0] in ("kind", "confirmed", "dismissed")]
+            other = [r for r in rs if r not in kept]
+            for r in other[:SHOWN] + kept:
                 rows.append(f"  - {cid} — {r}")
             if len(other) > SHOWN:
-                rows[-1 - len(kind)] += f" (+{len(other) - SHOWN} more)"
+                rows[-1 - len(kept)] += f" (+{len(other) - SHOWN} more)"
     rows += [f"  - novel — {n}" for n in novel]
     return [head] + rows
 
@@ -343,6 +380,10 @@ def main():
     ap.add_argument("plan", nargs="?")
     ap.add_argument("--paths", default=None, help="match: a shape's seams, comma-separated, with no file")
     ap.add_argument("--kinds", default=None, help="match: the declared change kinds, comma-separated")
+    ap.add_argument("--confirm", action="append", default=[], metavar="ID:WHY",
+                    help="match: enter a suggested class, with the drafter's reason; repeatable")
+    ap.add_argument("--dismiss", action="append", default=[], metavar="ID:WHY",
+                    help="match: decline a suggested class, with the reason; repeatable")
     ap.add_argument("--write", action="store_true", help="match PLAN: append the record to its ledger")
     ap.add_argument("--registry", default=None, help="registry path, root-relative (default: riskRegistry)")
     ap.add_argument("--root", default=None, help="repo root (default: the plan's git top level)")
@@ -377,8 +418,18 @@ def main():
         kinds = recorded_kinds(lines)
         if kinds is None:
             kinds = picked_kinds(text)
+    decisions = recorded_decisions(lines)
+    known = {c.get("id") for c in reg.get("classes") or []}
+    for verdict, flag, given in (("confirmed", "--confirm", a.confirm), ("dismissed", "--dismiss", a.dismiss)):
+        for d in given:
+            cid, sep, why = d.partition(":")
+            if not sep or not why.strip():
+                fail(f"{flag} takes ID:WHY, not {d!r}")
+            if cid.strip() not in known:
+                fail(f"no class {cid.strip()} in the registry")
+            decisions[cid.strip()] = (verdict, why.strip())
     paths = [p.strip() for p in (a.paths or "").split(",") if p.strip()]
-    block = record(root, *match(reg, root, text, paths, kinds))
+    block = record(root, *match(reg, root, text, paths, kinds, decisions))
     if a.write:
         if not a.plan:
             fail("--write takes a PLAN")

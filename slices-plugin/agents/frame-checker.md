@@ -71,6 +71,9 @@ Work in this order:
    shipped behaviour through those states and name every one where the shape leaves the
    user worse off than today — less margin, a step lost, a warning gone — or write `none`
    after the walk. A cost line the drafter wrote that the code contradicts is corrected.
+   A `risk:` field's `suggested <class>` decisions are read the same way: a confirm whose
+   shape does nothing the class's check is for, or a dismissal whose shape does, is
+   corrected, its reason rewritten from the walk.
 5. **Weigh.** A shape that delivers as much value at less cost beats the others. When value
    and cost point to different shapes — one buys more, another keeps most of it with fewer
    new mechanisms, fewer states, or no regression — say so: that trade is a product call,

@@ -1,38 +1,47 @@
 #!/usr/bin/env python3
-"""risk-review — the risk registry against what the window's work escaped.
+"""risk-review — the risk registry against what the window's work escaped, and what its
+class rounds found.
 
   risk-review.py [--since REV] [--root DIR]
 
 The registry is `riskRegistry` in `.claude/slices.json`, the slices plugin's; its schema is
-`slices-plugin/scripts/profile.py --help`. This reads three things the slices plugin writes
+`slices-plugin/scripts/profile.py --help`. This reads four things the slices plugin writes
 and joins them over the window `<REV>..HEAD` (REV defaults to `markTag`):
 
-  profiled at <sha>, … — classes: <id>, … | unclassified[; predicted: …][; novel: …]
+  profiled at <sha>, … — classes: <id>, … | unclassified[; predicted: …][; suggested: …][; dismissed: …][; novel: …]
       the newest one in each plan under `plansDir` (`.claude/slices.json`, default `Plans`),
-      in the window when its sha is
+      in the window when its sha is, with the rows under it: how each class was entered
+  gap-checked at <sha>, … — <N> defects …, class: <id>
+      a class round, in the window when its sha is; `0 defects` is an empty round
   escaped at <sha>, <date> — found by <stage>: <defect> — at <path>; class: <id> | none
       a plan-ledger line, in the window when its sha is
   Escaped-class: <id | none> — found by <stage>: <defect> — at <path>
       a commit trailer on a fix with no plan, in the window when its commit is
 
-An escape counts against the class it names, as its finder judged it; one naming `none` is
-unclassified, and those are grouped by the directory of `at <path>`:
-the add read. An escape naming an id the registry lacks is listed apart.
+A plan entered a class by `path` when a path row names it, else by `kind`, else `confirmed`
+(a suggestion the drafter took), else `symbol` (one the registry marks `enters`); a class it
+was only `suggested` or `dismissed` is counted apart and never entered. An escape counts
+against the class it names, as its finder judged it; one naming `none` is unclassified, and
+those are grouped by the directory of `at <path>`: the add read. An escape naming an id the
+registry lacks is listed apart.
 
 Output: a summary line; `## Classes`, one row per class —
-`<id>\\t<status>\\t<at>\\t<plans> plans\\t<escapes> escapes[\\tdormant]` with its escapes under
-it — where a class no plan in the window was profiled into, active or predicted, is
-`dormant` (a state derived here, never stored); `## Unclassified by area`, `<n>\\t<dir>`, most
-first, each escape under it; `## Unknown class`, when any.
+`<id>\\t<status>\\t<at>\\t<plans> plans (path <p>, kind <k>, confirmed <c>, symbol <s>; suggested
+<g>, dismissed <d>)\\t<r> rounds (<e> empty)\\t<escapes> escapes[\\tdormant]` with its escapes
+under it — where a class no plan in the window entered, active or predicted, is `dormant` (a
+state derived here, never stored); `## Unclassified by area`, `<n>\\t<dir>`, most first, each
+escape under it; `## Unknown class`, when any.
 
 Exit 0; 3 when no registry is configured (narrate and skip); 2 when it or the window cannot
 be read.
 """
 import argparse, json, os, re, subprocess, sys
 
-PROFILE = re.compile(r"^- profiled at (\S+), .*? — classes: ([^;]+)(?:; predicted: ([^;]+))?")
+PROFILE = re.compile(r"^- profiled at (\S+), .*? — classes: (.*)$")
+ROUND = re.compile(r"^- gap-checked at (\S+), .*? — (\d+) defects?\b.*\bclass: ([a-z0-9-]+)")
 ESCAPE = re.compile(r"^- escaped at (\S+), (\S+) — found by ([^:]+): (.*) — at (\S+); class: (\S+)\s*$")
 TRAILER = re.compile(r"^(\S+) — found by ([^:]+): (.*) — at (\S+)\s*$")
+ENTRY = ("path", "kind", "confirmed", "symbol")
 
 
 def refuse(msg, code=2):
@@ -57,8 +66,27 @@ def config(root, name):
         refuse(f".claude/{name} is not JSON: {e}")
 
 
-def ids(names):
-    return [n.strip() for n in (names or "").split(",") if n.strip() and n.strip() != "unclassified"]
+def fields(head):
+    """{field: [ids]} from a profile line's tail: classes, predicted, suggested, dismissed."""
+    out, parts = {}, head.split("; ")
+    out["classes"] = [i.strip() for i in parts[0].split(",") if i.strip() not in ("", "unclassified")]
+    for p in parts[1:]:
+        name, _, ids = p.partition(": ")
+        out[name] = [i.strip() for i in ids.split(",") if i.strip()]
+    return out
+
+
+def entries(head, rows):
+    """{class: how it was entered | 'suggested' | 'dismissed'} for one profile record."""
+    f, out = fields(head), {}
+    for cid in f.get("classes", []) + f.get("predicted", []):
+        how = {r.split(" — ", 1)[1].split(":", 1)[0] for r in rows
+               if r.startswith(f"  - {cid} — ")}
+        out[cid] = next((e for e in ENTRY if e in how), "symbol")
+    for name in ("suggested", "dismissed"):
+        for cid in f.get(name, []):
+            out[cid] = name
+    return out
 
 
 def main():
@@ -85,7 +113,7 @@ def main():
         return any(full.startswith(sha) for full in window) if len(sha) >= 4 else False
 
     plans_dir = os.path.join(root, slices.get("plansDir") or "Plans")
-    profiled, escapes = {}, []
+    profiled, escapes, rounds = {}, [], []
     for d, _, files in os.walk(plans_dir):
         for name in sorted(files):
             if not name.endswith(".md"):
@@ -97,15 +125,21 @@ def main():
             except OSError:
                 continue
             newest = None
-            for l in lines:
+            for i, l in enumerate(lines):
                 m = PROFILE.match(l)
                 if m:
-                    newest = m
+                    j = i + 1
+                    while j < len(lines) and lines[j].startswith("  - "):
+                        j += 1
+                    newest = (m, lines[i + 1:j])
+                r = ROUND.match(l)
+                if r and inside(r.group(1)):
+                    rounds.append((r.group(3), int(r.group(2)), rel))
                 e = ESCAPE.match(l)
                 if e and inside(e.group(1)):
                     escapes.append((e.group(6), e.group(3).strip(), e.group(4), e.group(5), rel))
-            if newest and inside(newest.group(1)):
-                profiled[rel] = ids(newest.group(2)) + ids(newest.group(3))
+            if newest and inside(newest[0].group(1)):
+                profiled[rel] = entries(newest[0].group(2), newest[1])
     log = git(root, "log", "--format=%x00%h%x1f%(trailers:key=Escaped-class,valueonly)", f"{since}..HEAD")
     n_trailer = 0
     for chunk in log.split("\x00"):
@@ -119,13 +153,19 @@ def main():
     classes = [c for c in reg.get("classes") or [] if isinstance(c, dict)]
     known = {c.get("id") for c in classes}
     out = [f"risk: {slices['riskRegistry']} · {since}..HEAD · {len(profiled)} plans profiled · "
-           f"{len(escapes)} escapes ({n_trailer} from trailers)", "", "## Classes"]
+           f"{len(rounds)} class rounds · {len(escapes)} escapes ({n_trailer} from trailers)", "", "## Classes"]
     for c in classes:
         cid, st = c.get("id"), c.get("status")
-        plans = [p for p, cs in profiled.items() if cid in cs]
+        how = [e[cid] for e in profiled.values() if cid in e]
+        n = {k: how.count(k) for k in ENTRY + ("suggested", "dismissed")}
+        entered = sum(n[k] for k in ENTRY)
         mine = [e for e in escapes if e[0] == cid]
-        row = f"{cid}\t{st}\t{(c.get('check') or {}).get('at')}\t{len(plans)} plans\t{len(mine)} escapes"
-        if st in ("active", "predicted") and not plans:
+        ran = [r for r in rounds if r[0] == cid]
+        row = (f"{cid}\t{st}\t{(c.get('check') or {}).get('at')}\t{entered} plans ("
+               + ", ".join(f"{k} {n[k]}" for k in ENTRY)
+               + f"; suggested {n['suggested']}, dismissed {n['dismissed']})"
+               + f"\t{len(ran)} rounds ({sum(1 for r in ran if r[1] == 0)} empty)\t{len(mine)} escapes")
+        if st in ("active", "predicted") and not entered:
             row += "\tdormant"
         out.append(row)
         out += [f"\t{stage}: {what} — at {where} ({src})" for _, stage, what, where, src in mine]
