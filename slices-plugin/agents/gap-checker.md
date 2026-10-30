@@ -32,8 +32,9 @@ holds only in the stub's case, a harm carried unsized as a premise, a cheaper de
 as much value left unnamed when it would win — is a shape finding: report **MIS-CARVED**
 with the wider frame and the evidence that shows it, and stop there, since every fix the
 order below would apply is to an argument about to be rewritten. A frame that holds but
-is not recorded — no frame tension, a harm with no row — is an ordinary defect, its
-record written from your walk.
+is not recorded — no frame tension, a harm with no row, a frame tension that weighs its
+shapes on value alone with no cost line for each — is an ordinary defect, its record
+written from your walk.
 
 Work in this order:
 

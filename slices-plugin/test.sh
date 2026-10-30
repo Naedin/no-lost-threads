@@ -84,3 +84,13 @@ printf -- '- drafted at 0000000, 2026-10-27, slices 0.9.0 — 1 sites opened (un
 python3 "$lr" rerun "$tmp/Plans/h.md" >"$tmp/out" && fail "rerun passed a row off the writer's form"
 grep -q '^unparsed' "$tmp/out" || fail "hand-written row not named"
 ok "a row off the writer's form is named and fails rerun"
+
+# 9. a stub's frame record takes rows and reruns; the lines after it are not rows
+st="$tmp/Plans/stub.md"
+printf -- '# S\n\n## Frame\n\n- framed at 0000000, 2026-10-29, slices 0.11.0\n- value: a sentence\n- shape A: x\n' > "$st"
+python3 "$lr" add "$st" 'two load sites' "rg -c 'load' src/store.txt" >/dev/null || fail "add refused a framed record"
+[ "$(sed -n '6p' "$st")" = "  - two load sites — \`rg -c 'load' src/store.txt\` — \`3\`" ] || fail "frame row not under the record: $(cat "$st")"
+grep -q '^- value: a sentence$' "$st" || fail "frame lines after the record lost"
+python3 "$lr" rerun "$st" >"$tmp/out" || fail "frame rerun did not hold: $(cat "$tmp/out")"
+grep -q '^rows: 1 held, 0 differ, 0 unverified, 0 unparsed$' "$tmp/out" || fail "frame rerun read lines past the record"
+ok "a stub's framed record takes rows and reruns them alone"

@@ -9,6 +9,22 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.11.0] — 2026-10-29
+
+### Changed
+
+- **The frame is weighed on cost, not value alone.** `/slices:draft`'s frame step gives every candidate shape a value line and a cost line: the seams it touches, each mechanism it needs that does not exist yet, the user states it must specify, and each regression against shipped behaviour in a state the user can be in. Doing less and a split by risk are always candidates, and so is every neighbour shape the stub names; a neighbour's shape goes Out only after the weighing rejects it. When value and cost point to different shapes, the pick is a product call and the draft stops. Two `since capture:` rows run `git log` from the stub's newest commit over the files its symbols live in and over the stubs and plans it links.
+- **Every frame record is written and reviewed cold.** The `## Frame` section is written on every draft, not only at a stop, and handed by path alone to the new `frame-checker` agent, which re-runs its rows, tests the stub's premises (sections headed as decided included) against code and direction docs, adds the shapes it lacks, corrects cost lines from the code, and returns `STANDS <shape>` or `CONTESTED`; the record carries `- reviewed: cold, <verdict>`. With a frame owner (`frame owner:` in the invocation, or the session that asked for the draft), a first invocation always ends at a frame stop for its pick, even when the stub's shape stands.
+- **Frame rows go through the writer.** The record line is now `- framed at …`, and `ledger-row.py add` and `rerun` take a stub's newest `framed at` record when it has no `drafted at`, so a frame row's output is derived, never typed. The record carries a `states walked:` line that each shape's state count is read against, and a declared `Blocked on:` is a row whose cost lines say whether a shape needs the blocker or only follows it. `test.sh` proves a framed record takes rows and reruns them alone.
+- The gap-checker counts a frame tension that weighs its shapes on value alone as a defect, and the built-in stub banner says the stub's shape is a claim too.
+
+### Contract
+
+- **A frame owner's `frame:` follows the record.** With a frame owner, `/slices:draft` honours `frame:` only against a `## Frame` record already in the stub; a first invocation always stops with one. An orchestrator that frames a stub itself and hands `frame:` to the first draft now gets a second stop. Adopter edit, reference adopter: retire its own pre-draft frame pass (`Plans/templates/frame-pass-brief.md` and `draft-brief.md`'s weighing rule), keep a frame rule naming its direction doc, and make `/sequence`'s *Ready it* step draft with `frame owner:`, pick at the plugin's stop, and re-invoke with `frame:`. The orchestrator owns that edit; it was not made before this release.
+- The frame record's line is `- framed at …` with its rows indented under it. No adopter stub carried the earlier form.
+
+On the reference adopter, a plan whose frame step ran and rejected a cheaper delivery on value alone took six gap-check rounds and three reframes, then a carve; its defects clustered on the states and the new mechanism the cheaper shape avoided.
+
 ## threads [0.23.0] — 2026-10-29
 
 ### Changed

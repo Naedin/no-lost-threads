@@ -22,9 +22,13 @@ a virtue: where the coherent change already fits one context, it ships whole.
   came from when that is not this repo's own session.
 - **`/slices:draft <stub>`** — promote a stub into a slice plan. The capture's
   claims are re-verified against current code before anything is built on them,
-  and its frame is sized — the value in one sentence, the harm measured, the
-  neighbouring states walked, two cheaper deliveries named — before the ledger is
-  spent on it, stopping for the maintainer when more than one shape stands;
+  and its frame is sized — the value in one sentence, the harm measured, what landed
+  since capture, the neighbouring states walked, and every candidate shape (doing less,
+  a split by risk, each neighbour's shape) weighed on value and on cost: seams, new
+  mechanisms, user states, regressions against shipped behaviour — before the ledger is
+  spent on it. A cold `frame-checker` reviews the frame record; the draft stops for the
+  maintainer when value and cost disagree, and always for an orchestrating frame owner's
+  pick;
   every Out item records which in-scope surface is wrong or hands the user a chore
   without it — none, a refinement, or a named limit no capability could lift — and any
   other is pulled in or, when another seam owns it, stops the draft for the frame
@@ -253,8 +257,8 @@ rung ships changes what these files are.
 
 ## Requirements
 
-Claude Code with sub-agent support (for `/slices:check`; the command narrates and
-degrades to a warm-context check without it). Python 3 for
+Claude Code with sub-agent support (for `/slices:check` and `/slices:draft`'s frame review;
+each narrates and degrades to a warm-context pass without it). Python 3 for
 `scripts/ledger-row.py`, the claim-row writer. No hooks, nothing at session start. All three commands are explicit-only.
 
 A plugin update reaches nothing in a running session: the agent definition loads at
@@ -273,4 +277,5 @@ slices-plugin/
   commands/draft.md               /slices:draft — stub → plan with review digest
   commands/check.md               /slices:check — fresh-context gap check
   agents/gap-checker.md           Cold adversary that edits only the plan (its brief)
+  agents/frame-checker.md         Cold reviewer that edits only a stub's frame record
 ```

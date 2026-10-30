@@ -1,7 +1,7 @@
 ---
-description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code and size its frame first, carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus at most five tension points). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
-argument-hint: "<stub path, or the concern to promote> [frame: <the shape picked at a frame stop>]"
-allowed-tools: Bash, Read, Grep, Glob, Write, Edit
+description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code and size its frame first (every shape weighed on value and cost, the record reviewed cold), carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus at most five tension points). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
+argument-hint: "<stub path, or the concern to promote> [frame: <the shape picked at a frame stop>] [frame owner: <orchestrating session>]"
+allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent
 ---
 
 # /slices:draft — from low-trust stub to slice plan
@@ -92,7 +92,8 @@ and stop here: the stub is implemented directly and the verification that guards
 still runs. Unsure → draft.
 
 Re-verify the stub's claims against the current tree — with commands and reads, not
-recall. Before treating the concern as new, sweep `plansDir` recursively (inbox, plans,
+recall. A section the stub heads as decided, a list of what a draft owes, and the mechanism
+it proposes are claims too, checked against the code and the repo's direction docs. Before treating the concern as new, sweep `plansDir` recursively (inbox, plans,
 completed) for its terms with `grep -r` or `rg --no-ignore`, never plain `rg`: a repo's
 ignore file can hide its archive from ripgrep, and the sweep then misses a closed concern
 in silence. A concern is often already framed under another filename. Then one of five
@@ -100,8 +101,8 @@ verdicts:
 
 - **Still real** → carry on.
 - **Real, a claim moved** → the concern stands, but a claim it rests on is false or its
-  measured instance is stale. Write the claim's current measurement as a row and carry
-  the correction into the frame step, whose first input it is.
+  measured instance is stale. Write the claim's current measurement as a `claim moved:`
+  row in the frame record (below), whose first input it is.
 - **Already closed** → report what closed it (the commit, the plan, the code that now does
   it), delete the stub (§0, *Every delete*), write no plan.
 - **Partly closed** → draft the remaining increment only, and say which part had landed.
@@ -132,56 +133,122 @@ claim like any other, settled here by measurement:
   written for it never lands in the product tree, and its source rides with the record
   that cites it — fenced under the stub's frame record, or beside the plan's ledger —
   for as long as a row cites it. A harm that cannot be sized is an `unverified:` row
-  naming what would size it, never a premise.
+  naming what would size it, never a premise. A count over a grid the repo built — a
+  golden matrix, a fixture sweep — sizes **reach** (which states the change touches), not
+  **prevalence** (how often users meet them); the claim says which it is. A row that
+  characterizes its hits — a bucket, a label, a split — is written after reading the hits
+  behind each bucket, as the site-opening pass requires (below).
+- **What changed since capture.** A stub's shape was last stated at the newest commit
+  that touched it (`git log -1 --format=%h -- <stub>`). Two rows from that sha, each hit
+  read: `since capture: code` — `git log --oneline <sha>..HEAD -- <files>`, the files
+  defining what the stub names (a symbol mapped to its file); and `since capture: plans`
+  — the same log over the stubs and plans the stub links, plus those under `plansDir`
+  that name this stub (`grep -rl <stub filename> <plansDir>`). A hit that supplies a
+  shape — a pattern now shipped, a neighbour's shape now settled — is a candidate below.
+  No hits is a row too.
+- **A declared block.** A `Blocked on:` the stub already carries is a row: open or
+  cleared, by the condition it names. It does not stop the frame step; each shape's cost
+  line says whether the shape needs what the blocker delivers (a mechanism dependency) or
+  only follows it in sequence.
 - **The neighbouring states.** Walk outward from the stub's case: each surface the change
   touches shown alone, beside the others, and not at all; every legitimate answer the user
   has to what the change asks of them — accept, decline, put off, ignore — and who is right
   to give each, which sizes how many users the stub's case leaves out; what undoes the
-  trigger a week on.
-- **Two cheaper deliveries.** Name at least two ways to deliver as much value with less
-  surface — doing less is always one — and what the stub's shape buys over each. A cheaper
-  delivery that buys as much overturns the stub's shape.
+  trigger a week on. Walk today's behaviour in the same states: it is what a shape can
+  regress.
+- **The shapes, weighed on value and cost.** The candidates are the stub's shape; **doing
+  less**; a **split by risk** — the safest piece that carries most of the value first, the
+  rest a stub behind it; every **neighbour shape** the stub names or the since-capture row
+  turned up — a neighbour stub's or plan's shape, an existing pattern — that would make this
+  one smaller; and any other delivery of as much value with less surface. A neighbour's
+  shape is a candidate here, never an Out item settled as that neighbour's decision; Scope
+  may put it Out only after this weighing rejects it. Each shape carries two lines. **Value**:
+  its user outcome, and what of the value sentence it gives up. **Cost**: the seams it
+  touches; each mechanism it needs that does not exist yet, by name; the user states it
+  must specify, counted from the walk; and each regression against shipped behaviour in a
+  state the user can be in, from the walk of today's behaviour — `none` when the walk found
+  none. **A shape is never chosen on value alone.** A shape that delivers as much value at
+  less cost overturns the stub's; when value and cost point to different shapes — the stub's
+  buys more, a cheaper one keeps most of it with fewer new mechanisms, states, or
+  regressions — the trade is a product call, not the drafter's.
+
+**Write the frame record, then have it reviewed cold.** Every frame step ends by writing
+the frame into the stub as a capture update — a `## Frame` section, the one edit this
+command makes to a stub it does not promote:
+
+```markdown
+## Frame
+
+- framed at <short sha>, <date>, slices <version>
+  - <claim> — `<generating command>` — <its output line>
+- value: <the sentence>
+- states walked: <each state the walk reached, `; `-separated, today's behaviour in each>
+- shape A: <the shape> — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>; states: <n, of those walked>; regresses: <each, by state, or none>
+- shape B: …
+- drafter's pick: <shape> — <one line: why, on value and cost>
+```
+
+Write the `- framed at` line first, then every row — premise corrections, the harm, the
+since-capture logs, the declared block — through the writer, as the ledger's are (§1's
+site-opening pass): `ledger-row.py add <stub> '<claim>' '<command>'` writes under a stub's
+`framed at` record, and `rerun <stub>` re-runs them. Any probe's source is fenced below.
+Then the record goes to a context that has not read the drafting rationale: use the
+`Agent` tool with this plugin's `frame-checker` agent (`subagent_type:
+slices:frame-checker`), passing **only the stub's path** — *"Review the frame record in
+`<path>`."* — plus, when `draftBrief` is set, *"Its sizing rules are in `<draftBrief
+path>`."* — and *"The row re-runner is `${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py`."*,
+the variable expanded. Nothing else: not the invocation's brief, not the premise audit's
+narration, not what you are unsure of; the record is the whole argument, as the plan is to
+`/slices:check`. When `checkerModel` is set, pass it as the spawn's `model` unless
+`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is true, and spawn again without it if it is refused.
+When the agent type is not loaded but the `Agent` tool is, spawn a general-purpose agent
+whose prompt is the body of `${CLAUDE_PLUGIN_ROOT}/agents/frame-checker.md` followed by
+the same brief: still cold. The checker re-runs the rows, runs its own since-capture and neighbour
+sweep, walks today's behaviour for regressions, and **edits the record in place** — a
+missed shape added, a cost line corrected — then ends in **STANDS** `<shape>` (value and
+cost agree on one shape) or **CONTESTED** (more than one stands, or value and cost point
+apart). Then re-read the corrected record and rewrite your pick line when a correction
+took away its reason; a pick still resting on a refuted row is the anchoring this review
+exists to remove. Append the review's line last, `- reviewed: cold, <verdict>[, <shape>]`.
+With no `Agent` tool, review the record yourself against the checker's brief, say the
+review was warm, and write `- reviewed: warm, …`.
 
 Then one of two outcomes:
 
-- **The stub's shape stands**, or a shape the maintainer agreed stands — named in this
-  command's `frame:` argument, or recorded in the stub as theirs → it is the plan's frame,
-  written as its first tension (§2): the shape taken over the cheaper deliveries, the
-  states it covers and the ones it leaves out, the harm cited by its row. The
-  `draftBrief`'s standing-shape rules (§0) run on it now, before the site-opening pass, so
-  what they decide is decided once on the frame and not on the stub, and whatever they
-  name is opened with the rest. An agreed shape that is not the stub's is sized like the
-  stub's was — the harm rows run against it, the walk run on it — and stands only if they
-  leave it standing; one they overturn is a frame stop naming what moved.
-- **The stub's shape is overturned and nobody has agreed the shape that replaces it** —
-  more than one standing, or exactly one the walk reached alone, or a product call the
-  walk cannot settle → **a frame stop**: no ledger, no plan, and no standing-shape rule
-  runs. Write the frame into the stub as a capture update — a `## Frame` section, the one
-  edit this command makes to a stub it does not promote:
-
-  ```markdown
-  ## Frame
-
-  framed at <short sha>, <date>, slices <version>
-  - value: <the sentence>
-  - <claim> — `<generating command>` — <one line of its output>
-  - shape A: <the shape> — <its user outcome>
-  - shape B: <the shape> — <its user outcome>
-  ```
-
-  — the sizing rows exactly as the ledger would hold them, every shape presented with its
-  user outcome, any probe's source fenced below. Present the shapes in-thread and return;
-  what a caller does at the stop — a prototype, a commit — runs after this command does.
-  The Out-item dependency test (below) stops here too, whenever it finds a dependency
-  another seam owns.
+- **The shape stands** → it is the plan's frame, written as its first tension (§2): the
+  shape taken, each other shape with its value and cost lines, the states it covers and
+  the ones it leaves out, the harm cited by its row, who picked it, and the review's
+  verdict. The `draftBrief`'s standing-shape rules (§0) run on it now, before the
+  site-opening pass, so what they decide is decided once on the frame and not on the stub,
+  and whatever they name is opened with the rest. A shape stands only when:
+  - **this draft has a frame owner** (an orchestrating session — `frame owner:` in the
+    invocation, or the session whose message asked for this draft; §2) and the frame owner
+    picked it against this record: the invocation's `frame:` names it and the stub carries
+    the record (re-entry, below). With a frame owner, the pick **always** follows the
+    record and never precedes it: a first invocation with no record, `frame:` or not, ends
+    in a frame stop, whatever the review said; or
+  - **the user is the frame owner**, the review says STANDS, and the shape it stands on is
+    the stub's or one the user agreed — named in `frame:`, or recorded in the stub as
+    theirs. An agreed shape that is not the stub's is sized like the stub's was — the harm
+    rows run against it, the walk run on it — before the record is written.
+- **Otherwise a frame stop**: CONTESTED, or STANDS on a shape nobody agreed, or a frame
+  owner who has not picked against this record → no ledger, no plan, and no
+  standing-shape rule runs. The record stays in the stub. Present the shapes in-thread —
+  each with its value and cost lines, the drafter's pick, the review's verdict — and
+  return: the command's closing message is the pick request, to whichever session invoked
+it, which relays it when it is not the frame owner itself. What a caller does at the
+  stop — a prototype, a commit — runs after this command does. The Out-item dependency
+  test (below) stops here too, whenever it finds a dependency another seam owns.
 
 **Re-entry after a frame stop.** The invocation names the picked shape as `frame:
 <shape>`, and the stub carries the `## Frame` record. The record's rows are **read, not
 re-sized**, when `git log --oneline <its sha>..HEAD -- <the paths its rows cite>` is
-empty; a row whose cited paths moved is re-run, and only that row. The neighbouring-states
-walk runs only on a picked shape that was not among those the record presents. The picked
-shape stands — the first outcome above — unless a re-run row or that walk overturns it,
-which is a frame stop again, naming the rows or the states that moved. A pick to block on
+empty; a row whose cited paths moved is re-run, and only that row, and the since-capture
+row is re-run from the record's sha. Neither the walk nor the cold review runs again on a
+shape the record presents; a picked shape it does not present is weighed and walked like
+the others and written into the record. The picked shape stands — the first outcome
+above — unless a re-run row, the since-capture hits, or that walk overturns it, which is a
+frame stop again, naming the rows or the states that moved. A pick to block on
 a dependency writes the stub's `Blocked on:` line and drafts nothing. A stub carrying a
 `## Frame` record invoked with no `frame:` is a stop still waiting on its pick: re-run only
 the rows whose cited paths moved, present the record's shapes again, and return. The premise audit
@@ -257,6 +324,8 @@ string check still passes. The answer is recorded on the item's line, so a reade
 in one of three forms, and only these go Out:
 
 - `- Out: <item> — without it: none` — no surface needs it; a deferral, to a stub as above.
+  A neighbour's shape goes Out only after the frame's weighing rejected it as a candidate;
+  one the weighing never saw sends the draft back to the frame step.
 - `- Out: <item> — without it: none (refinement: <what improves>)` — a surface behaves
   differently without it but stays correct and honest, and its copy asks the user to
   carry nothing.
@@ -338,8 +407,8 @@ from `ledger-row.py add`, which keeps the counts (§1).
 `<version>` is the `version` field of `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
 read at write time, as `/slices:check` reads it for its own line; `slices ?` when the file
 cannot be read. The record's sha is the baseline the rows were measured against.
-`frame owner:` names the session that started this draft — the one whose message asked
-for it — by the handle a later session can reach it at; a draft the user started omits
+`frame owner:` names the session that started this draft — the invocation's `frame owner:`,
+else the one whose message asked for it — by the handle a later session can reach it at; a draft the user started omits
 it, and the user is the frame owner. `/slices:check` sends its hand-up there when a round
 stops.
 A re-draft — a carve drafted again from its stub, or a plan whose file already carries a
@@ -458,6 +527,9 @@ check exists precisely because this context just wrote the plan.
 - **Drafting on unverified stub claims.** The audit (§1) is the point.
 - **Designing inside the stub's one case.** The frame is sized (§1) before the ledger is
   spent on it; a cold check that finds it too narrow has thrown that ledger away.
+- **Picking the frame on value alone.** The higher-value shape always wins that
+  comparison; the convergence cost and the regressions it carries are what the cheaper
+  shape avoids, and the trade is the frame owner's.
 - **A plan with no tensions.** Zero contestable decisions means either the slice
   is trivial or the contestable calls were made silently. Say which.
 - **More than five tensions in the digest** — that's the whole plan re-litigated in

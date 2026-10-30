@@ -62,7 +62,8 @@ Write exactly this shape. Nothing here changes when a repo has no template:
 
 ```markdown
 > **Low-trust capture.** Unverified claims recorded in passing — re-verify before
-> building on anything here. One concern per stub; amend rather than duplicate.
+> building on anything here; its shape is a claim too, sized by `/slices:draft`'s frame
+> step. One concern per stub; amend rather than duplicate.
 
 # <one-line concern>
 

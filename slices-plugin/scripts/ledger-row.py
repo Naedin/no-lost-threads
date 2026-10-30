@@ -7,9 +7,11 @@ line is derived, never authored.
     python3 ledger-row.py add PLAN 'CLAIM' --unverified 'WHAT WOULD SETTLE IT'
     python3 ledger-row.py rerun PLAN
 
+PLAN may also be an inbox stub carrying a frame record (`- framed at …`, slices:draft §1).
+
 `add` runs COMMAND with bash in the plan's repo root, derives the output line, and writes
 `  - CLAIM — `COMMAND` — OUTPUT` under the plan's newest `drafted at` or `gap-checked at`
-record; a row under that record with the same command is replaced, not duplicated. Under
+record, else under a stub's newest `framed at` record; a row under that record with the same command is replaced, not duplicated. Under
 a `drafted at` record the record's `<N> sites opened (unverified: <n>)` is recounted from
 its rows. No such record is a refusal: the record line is written first.
 
@@ -17,7 +19,8 @@ Every command runs with the plan file itself emptied and restored afterward, so 
 over a tree holding the plan never matches the plan's own text — its ledger row quotes
 the pattern it searches for.
 
-`rerun` re-runs every command row under the newest `drafted at` record and prints one
+`rerun` re-runs every command row under the newest `drafted at` record (a stub's newest
+`framed at` when it has none) and prints one
 line per row — `held`, `differs` with the recorded and the derived output, or
 `unverified` — then a count line. It exits 1 when any row differs.
 
@@ -28,8 +31,8 @@ stdout is empty. Each line is cut at 160 characters.
 """
 import contextlib, os, re, subprocess, sys
 
-RECORD = re.compile(r"^- (drafted at|gap-checked at|reframed at|check held at|go at) ")
 TARGET = re.compile(r"^- (drafted at|gap-checked at) ")
+FRAME = re.compile(r"^- framed at ")
 COUNT = re.compile(r"— \d+ sites opened \(unverified: \d+\)")
 ROW = re.compile(r"^  - (?P<claim>.*?) — (?P<fence>`+) ?(?P<cmd>.+?) ?(?P=fence)(?!`) — (?P<out>.*)$")
 UNVERIFIED = re.compile(r"^  - (?P<claim>.*) — unverified: (?P<what>.*)$")
@@ -118,7 +121,9 @@ def add(plan, claim, cmd, unverified):
     lines = read(plan)
     at, end = block(lines, TARGET)
     if at is None:
-        fail("%s has no `drafted at` or `gap-checked at` record; write the record line first" % plan)
+        at, end = block(lines, FRAME)
+    if at is None:
+        fail("%s has no `drafted at`, `gap-checked at`, or `framed at` record; write the record line first" % plan)
     if unverified is not None:
         row = "  - %s — unverified: %s" % (claim, unverified)
     else:
@@ -152,7 +157,9 @@ def rerun(plan):
     lines = read(plan)
     at, end = block(lines, re.compile(r"^- drafted at "))
     if at is None:
-        fail("%s has no `drafted at` record" % plan)
+        at, end = block(lines, FRAME)
+    if at is None:
+        fail("%s has no `drafted at` or `framed at` record" % plan)
     cwd = root_of(plan)
     rows = [(l, ROW.match(l)) for l in lines[at + 1:end]]
     with plan_emptied(plan):
