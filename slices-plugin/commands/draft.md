@@ -73,7 +73,10 @@ each is a plain `git rm` (or removing the file, when it was never tracked). With
   the plan once written, a survivor once the loser's content is folded in, a restored stub
   once its reframing is folded — since a tool that repoints references reads the index.
 - **The command owns the references.** With a target it repoints every inbound reference
-  at the target, so §1's near-duplicate repoint is its job, not a hand edit. Its output is
+  at the target, so §1's near-duplicate repoint is its job, not a hand edit. A claim
+  row's command is not a reference: it records what ran, and the command leaves every
+  ledger and frame row as it stands — a row citing the deleted path is history, and
+  `rerun` reads only the newest record's rows. Its output is
   carried into the run's report whatever the exit: a list of mentions it left for review
   is walked like any other finding.
 - **Its result is honoured.** Exit 0 with `{doc}` gone from the index and the tree is the
@@ -184,7 +187,7 @@ command makes to a stub it does not promote:
   - <claim> — `<generating command>` — <its output line>
 - value: <the sentence>
 - states walked: <each state the walk reached, `; `-separated, today's behaviour in each>
-- shape A: <the shape> — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>; states: <n, of those walked>; regresses: <each, by state, or none>
+- shape A: <the shape> — mechanism: <how it works: what it derives or decides, from what, through which existing machinery> — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>; states: <n, of those walked>; regresses: <each, by state, or none>
 - shape B: …
 - drafter's pick: <shape> — <one line: why, on value and cost>
 ```
@@ -247,8 +250,10 @@ it, which relays it when it is not the frame owner itself. What a caller does at
 re-sized**, when `git log --oneline <its sha>..HEAD -- <the paths its rows cite>` is
 empty; a row whose cited paths moved is re-run, and only that row, and the since-capture
 row is re-run from the record's sha. Neither the walk nor the cold review runs again on a
-shape the record presents; a picked shape it does not present is weighed and walked like
-the others and written into the record. The picked shape stands — the first outcome
+shape the record presents, its mechanism included. A pick that is not one — a shape the
+record lacks, or a `frame:` that adds mechanism its shape's line does not carry — is
+weighed and walked like the others, written into the record, and reviewed cold again
+before it stands. The picked shape stands — the first outcome
 above — unless a re-run row, the since-capture hits, or that walk overturns it, which is a
 frame stop again, naming the rows or the states that moved. A pick to block on
 a dependency writes the stub's `Blocked on:` line and drafts nothing. A stub carrying a

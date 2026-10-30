@@ -195,7 +195,8 @@ them, and one for a delete with nothing to absorb them:
 promotion, the survivor for a near-duplicate, the restored stub for a MIS-CARVED plan,
 and the closer's plan for a stub a shipped plan closed. Both docs are staged before the
 command runs. The command owns the inbound references, so the draft makes no hand
-repoint. Exit 0 with the doc gone is the delete done. Exit 0 with the doc still there
+repoint; a ledger or frame row's command is a record of what ran, not a reference, and is
+never repointed. Exit 0 with the doc gone is the delete done. Exit 0 with the doc still there
 means an apply flag is missing, and the draft stops. Any other exit also stops the draft
 with the command's output. Once the field is set, no delete falls back to a bare
 `git rm`, and a site whose form is missing stops. With no field set, deletes are plain

@@ -9,6 +9,18 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.11.2] — 2026-10-29
+
+### Changed
+
+- **A frame shape names its mechanism.** Each shape in the frame record carries `mechanism:` (what it derives or decides, from what, through which existing machinery), and the frame-checker walks it through the states where existing rules meet it before costing it. On re-entry, a `frame:` pick that adds mechanism its shape's line does not carry is reviewed cold again before it stands.
+
+### Contract
+
+- **A delete never repoints a claim row's command.** `deleteCommand` repoints inbound references; a ledger or frame row's command records what ran and is left as it stands. Adopter edit, reference adopter: `scripts/rm-doc.sh` skips `  - … — \`<command>\` — …` row lines when it repoints. Owed by the adopter's orchestrator, not made before this release.
+
+On the reference adopter, the delete of a plan rewrote paths inside another plan's ledger-row commands, and the repo's sweep check refused the commit; and a picked shape whose line named no mechanism drafted one that the gap check returned MIS-CARVED.
+
 ## slices [0.11.1] — 2026-10-29
 
 ### Fixed

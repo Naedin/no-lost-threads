@@ -58,7 +58,11 @@ Work in this order:
    one: find the piece of the stub's shape that touches no shipped behaviour, or the fewest
    states, and ask what it delivers alone. Then each neighbour shape from step 2. Add each
    missing one to the record with both lines.
-4. **Write every cost line from the code, not the stub.** For each shape: the seams it
+4. **Write every cost line from the code, not the stub.** For each shape, first its
+   **mechanism**: how it works, what it derives or decides and from what. A shape line that
+   names an outcome with no mechanism cannot be costed; write the mechanism the shape needs,
+   and walk it through the states where existing rules meet it — a band edge, a threshold,
+   a shoulder, a default. Then: the seams it
    touches (files or modules, opened); each mechanism it needs that does not exist yet, by
    name — a new outcome type, a new across-readings rule, a new matching predicate; the user
    states it must specify, counted against the record's `states walked:` line — every state a user can be in where the change is
