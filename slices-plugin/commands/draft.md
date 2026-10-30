@@ -130,16 +130,17 @@ claim like any other, settled here by measurement:
   mechanism over the inputs that vary or by counting in the repo's own data, the
   `draftBrief`'s sizing rules (§0) saying where that lives and how it is counted. The
   measurement is a claim row like any other, so its command stays runnable: a probe
-  written for it never lands in the product tree, and its source rides with the record
-  that cites it — fenced under the stub's frame record, or beside the plan's ledger —
-  for as long as a row cites it. A harm that cannot be sized is an `unverified:` row
+  written for it never lands in the product tree, and **the command is its source** — a
+  self-contained `python3 -I -c '…'` or `bash -c '…'`, never a reference to a probe kept
+  in the stub or the plan, since the writer empties that file while the command runs. A harm that cannot be sized is an `unverified:` row
   naming what would size it, never a premise. A count over a grid the repo built — a
   golden matrix, a fixture sweep — sizes **reach** (which states the change touches), not
   **prevalence** (how often users meet them); the claim says which it is. A row that
   characterizes its hits — a bucket, a label, a split — is written after reading the hits
   behind each bucket, as the site-opening pass requires (below).
 - **What changed since capture.** A stub's shape was last stated at the newest commit
-  that touched it (`git log -1 --format=%h -- <stub>`). Two rows from that sha, each hit
+  that changed it (`git log -1 --no-merges --format=%h -- <stub>`; a merge only carries
+  an edit made elsewhere). Two rows from that sha, each hit
   read: `since capture: code` — `git log --oneline <sha>..HEAD -- <files>`, the files
   defining what the stub names (a symbol mapped to its file); and `since capture: plans`
   — the same log over the stubs and plans the stub links, plus those under `plansDir`
@@ -191,7 +192,7 @@ command makes to a stub it does not promote:
 Write the `- framed at` line first, then every row — premise corrections, the harm, the
 since-capture logs, the declared block — through the writer, as the ledger's are (§1's
 site-opening pass): `ledger-row.py add <stub> '<claim>' '<command>'` writes under a stub's
-`framed at` record, and `rerun <stub>` re-runs them. Any probe's source is fenced below.
+`framed at` record, and `rerun <stub>` re-runs them.
 Then the record goes to a context that has not read the drafting rationale: use the
 `Agent` tool with this plugin's `frame-checker` agent (`subagent_type:
 slices:frame-checker`), passing **only the stub's path** — *"Review the frame record in
@@ -203,7 +204,8 @@ narration, not what you are unsure of; the record is the whole argument, as the 
 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is true, and spawn again without it if it is refused.
 When the agent type is not loaded but the `Agent` tool is, spawn a general-purpose agent
 whose prompt is the body of `${CLAUDE_PLUGIN_ROOT}/agents/frame-checker.md` followed by
-the same brief: still cold. The checker re-runs the rows, runs its own since-capture and neighbour
+the same brief: still cold. A spawn the harness runs in the background is waited on: nothing
+below runs until its report is in, and a turn may end in between. The checker re-runs the rows, runs its own since-capture and neighbour
 sweep, walks today's behaviour for regressions, and **edits the record in place** — a
 missed shape added, a cost line corrected — then ends in **STANDS** `<shape>` (value and
 cost agree on one shape) or **CONTESTED** (more than one stands, or value and cost point
@@ -253,8 +255,8 @@ a dependency writes the stub's `Blocked on:` line and drafts nothing. A stub car
 `## Frame` record invoked with no `frame:` is a stop still waiting on its pick: re-run only
 the rows whose cited paths moved, present the record's shapes again, and return. The premise audit
 above still runs, since the stub's other claims are not the frame's; the record's rows
-go into the ledger under the `drafted at` line through the writer (§1), and a
-probe's source moves beside the ledger before §3 deletes the stub.
+go into the ledger under the `drafted at` line through the writer (§1), each command
+carrying its probe with it.
 
 **Every artifact the draft names is opened at draft time** — a symbol, a file, a test, a
 precedent ("as Y does"), a rule — and cited at file-and-line or section. A claim recalled

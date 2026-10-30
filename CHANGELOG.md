@@ -9,6 +9,14 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.11.1] — 2026-10-29
+
+### Fixed
+
+- **A frame probe is its command.** `ledger-row.py` empties the stub or plan while a row's command runs, so a probe fenced in that file could not be read. `/slices:draft` now has a probe written as a self-contained `python3 -I -c` or `bash -c` command, never fenced in the stub or plan.
+- **Since capture skips merges.** The baseline is `git log -1 --no-merges` on the stub, since a merge commit only carries an edit made elsewhere; the frame-checker reads the same.
+- **The frame review is waited on.** A `frame-checker` spawn the harness runs in the background holds the frame step until its report is in; a turn may end in between.
+
 ## slices [0.11.0] — 2026-10-29
 
 ### Changed

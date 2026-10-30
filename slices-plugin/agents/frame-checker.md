@@ -43,8 +43,8 @@ Work in this order:
    and any the stub links). A false or contradicted premise is written into the record as a
    row, `claim moved: <what the stub said> — <what holds>`, with its command; a shape that
    rested on it has its lines rewritten.
-2. **What changed since capture.** From the newest commit touching the stub (`git log -1
-   --format=%h -- <stub>`), run `git log --oneline <sha>..HEAD --` over the files defining
+2. **What changed since capture.** From the newest commit that changed the stub (`git log -1
+   --no-merges --format=%h -- <stub>`), run `git log --oneline <sha>..HEAD --` over the files defining
    what the stub names and over the stubs and plans it links, and find the plans under
    the plans root (`.claude/slices.json`'s `plansDir`, else `Plans`) that name the stub;
    read every hit. Read the stub's named neighbours too — every stub,
