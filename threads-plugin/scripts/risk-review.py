@@ -6,17 +6,24 @@ class rounds found.
 
 The registry is `riskRegistry` in `.claude/slices.json`, the slices plugin's; its schema is
 `slices-plugin/scripts/profile.py --help`. This reads four things the slices plugin writes
-and joins them over the window `<REV>..HEAD` (REV defaults to `markTag`):
+and joins them over the window since REV (default `markTag`):
 
   profiled at <sha>, … — classes: <id>, … | unclassified[; predicted: …][; suggested: …][; dismissed: …][; novel: …]
       the newest one in each plan under `plansDir` (`.claude/slices.json`, default `Plans`),
-      in the window when its sha is, with the rows under it: how each class was entered
+      with the rows under it: how each class was entered
   gap-checked at <sha>, … — <N> defects …, class: <id>
-      a class round, in the window when its sha is; `0 defects` is an empty round
+      a class round; `0 defects` is an empty round
   escaped at <sha>, <date> — found by <stage>: <defect> — at <path>; class: <id> | none
-      a plan-ledger line, in the window when its sha is
+      a plan-ledger line
   Escaped-class: <id | none> — found by <stage>: <defect> — at <path>
-      a commit trailer on a fix with no plan, in the window when its commit is
+      a line in the body of a commit in `<REV>..HEAD`, a trailer or not, each text once
+
+A ledger line is in the window when no plan under `plansDir` held it at REV: the line's own
+arrival, never the sha it cites, which may name a branch commit a squash merge left off the
+default branch. A plan moving directory brings no line into the window. An `Escaped-class:`
+line is read anywhere in a body because a squash merge's message concatenates the branch's
+messages, so git parses none of their trailers; the same text twice, a branch commit and its
+merge, is one escape.
 
 A plan entered a class by `path` when a path row names it, else by `kind`, else `confirmed`
 (a suggestion the drafter took), else `symbol` (one the registry marks `enters`); a class it
@@ -107,12 +114,14 @@ def main():
     since = a.since or config(root, "threads.json").get("markTag") or "process-review-mark"
     if not git(root, "rev-parse", "--verify", "-q", since + "^{commit}", check=False).strip():
         refuse(f"no commit {since}")
-    window = git(root, "rev-list", f"{since}..HEAD").split()
+    plans_rel = slices.get("plansDir") or "Plans"
+    plans_dir = os.path.join(root, plans_rel)
+    held = {l.strip() for l in git(root, "grep", "-h", "-E", "^- (profiled|gap-checked|escaped) at ",
+                                     since, "--", plans_rel, check=False).splitlines()}
 
-    def inside(sha):
-        return any(full.startswith(sha) for full in window) if len(sha) >= 4 else False
+    def inside(line):
+        return line.strip() not in held
 
-    plans_dir = os.path.join(root, slices.get("plansDir") or "Plans")
     profiled, escapes, rounds = {}, [], []
     for d, _, files in os.walk(plans_dir):
         for name in sorted(files):
@@ -133,20 +142,24 @@ def main():
                         j += 1
                     newest = (m, lines[i + 1:j])
                 r = ROUND.match(l)
-                if r and inside(r.group(1)):
+                if r and inside(l):
                     rounds.append((r.group(3), int(r.group(2)), rel))
                 e = ESCAPE.match(l)
-                if e and inside(e.group(1)):
+                if e and inside(l):
                     escapes.append((e.group(6), e.group(3).strip(), e.group(4), e.group(5), rel))
-            if newest and inside(newest[0].group(1)):
+            if newest and inside(newest[0].group(0)):
                 profiled[rel] = entries(newest[0].group(2), newest[1])
-    log = git(root, "log", "--format=%x00%h%x1f%(trailers:key=Escaped-class,valueonly)", f"{since}..HEAD")
-    n_trailer = 0
+    log = git(root, "log", "--format=%x00%h%x1f%B", f"{since}..HEAD")
+    n_trailer, seen = 0, set()
     for chunk in log.split("\x00"):
-        sha, _, vals = chunk.partition("\x1f")
-        for v in vals.splitlines():
-            m = TRAILER.match(v.strip())
+        sha, _, body = chunk.partition("\x1f")
+        for v in body.splitlines():
+            v = re.sub(r"^[*\s-]*", "", v).strip()
+            if not v.startswith("Escaped-class: ") or v in seen:
+                continue
+            m = TRAILER.match(v[len("Escaped-class: "):])
             if m:
+                seen.add(v)
                 n_trailer += 1
                 escapes.append((m.group(1), m.group(2).strip(), m.group(3), m.group(4), f"commit {sha.strip()}"))
 

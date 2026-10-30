@@ -9,6 +9,12 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.25.2] — 2026-10-30
+
+### Fixed
+
+- **`risk-review.py` survives a squash merge.** A ledger line (`profiled at`, `gap-checked at … class:`, `escaped at`) was windowed by the sha it cites. On a squash-merge repo that sha names a branch commit the default branch never holds, so every line read as outside the window. A line is now in the window when no plan under `plansDir` held it at the mark: its own arrival, with the cited sha kept as provenance. A plan that moves directory brings no line in. `Escaped-class:` is read from any line of a commit body, because a squash message concatenates the branch's messages and git parses none of their trailers. The same text in a branch commit and its merge counts once. On the reference adopter, a squashed PR's body held 9 trailer-shaped lines and git parsed none of them. `test.sh` proves a squash keeps both escapes, a moved plan adds none, and a merge with `--log` counts its branch's escape once.
+
 ## slices [0.12.1] — 2026-10-30
 
 ### Changed

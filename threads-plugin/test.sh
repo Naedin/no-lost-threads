@@ -680,7 +680,7 @@ cat > "$K/.claude/risk.json" <<'JSON'
   { "id": "copy", "status": "active", "signals": {}, "check": { "at": "pre-pr", "text": "t" } },
   { "id": "sync", "status": "predicted", "signals": {}, "check": { "at": "plan", "text": "t" } } ] }
 JSON
-printf '# old\n\n## Verification ledger\n\n- profiled at 0000000, 2026-09-01, slices 0.12.0 — classes: copy\n' > "$K/Plans/done/old.md"
+printf '# old\n\n## Verification ledger\n\n- profiled at 0000000, 2026-09-01, slices 0.12.0 — classes: copy\n- escaped at 0000000, 2026-09-01 — found by pre-pr: before the window — at src/x.swift; class: state-machine\n' > "$K/Plans/done/old.md"
 k_ add -A; k_ commit -q -m base; k_ tag mark
 in1="$(k_ rev-parse --short HEAD)"
 printf 'x\n' > "$K/f"; k_ add -A; k_ commit -q -m work; w="$(k_ rev-parse --short HEAD)"
@@ -696,7 +696,6 @@ cat > "$K/Plans/a.md" <<PLAN
 - gap-checked at $w, 2026-10-30, slices 0.12.0 — 0 defects (addressed: 0), 0 questions (open: 0), class: state-machine
 - escaped at $w, 2026-10-30 — found by walkthrough: a pause never resumed — at src/policy/Pause.swift; class: state-machine
 - escaped at $w, 2026-10-30 — found by pre-pr: rounding off by one — at src/math/Dose.swift; class: none
-- escaped at $in1, 2026-10-01 — found by pre-pr: before the window — at src/x.swift; class: state-machine
 PLAN
 cat > "$K/Plans/b.md" <<PLAN
 # b
@@ -721,6 +720,32 @@ grep -q $'^2\tsrc/math$' "$K/out" || fail "unclassified escapes from a plan and 
 grep -q $'^ghost\tmaintainer: x' "$K/out" || fail "an unknown class was not listed apart"
 mv "$K/.claude/slices.json" "$K/.claude/off.json"; python3 "$rr" --root "$K" >/dev/null 2>&1; [ $? -eq 3 ] || fail "no registry did not exit 3"
 ok "risk-review: escapes from plan lines and trailers, class rounds and empty ones, entries by path/kind/confirmed apart from suggested/dismissed; unclassified by area; dormant; an unknown class apart"
+# risk-review on a squash-merge repo: a ledger line counts by its arrival, not its cited sha; an
+# Escaped-class: line counts from a squash body that git parses no trailers from; a plan that
+# moves directory brings no line in; the same escape in a branch commit and its merge is one
+Q="$tmp/squash"; mkdir -p "$Q/.claude" "$Q/Plans/active" "$Q/Plans/completed"
+git init -q -b master "$Q"; q_() { git -C "$Q" "$@"; }; q_ config user.email t@t; q_ config user.name t
+cp "$K/.claude/risk.json" "$Q/.claude/risk.json"
+printf '{ "plansDir": "Plans", "riskRegistry": ".claude/risk.json" }\n' > "$Q/.claude/slices.json"
+printf '# old\n\n## Verification ledger\n\n- escaped at 1111111, 2026-09-01 — found by pre-pr: held at the mark — at src/old.swift; class: copy\n' > "$Q/Plans/active/old.md"
+q_ add -A; q_ commit -q -m base; q_ tag process-review-mark
+q_ checkout -q -b slice
+printf 'w\n' > "$Q/w"; q_ add -A; q_ commit -q -m "feat: work"; pre="$(q_ rev-parse --short HEAD)"
+printf '# p\n\n## Verification ledger\n\n- escaped at %s, 2026-10-30 — found by pre-pr: pause never resumes — at src/policy/X.swift; class: state-machine\n' "$pre" > "$Q/Plans/active/p.md"
+printf 'f\n' > "$Q/f"; q_ add -A; q_ commit -q -m "fix: resume" -m "Escaped-class: none — found by walkthrough: wrong copy — at src/ui/X.swift"
+q_ checkout -q master
+msg="$(q_ log --reverse --format='* %B' master..slice)"
+q_ merge -q --squash slice >/dev/null 2>&1; q_ commit -q -m "slice (#1)" -m "$msg" -m "Co-authored-by: a <a@b>"
+[ -z "$(q_ log -1 --format='%(trailers:key=Escaped-class,valueonly)')" ] || fail "fixture: the squash body parsed a trailer, so it does not test the loss"
+q_ branch -q -D slice; q_ merge-base --is-ancestor "$pre" master 2>/dev/null && fail "fixture: the cited branch sha is still on master"
+q_ mv Plans/active/old.md Plans/completed/old.md; q_ commit -q -m "closeout: move"
+python3 "$rr" --root "$Q" > "$Q/out" 2>&1 || fail "risk-review failed on a squash repo: $(cat "$Q/out")"
+head -1 "$Q/out" | grep -q ' · 2 escapes (1 from trailers)$' || fail "a squash merge lost an escape, or a moved plan's held line re-entered: $(cat "$Q/out")"
+grep -q $'^state-machine\t.*\t1 escapes' "$Q/out" && grep -q $'^1\tsrc/ui$' "$Q/out" || fail "the squash escapes were not attributed: $(cat "$Q/out")"
+q_ checkout -q -b slice2; printf 'g\n' > "$Q/g"; q_ add -A; q_ commit -q -m "fix: again" -m "Escaped-class: none — found by review: once — at src/ui/Y.swift"
+q_ checkout -q master; q_ merge -q --no-ff --log slice2 -m "merge slice2" >/dev/null 2>&1
+python3 "$rr" --root "$Q" 2>&1 | head -1 | grep -q ' · 3 escapes (2 from trailers)$' || fail "an escape in a branch commit and its merge message was counted twice: $(python3 "$rr" --root "$Q" 2>&1 | head -1)"
+ok "risk-review on squash merges: a ledger line counts by its arrival, an Escaped-class: line from a squash body; a moved plan adds nothing; one escape in a commit and its merge counts once"
 
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.
