@@ -9,6 +9,28 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.12.0] — 2026-10-30
+
+### Added
+
+- **A risk registry scales scrutiny to what the work touches.** `riskRegistry` in `.claude/slices.json` points at an adopter-owned JSON registry. Each class has path and symbol regex signals, declared change kinds, a check run at `plan`, `build`, or `pre-pr`, evidence, and a status of `active`, `predicted`, or `retired`. Dormancy is derived, never stored. The new `scripts/profile.py` matches a plan, a stub, or a shape's seams. Paths resolve as files, directories, or CamelCase stems, and novelty counts only commits touching `novelty.roots`. `--write` appends a `profiled at` record to the plan's ledger, the one place later stages read. `rounds` prints the check budget, and `check` validates the registry.
+
+### Changed
+
+- **`/slices:draft` declares and prices risk.** With a registry, each shape line carries `kinds:` and its cost carries `risk:`, so a shape entering fewer classes can win on cost. The plan is profiled once its rows are in.
+- **`/slices:check` runs the profile's budget.** Round 1 is the full check, with a novelty note when the plan touches a new area. Each later round runs only a `plan` class's check, recorded as `class: <id>`. No-decay compares a round with the previous round of its class, and the cap is the end of the budget. An unclassified plan gets one round. A `changed at` line buys one round of that change alone, recorded as `change: <sha>`. With no registry, the two-round cap is unchanged.
+- **Escapes have a carrier.** An `escaped at` ledger line, or an `Escaped-class:` trailer on a fix with no plan, records a defect the plan governed that got past the check.
+
+### Contract
+
+- **Three new plan-ledger lines and one commit trailer**, a stable grammar adopters read: `profiled at … — classes: <id>, … | unclassified[; predicted: …][; novel: …]` (written by `profile.py`), `changed at … — <who>: <what>`, `escaped at … — found by <stage>: <defect> — at <path>; class: <id> | none`, and the trailer `Escaped-class: <id | none> — found by <stage>: <defect> — at <path>`. All are opt-in behind `riskRegistry`; with none, nothing changes. Adopter edit, reference adopter: `riskRegistry` and its seed registry in `.claude/slices.json`, and escape writers in its pre-pr fix batches, walkthrough pass, maintainer-feedback fixes, and post-merge fix PRs. Owed by the adopter after this release, not made before it.
+
+## threads [0.25.0] — 2026-10-30
+
+### Added
+
+- **`/threads:process-review` tests the risk registry (step 0e).** The new `scripts/risk-review.py` joins the window's `profiled at` records with its `escaped at` lines and `Escaped-class:` trailers, per class and, for unclassified work, by area. A class no plan entered reads dormant. The review proposes add, revise a check, promote, or retire on evidence; a dormant class gets no proposal. `risk` joins the gate's `Opened:` vocabulary. `test.sh` proves the window, the join, dormancy, area grouping, and an unknown class listed apart.
+
 ## threads [0.24.0] — 2026-10-30
 
 ### Changed

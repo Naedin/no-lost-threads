@@ -160,6 +160,10 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   (one incident), patched (its status line cites the patch; one that only bounds the cost
   is partial and names the cost driver as the open half), or unpatched, and names any
   process commit that answers no key, since nothing else counts its recurrence.
+- **It tests the risk registry** a slices adopter keeps. `risk-review.py` joins the
+  window's plan profiles with what escaped them, per class and, for unclassified work, by
+  area. The review then proposes adding a class, revising a check, promoting a predicted
+  class, or retiring one on evidence it is wrong. A dormant class is left alone.
 - **It closes with its own economics**, as questions to you, each carrying the review's
   own answer and the default it acts on, or why only you can answer it: what it read
   against what bore on a ruling, how much of the marker stream was its own weight, how
@@ -213,6 +217,7 @@ threads-plugin/
   scripts/retro-log.py            The retro log's view (state and counts per key) and compaction
   scripts/marker-stream.py        The marker-commit stream since the mark, classified organic / review / bookkeeping
   scripts/land-process-commit.py  Land one marker commit on the default branch from a slice branch, through the repo's own hook
+  scripts/risk-review.py          The slices risk registry against the window's escapes, per class and unclassified by area
 ```
 
 **The retro log is an append-only stream, read through a view.** Sessions append; a

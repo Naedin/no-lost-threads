@@ -233,7 +233,7 @@ rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a r
 conflict or a red gate; a run that has spent its budget is not thrown away for a clean
 rebase.
 
-0. **Free — the reads that size the run.** 0a–0c are cheap; none is optional where
+0. **Free — the reads that size the run.** 0a–0c and 0e are cheap; none is optional where
    configured. Do them before looking at a single commit; 0d, the one paid step, follows.
 
    **0a — the core** (`invariantDocs`, in order). Read them whole. You are about to
@@ -457,6 +457,33 @@ rebase.
    recurrence for the gate below and a candidate like any other, classed `tooling` for a
    lint class or `amend` for a review-prompt line. Absent → narrate and skip.
 
+   **0e — the risk registry** (`riskRegistry` in `.claude/slices.json`, the slices
+   plugin's; its schema is that plugin's `scripts/profile.py --help`). Free:
+   `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/risk-review.py --since <markTag>` joins the
+   window's plan profiles with its escapes — `escaped at` lines in plans, `Escaped-class:`
+   trailers on fixes with no plan — per class, and groups the unclassified ones by area. The
+   registry is the repo's prediction of where scrutiny pays; this read tests it, and every
+   ruling is about what the work touched, never about time. One proposal per class or area,
+   each a registry edit landed like any candidate:
+   - **add** — unclassified escapes clustering at one area (two or more at one directory, or
+     one whose cost the maintainer named): a class with its signals drawn from the area, its
+     check from what the escapes needed, `status: predicted` until a window shows its check
+     catching, and the escapes as `evidence`.
+   - **revise a check** — a class whose escapes landed on plans profiled into it: its check
+     ran and missed them. The revision names what the escapes needed that the check did not
+     ask for; a `plan` check that keeps missing what a render or a replay finds moves its
+     `at`, since another round of reading cannot buy it.
+   - **leave dormant** — a class no plan entered (`dormant`): no proposal, only a line in the
+     record. Dormancy is never evidence; a class idle for a year still matches the day work
+     returns to it.
+   - **retire** — only on evidence the class is wrong: its signals keep pulling in work its
+     check finds nothing on while the escapes land elsewhere, cited by plan. It stays in the
+     file with `retired: <ref> — <the evidence>`, so the review never proposes it again.
+   - **promote** — a `predicted` class whose check caught what it predicted on a plan in the
+     window: `status: active`.
+   An escape naming a class the registry lacks is a misspelling or a class never written:
+   fix the line at its source, or add the class. Exit 3 (no registry) → narrate and skip.
+
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
 expensive path and they are *conditional*, not automatic. **Its direction is expected
 value**: open the funnel, and rank inside it, by what a finding is likely to cost if left —
@@ -465,14 +492,15 @@ occurrence count is one input, and a floor: a slip that is frequent, cheap, and 
 is rarely captured, so where a script can detect the shape, its run over history is the rate. **The mechanism below is the current hypothesis**, not the
 definition: a recurrence, a fired cluster, or one `Escaped:` or `Gate-run:` occurrence opens the gate, and
 ranking puts escapes first, then targets read on every run, then count. Each marker commit
-body carries `Opened: <recurrence | escape | cluster | ledger | deep> — <the keys or files>`
+body carries `Opened: <recurrence | escape | cluster | risk | ledger | deep> — <the keys, files, or classes>`
 beside `Tally:`, and a later review tests the hypothesis from what is already recorded: of
 the keys landed by runs each opener started, how many came back after `LANDED` (`view
 --recurred`), and how many runs it opened landed nothing. An opener whose landings recur, or
 that opens runs with nothing to land, is revised on that evidence.
 
-- **Nothing recurred** in 0b, 0c, or 0d (no key `--reached` shows after re-keying — an
-  `Escaped:` or `Gate-run:` key shows at one occurrence — no placement cluster fires, no shape routed), and
+- **Nothing recurred** in 0b, 0c, 0d, or 0e (no key `--reached` shows after re-keying — an
+  `Escaped:` or `Gate-run:` key shows at one occurrence — no placement cluster fires, no shape routed,
+  no risk proposal but leave-dormant), and
   no ledger signal fired → **stop and say so.** Report the pending
   captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
   the complete answer for the price of step 0; running the full funnel against it burns

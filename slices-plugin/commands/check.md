@@ -30,7 +30,11 @@ never validates; and `checkBrief` is the path of an adopter-owned markdown file 
 platform's accessibility rules, its data-format checks — which §1 hands to the checker
 beside the plan's path. It is repo rules, not drafting context, so it does not warm the
 cold read. A `checkBrief` path that does not resolve to a readable file is narrated and
-the check runs on the built-in classes alone. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is a boolean flag: when it holds a
+the check runs on the built-in classes alone. `riskRegistry` is the adopter's risk
+registry (`${CLAUDE_PLUGIN_ROOT}/scripts/profile.py --help` holds its schema); with it set
+and a `profiled at` record in the plan's ledger, the profile sets the round budget (§1).
+With either absent, the rounds run as below without it, and the record says so in one line.
+`CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is a boolean flag: when it holds a
 true value (`1`, `true`), the harness pins every sub-agent to `CLAUDE_CODE_SUBAGENT_MODEL`
 or the session model and removes `model` from the spawn's parameters; any other value,
 including a model name, is false. When it is true and `checkerModel` is also set, omit
@@ -40,12 +44,22 @@ including a model name, is false. When it is true and `checkerModel` is also set
 
 **First, count the round.** This check is round `<r>`: one more than the `gap-checked at`
 records the plan's ledger holds since its **frame baseline** — the newest `drafted at` or
-`reframed at` record (§3). A re-draft writes a fresh `drafted at`, and a fold that rewrites
+`reframed at` record (§3), a `change:` round not counted. A re-draft writes a fresh `drafted at`, and a fold that rewrites
 the plan's frame appends `reframed at`; either way the records above it measured a
 different document, so they are history: no round count, no-decay `<N>`, or `touched:`
-list is read from them. **Cap:** never start a third round, or any after it,
-without the frame owner's go — a `go at` line (§3) appended after the newest
-`gap-checked at` record. With none, spawn nothing: append the held record (§3), commit the
+list is read from them. **A change round comes first.** A `changed at` line (§3) after the
+newest `gap-checked at` record — a material change to a checked plan — makes this check one
+round of that change alone, outside the budget and the cap: the checker is told *"This round
+checks only the change since `<the newest gap-checked sha>`: `git diff <that sha>..<the
+changed sha> -- <plan>`."*, and the record says `change: <sha>`. **The budget, under a
+profile:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile.py rounds <plan>` prints it —
+round 1 the base, then one line per round an active or predicted class's `plan` check buys.
+Round 1 runs the full check, with the novelty note when the line names one; round `<r>` past
+1 runs only the check its line names, and the record says `class: <id>`. A round the budget
+does not list is past the cap. An unclassified plan's budget is round 1. **Cap:** under a
+profile, never start a round past the budget without the frame owner's go; with none, never
+start a third round, or any after it, without one — a `go at` line (§3) appended after the
+newest `gap-checked at` record. A go's round runs the full check. With none, spawn nothing: append the held record (§3), commit the
 plan file as WIP, send the hand-up report (§2) built from the rounds already recorded, and
 stop. Otherwise copy the
 plan file to a scratch path outside the repo before the spawn — the round's baseline, which
@@ -56,7 +70,12 @@ Use the `Agent` tool with this plugin's `gap-checker` agent
 to break the slice plan at `<path>`."* — and, when `checkBrief` is set, one more
 sentence: *"Also run the local gap classes in `<checkBrief path>`."* — and always one
 naming the row re-runner by its absolute path: *"The row re-runner is
-`${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py`."*, the variable expanded. No background, no
+`${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py`."*, the variable expanded. Under a profile one
+more: round 1 with a novelty note, *"The plan touches an area new to the repo: <the novel
+paths and kinds>. <novelty check text>"*; a class round, *"This round runs only the risk
+check for `<id>`: <its check text>"*. The class's check is the repo's rule, as the
+`checkBrief` is, so it does not warm the cold read; the profile's reasons do, and are not
+passed. No background, no
 rationale, no summary of the drafting conversation, no note about what you're unsure
 of. Its brief lives in the agent definition, and the plan's own ledger tells it where to
 start: once the frame is read — a frame narrower than the problem ends the check
@@ -118,9 +137,12 @@ read the report against the stops. **Reasons**, which fire at any round:
 
 - **(d) no decay** — the round's `<N>` is not below the previous `gap-checked at`
   record's `<N>` since the frame baseline. The first round after one has nothing to decay
-  from, so (d) cannot fire on it. Within one frame nothing resets it: a `go at` line, a
+  from, so (d) cannot fire on it. Under a profile the previous record is the newest one of
+  the same `class:` (round 1 and a go's rounds are one class, the base): a class round
+  measures a different check than the one before it. Within one frame nothing resets it: a `go at` line, a
   folded question, or a round of applied fixes leaves the baseline where it is;
-- **(e) cap** — §1's: no third round without the frame owner's go.
+- **(e) cap** — §1's: no round past the budget, or with no profile no third round,
+  without the frame owner's go.
 
 Name every one that fired, reasons first. A **MIS-CARVED** verdict is not read against
 the stops: it already returns the plan upward. **On a stop**, apply nothing from the
@@ -196,11 +218,23 @@ carries a `- (none yet)` placeholder, and the first append replaces it. That, an
 creation above, are the only writes into the ledger that are not appends:
 
 ```
-- gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
+- gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, class: <id> | change: <sha>][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
 - check held at <short commit sha>, <date>, slices <version> — round <r>: no frame-owner go
 - go at <short commit sha>, <date> — <frame owner>: <the disposition, one line>
 - reframed at <short commit sha>, <date>, slices <version> — <frame owner>: <what the frame now is, one line>
+- changed at <short commit sha>, <date> — <who>: <what changed in the checked plan, one line>
+- escaped at <short commit sha>, <date> — found by <stage>: <the defect, one line> — at <path>; class: <id> | none
 ```
+
+`profiled at` is `profile.py`'s (`/slices:draft` §2), and a `reframed at` is followed by a
+re-profile (`profile.py match <plan> --write`), which reads its kinds from the record before.
+A `changed at` is appended by whoever changes a checked plan's behaviour, scope, or mechanism —
+scope added after the check, a fix round's rewrite — and the next check is its change round.
+An `escaped at` is appended by whoever finds a defect the plan governed past the check — at
+pre-pr, a walkthrough, review, or after merge — with `class:` naming the profiled class whose
+check should have caught it, or `none`. Work with no plan carries the same fields as a commit
+trailer on its fix, `Escaped-class: <id | none> — found by <stage>: <the defect> — at <path>`;
+`/threads:process-review` reads both.
 
 `<N>` counts every defect, dependency findings included, so the next round's no-decay
 backstop reads it from this line; `<D>` is written when any dependency finding came back.

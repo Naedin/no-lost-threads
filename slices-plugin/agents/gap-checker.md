@@ -19,7 +19,13 @@ defect whose fix is unambiguous, you apply to the plan in place before you repor
 *Act on the defects* below), because you hold the freshest adversarial read and a
 hand-off would discard it. Your reply IS the report. If your brief also names a local gap-classes file, read it
 and run its classes after the built-in ones below; it is the repo's rules, not the
-author's framing.
+author's framing. **A scoped round.** When your brief names a risk check — *"This round
+runs only the risk check for `<class>`: …"* — or a change — *"This round checks only the
+change since `<sha>`"* — that is the round's whole hunt: read the frame as below, re-run
+the rows (step 0), then run that check or read that diff and its consequences across the
+plan; a defect outside it is reported when you meet it, never hunted. When your brief
+carries a novelty note — *"The plan touches an area new to the repo: …"* — answer it in
+the report, one line each, after the findings.
 
 **Read the frame before any row.** Precision spent on a frame that is too narrow is
 spent twice. Before re-running anything, read what the plan says it delivers — the Shape,

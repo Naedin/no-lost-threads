@@ -221,6 +221,28 @@ only the classes the built-ins lack; a class restating a built-in is paid twice.
 wraps `/slices:check` instead of keeping two checkers: the local classes move into the
 brief, the local command calls `/slices:check`, and nothing is duplicated.
 
+<a id="risk-registry"></a>
+
+### Scaling scrutiny to risk — `riskRegistry`
+
+A repo whose plans pay for extra check rounds on some kinds of work and not others points
+`riskRegistry` at a JSON registry of **risk classes**. Each class has signals (path and
+symbol regexes, declared change kinds), a check, where it runs (`plan`, `build`, or `pre-pr`),
+and the evidence behind it. `scripts/profile.py --help` holds the schema. The adopter grows
+the registry and `/threads:process-review` proposes changes to it. A class is keyed to what
+work touches, never to time: one no plan entered is dormant, not stale.
+
+- `/slices:draft` declares each shape's kinds and prices the classes it enters as cost, then
+  writes a `profiled at` record into the plan's ledger: the classes, predicted classes, and
+  novel areas it touches. Every later stage reads that record, an adopter's pre-pr included.
+- `/slices:check` runs round 1 as the full check, then one round per `plan`-class check the
+  profile buys. A round past that budget needs the frame owner's go. An unclassified plan
+  gets round 1, and a `changed at` line buys one round of just that change.
+- `escaped at` ledger lines, or `Escaped-class:` trailers on fixes with no plan, record what
+  got past the check, so the review can test the registry.
+
+Absent, the check keeps its two-round cap.
+
 ### What the ledger holds
 
 The drafter writes it first. `/slices:draft` opens every production symbol, file, test,
@@ -279,4 +301,6 @@ slices-plugin/
   commands/check.md               /slices:check — fresh-context gap check
   agents/gap-checker.md           Cold adversary that edits only the plan (its brief)
   agents/frame-checker.md         Cold reviewer that edits only a stub's frame record
+  scripts/ledger-row.py           Write and re-run a plan's claim rows
+  scripts/profile.py              Match work against the risk registry; the check's round budget
 ```

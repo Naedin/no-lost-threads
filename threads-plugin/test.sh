@@ -668,6 +668,45 @@ printf '## Entries\n\nr/open\n  LANDED abc1234 — x.md.\nr/open\n  REOPENED 202
 python3 "$rl" view --keys --reached --root "$tmp" --log reopen.md 2>/dev/null | grep -q '^r/open  ×0  -  REOPENED$' || fail "a REOPENED key at ×0 did not rank: $(python3 "$rl" view --keys --reached --root "$tmp" --log reopen.md 2>&1)"
 ok "view --outside: a key closed or filed in the window by a retro, a slice, or an uncommitted line is shown with its closer and its chain; a review's closing, one before the mark, and a live key are not; a same-commit patch is not a recurrence; a closing sha off the placement is named; the footer reads REV; a REOPENED key ranks at ×0"
 
+# ---- scripts/risk-review.py: the risk registry against the window's escapes
+rr="$here/scripts/risk-review.py"
+K="$tmp/risk"; mkdir -p "$K/.claude" "$K/Plans/done"
+git init -q -b main "$K"; k_() { git -C "$K" "$@"; }; k_ config user.email t@t; k_ config user.name t
+printf '{ "plansDir": "Plans", "riskRegistry": ".claude/risk.json" }\n' > "$K/.claude/slices.json"
+printf '{ "markTag": "mark" }\n' > "$K/.claude/threads.json"
+cat > "$K/.claude/risk.json" <<'JSON'
+{ "kinds": {}, "classes": [
+  { "id": "state-machine", "status": "active", "signals": {}, "check": { "at": "plan", "text": "t" } },
+  { "id": "copy", "status": "active", "signals": {}, "check": { "at": "pre-pr", "text": "t" } },
+  { "id": "sync", "status": "predicted", "signals": {}, "check": { "at": "plan", "text": "t" } } ] }
+JSON
+printf '# old\n\n## Verification ledger\n\n- profiled at 0000000, 2026-09-01, slices 0.12.0 — classes: copy\n' > "$K/Plans/done/old.md"
+k_ add -A; k_ commit -q -m base; k_ tag mark
+in1="$(k_ rev-parse --short HEAD)"
+printf 'x\n' > "$K/f"; k_ add -A; k_ commit -q -m work; w="$(k_ rev-parse --short HEAD)"
+cat > "$K/Plans/a.md" <<PLAN
+# a
+
+## Verification ledger
+
+- profiled at $w, 2026-10-30, slices 0.12.0 — classes: state-machine
+- escaped at $w, 2026-10-30 — found by walkthrough: a pause never resumed — at src/policy/Pause.swift; class: state-machine
+- escaped at $w, 2026-10-30 — found by pre-pr: rounding off by one — at src/math/Dose.swift; class: none
+- escaped at $in1, 2026-10-01 — found by pre-pr: before the window — at src/x.swift; class: state-machine
+PLAN
+k_ add -A; k_ commit -q -m plan
+printf 'y\n' > "$K/g"; k_ add -A; k_ commit -q -m "fix: dose rounding" -m "Escaped-class: none — found by after merge: dose rounds down — at src/math/Solver.swift"
+printf 'z\n' > "$K/h"; k_ add -A; k_ commit -q -m "fix: odd" -m "Escaped-class: ghost — found by maintainer: x — at src/y.swift"
+python3 "$rr" --root "$K" > "$K/out" 2>&1 || fail "risk-review failed: $(cat "$K/out")"
+head -1 "$K/out" | grep -q '^risk: .claude/risk.json · mark..HEAD · 1 plans profiled · 4 escapes (2 from trailers)$' || fail "summary wrong: $(head -1 "$K/out")"
+grep -q $'^state-machine\tactive\tplan\t1 plans\t1 escapes$' "$K/out" || fail "a class's escape in the window was not counted, or one before it was: $(cat "$K/out")"
+grep -q $'^copy\tactive\tpre-pr\t0 plans\t0 escapes\tdormant$' "$K/out" || fail "a class profiled only before the window did not read dormant"
+grep -q $'^sync\tpredicted\tplan\t0 plans\t0 escapes\tdormant$' "$K/out" || fail "a predicted class with no plan did not read dormant"
+grep -q $'^2\tsrc/math$' "$K/out" || fail "unclassified escapes from a plan and a trailer were not grouped by area: $(cat "$K/out")"
+grep -q $'^ghost\tmaintainer: x' "$K/out" || fail "an unknown class was not listed apart"
+mv "$K/.claude/slices.json" "$K/.claude/off.json"; python3 "$rr" --root "$K" >/dev/null 2>&1; [ $? -eq 3 ] || fail "no registry did not exit 3"
+ok "risk-review: escapes in the window from plan lines and trailers, per class and unclassified by area; a class no plan entered reads dormant; an unknown class apart"
+
 # ---- scripts/core-diff.py: each core doc's window as churn — words at the mark and at
 # the head, words added and removed, commits — so a core doc that grows unread is seen.
 cd_="$here/scripts/core-diff.py"

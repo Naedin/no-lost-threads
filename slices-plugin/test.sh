@@ -94,3 +94,83 @@ grep -q '^- value: a sentence$' "$st" || fail "frame lines after the record lost
 python3 "$lr" rerun "$st" >"$tmp/out" || fail "frame rerun did not hold: $(cat "$tmp/out")"
 grep -q '^rows: 1 held, 0 differ, 0 unverified, 0 unparsed$' "$tmp/out" || fail "frame rerun read lines past the record"
 ok "a stub's framed record takes rows and reruns them alone"
+
+# ---- scripts/profile.py: the risk registry, matched against what a plan touches
+pf="$here/scripts/profile.py"
+R="$tmp/risk"; mkdir -p "$R/.claude" "$R/src/policy" "$R/src/math" "$R/src/old" "$R/src/ui" "$R/Plans"
+git -C "$R" init -q; r_() { git -C "$R" "$@"; }; r_ config user.email t@t; r_ config user.name t
+printf '{ "riskRegistry": ".claude/risk.json" }\n' > "$R/.claude/slices.json"
+cat > "$R/.claude/risk.json" <<'EOF'
+{
+  "kinds": { "lifecycle-axis": "a new state or ordering rule", "new-surface": "a new screen" },
+  "novelty": { "roots": ["^src/"], "commits": 2, "check": "Name what the area resembles." },
+  "classes": [
+    { "id": "state-machine", "status": "active",
+      "signals": { "paths": ["^src/policy/"], "symbols": ["\\bsnooze\\w*"], "kinds": ["lifecycle-axis"] },
+      "check": { "at": "plan", "text": "Tabulate axes x states.", "rounds": 2 }, "evidence": ["#1"] },
+    { "id": "numeric", "status": "active",
+      "signals": { "paths": ["^src/math/"], "symbols": [], "kinds": [] },
+      "check": { "at": "build", "text": "Boundary tests.", "rounds": 0 }, "evidence": [] },
+    { "id": "copy", "status": "predicted",
+      "signals": { "paths": ["Copy\\.txt$"], "symbols": [], "kinds": ["new-surface"] },
+      "check": { "at": "plan", "text": "Read the copy." }, "evidence": [] },
+    { "id": "gone", "status": "retired", "retired": "#9 — never fired right",
+      "signals": { "paths": ["^src/"], "symbols": [], "kinds": [] },
+      "check": { "at": "plan", "text": "x" }, "evidence": [] }
+  ]
+}
+EOF
+printf 'a\n' > "$R/src/old/Legacy.txt"; r_ add -A; r_ commit -q -m old
+for i in 1 2; do printf '%s\n' "$i" >> "$R/src/policy/PauseRule.txt"; printf '%s\n' "$i" > "$R/src/math/Dose.txt"; printf '%s\n' "$i" > "$R/src/ui/HomeCopy.txt"; r_ add -A; r_ commit -q -m "code $i"; done
+for i in 1 2 3; do printf '%s\n' "$i" > "$R/notes.md"; r_ add -A; r_ commit -q -m "docs $i"; done
+
+# 1. check validates; rounds outside a plan check, an unknown kind, and a bad regex refuse
+python3 "$pf" check --root "$R" | grep -q '^.claude/risk.json: 4 classes, 2 kinds$' || fail "check refused a valid registry"
+sed 's/"rounds": 0/"rounds": 1/' "$R/.claude/risk.json" > "$R/.claude/bad.json"
+python3 "$pf" check --root "$R" --registry .claude/bad.json 2>"$R/err" && fail "check passed rounds on a build check"
+grep -q 'only a plan check buys rounds' "$R/err" || fail "rounds refusal not named: $(cat "$R/err")"
+sed 's/"kinds": \["new-surface"\]/"kinds": ["nope"]/; s/"\^src\/math\/"/"(unclosed"/' "$R/.claude/risk.json" > "$R/.claude/bad.json"
+python3 "$pf" check --root "$R" --registry .claude/bad.json 2>"$R/err"; grep -q 'kind nope is not in the kinds vocabulary' "$R/err" && grep -q "signals.paths '(unclosed'" "$R/err" || fail "kind or regex refusal not named: $(cat "$R/err")"
+ok "profile check: a valid registry passes; rounds off a plan check, an unknown kind, a bad regex refuse"
+
+# 2. match: a file by path, a file by its stem, a directory as itself, a symbol, a kind; retired never; predicted apart
+cat > "$R/Plans/p.md" <<'EOF'
+# P
+
+Touches src/math/Dose.txt and the PauseRule, and a snoozed state. A new src/fresh/Thing.txt.
+
+## Verification ledger
+
+- drafted at abc1234, 2026-10-30, slices 0.12.0 — 0 sites opened (unverified: 0)
+
+## After
+EOF
+python3 "$pf" match "$R/Plans/p.md" --kinds new-surface,odd-kind > "$R/m" || fail "match failed: $(cat "$R/m")"
+head -1 "$R/m" | grep -q ' — classes: state-machine, numeric; predicted: copy; novel: src/fresh, odd-kind$' || fail "record line wrong: $(head -1 "$R/m")"
+grep -q '^  - state-machine — path: src/policy/PauseRule.txt$' "$R/m" || fail "a CamelCase identifier did not resolve to its file"
+grep -q '^  - state-machine — symbol: snoozed$' "$R/m" || fail "a symbol did not match"
+grep -q '^  - numeric — path: src/math/Dose.txt$' "$R/m" || fail "a cited path did not match"
+grep -q '^  - copy — kind: new-surface$' "$R/m" || fail "a declared kind did not join its class"
+grep -q 'gone' "$R/m" && fail "a retired class matched"
+grep -q 'novel — path: src/old\|novel — path: src/math' "$R/m" && fail "a recently touched directory read novel"
+printf 'See src/old/ for the legacy.\n' > "$R/Plans/o.md"
+python3 "$pf" match "$R/Plans/o.md" | head -1 | grep -q ' — classes: unclassified; novel: src/old$' || fail "a directory untouched by the last root commits did not read novel, or docs commits counted: $(python3 "$pf" match "$R/Plans/o.md")"
+ok "profile match: path, stem, directory, symbol and kind signals; retired never; predicted apart; novelty counts only root commits"
+
+# 3. --write appends at the end of the ledger section; a re-profile reads its kinds from the record
+python3 "$pf" match "$R/Plans/p.md" --kinds lifecycle-axis --write >/dev/null || fail "--write refused"
+awk '/^## Verification ledger/{s=1} /^## After/{s=0} s' "$R/Plans/p.md" | grep -q '^- profiled at .* — classes: state-machine, numeric; novel: src/fresh$' || fail "record not written inside the ledger: $(cat "$R/Plans/p.md")"
+tail -2 "$R/Plans/p.md" | head -1 | grep -q '^$' && tail -1 "$R/Plans/p.md" | grep -q '^## After$' || fail "the next section was disturbed: $(cat "$R/Plans/p.md")"
+python3 "$pf" match "$R/Plans/p.md" | grep -q '^  - state-machine — kind: lifecycle-axis$' || fail "a re-profile did not read its kinds from the record"
+printf -- '## Frame\n\n- shape A: do it — kinds: new-surface — value: v\n- shape B: less — kinds: none — value: v\n- drafter'"'"'s pick: shape A — why\n' > "$R/Plans/stub.md"
+python3 "$pf" match "$R/Plans/stub.md" | grep -q '^  - copy — kind: new-surface$' || fail "a stub's picked shape's kinds were not read"
+ok "profile --write: inside the ledger section; kinds from the record, else the picked shape"
+
+# 4. rounds: the base round, novelty's check in it, then each plan class's rounds; none without a record
+python3 "$pf" rounds "$R/Plans/p.md" > "$R/r"
+[ "$(cat "$R/r")" = "$(printf 'round 1: base — novel: src/fresh — Name what the area resembles.\nround 2: state-machine — Tabulate axes x states.\nround 3: state-machine — Tabulate axes x states.')" ] || fail "rounds budget wrong: $(cat "$R/r")"
+python3 "$pf" rounds "$R/Plans/o.md" >/dev/null; [ $? -eq 3 ] || fail "rounds without a record did not exit 3"
+mv "$R/.claude/slices.json" "$R/.claude/off.json"
+python3 "$pf" match "$R/Plans/p.md" | grep -q 'no riskRegistry' || fail "no registry was not narrated"
+mv "$R/.claude/off.json" "$R/.claude/slices.json"
+ok "profile rounds: base plus each plan class's rounds; build checks buy none; no record or registry exits 3"
