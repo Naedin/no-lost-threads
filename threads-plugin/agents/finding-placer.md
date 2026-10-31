@@ -55,6 +55,21 @@ doc, grep it for the finding's own vocabulary and read the hits in place.
 
 ## 3. Bias, in order
 
+First, **out of the doc.** A doc admits only this repo's own decisions. When a finding's
+cause is a tool's own behavior — the harness, a CLI, an app, a dependency — or the rule is
+already enforced at the moment it fires by a hook, script, check, or config, no doc clause
+hosts it: return **`out of doc`**, naming the owner — the hook, script, or config to change;
+a workaround register entry, where the caller's `.claude/threads.json` names a
+`workaroundsPath`, as a **probe** when a command reproduces the limitation and a
+**retest** when only hand steps do; or telemetry only. A clause
+restating a tool's behavior goes stale the day the tool changes, and nothing says so.
+An `out of doc` placement carries no doc edit and names no doc section, not as a fallback
+should the maintainer overrule it and not as a near-miss home: the first doc pointer offered
+is the one a reader lands, and a maintainer who overrules asks for the edit. Key-only, the
+same ruling is yours to make from the finding alone.
+
+Otherwise:
+
 1. **Amend** an existing entry when the lesson shares a meta-principle with it.
 2. **Merge** adjacent entries when one combined entry is more findable.
 3. **Remove or narrow** a rule the findings show has aged out or never fired.
@@ -78,7 +93,8 @@ have, place it and name what's missing. The rule's content belongs to your calle
 
 ## 5. Return, per finding
 
-- **placement** — amend / merge / narrow / add, with file and section — the section or a
+- **placement** — amend / merge / narrow / add, with file and section, or out of doc,
+  with its owner — the section or a
   numbered item by its name, never its number alone: your caller writes it into an
   append-only log, and a list renumbers
 - **the existing text**, quoted **as it sits on disk**: `path:first-last` line numbers,
@@ -137,7 +153,8 @@ time, and it's why you write the key rather than the caller.
 If an existing key names the same shape, return it — verbatim, with its occurrence count
 and dates — and reuse that exact key rather than minting a near-duplicate.
 
-**Prefer no-match when unsure.** A miss costs one window; a false match promotes a finding
+**Prefer no-match when unsure** — but a match that turns only on a mechanism the existing
+key's wording already covers is a match, not doubt, key-only included. A miss costs one window; a false match promotes a finding
 to *adopt now* and lands a rule that never needed to exist. Same asymmetry as `add
 (unconsolidated)`.
 
@@ -165,6 +182,8 @@ call on the evidence — that fence from §4 holds here exactly as it does every
   it — consolidation has a later pass; this one has a clock.
 - **Re-litigating the finding, or re-scoping its fix.** Both settled. If the docs
   genuinely contradict it, note that — don't silently drop it.
+- **Restating a tool's behavior as a rule.** The tool owns it; a clause about it is the
+  prose that outlives the behavior it describes.
 - **Only ever growing the doc.** If the right placement is a removal or a narrowing,
   propose that.
 - **Reading the retro log end to end.** The key list is the corpus; the log is for a hit's

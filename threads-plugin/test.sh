@@ -779,6 +779,24 @@ grep -q 'in both invariantDocs and windowOnlyDocs: CLAUDE.md' "$CD/err4" || fail
 printf '{ "markTag": "process-review-mark" }\n' > "$CD/.claude/threads.json"
 python3 "$cd_" --root "$CD" 2>/dev/null | grep -q 'no invariantDocs or windowOnlyDocs configured' || fail "no invariantDocs did not say so"
 ok "core-diff: per-doc words at mark and head, added/removed, commits, whole/window; diff; --since; a missing mark, a doc in neither list, and one in both refuse"
+python3 "$cd_" self --root "$CD" 2>/dev/null | grep -q 'no commit carries Process-Review' || fail "self with no review landing did not say so"
+printf '%s\n' one two three four five >> "$CD/docs/core.md"; mkdir -p "$CD/.claude"; printf 'log\n' > "$CD/.claude/threads-retro-log.md"
+c add docs .claude/threads-retro-log.md; c commit -q -m "docs(process/x): a landing" -m "Process-Review: 2026-09-01" -m "Co-Authored-By: t <t@t>"
+printf '%s\n' six seven >> "$CD/docs/core.md"; printf 'a rule\n' >> "$CD/CLAUDE.md"
+c add docs CLAUDE.md; c commit -q -m "docs(process/x): a later landing" --trailer 'Process-Review: 2026-09-08'
+printf 'one two three\n' > "$CD/CLAUDE.md"
+c add CLAUDE.md; c commit -q -m "docs(process/x): a trim" --trailer 'Process-Review: 2026-09-15'
+printf 'long ago\n' > "$CD/docs/old.md"; c add docs; GIT_AUTHOR_DATE=2026-01-01T00:00:00 c commit -q -m "docs(process/x): an old landing" --trailer 'Process-Review: 2026-01-01'
+printf 'organic growth not the review\n' >> "$CD/docs/new.md"
+c add docs; c commit -q -m "docs(process/y): organic"
+python3 "$cd_" self --root "$CD" > "$CD/self.out" 2>"$CD/err5" || fail "core-diff self failed: $(cat "$CD/err5")"
+grep -q '^core-diff self: the review.s own landings over 30 days, 3 runs (2026-09-01\.\.2026-09-15), 2 files$' "$CD/self.out" || fail "self header wrong: $(head -1 "$CD/self.out")"
+[ "$(sed -n 2p "$CD/self.out")" = 'docs/core.md	20	+7 -0	2 grew · 0 trimmed of 2 runs' ] || fail "the doc the review grew run after run, one landing's marker outside the trailer block, is not first: $(cat "$CD/self.out")"
+grep -qx 'CLAUDE.md	3	+2 -2	1 grew · 1 trimmed of 2 runs' "$CD/self.out" || fail "a grown-then-trimmed doc is wrong: $(cat "$CD/self.out")"
+grep -q 'retro-log\|new.md\|old.md' "$CD/self.out" && fail "self counted the retro log, an organic commit, or a run outside the window"
+python3 "$cd_" self --days 7 --root "$CD" 2>/dev/null | grep -q 'over 7 days, 2 runs (2026-09-08\.\.2026-09-15), 2 files' || fail "--days did not bound the window: $(python3 "$cd_" self --days 7 --root "$CD" 2>&1 | head -1)"
+python3 "$here/scripts/marker-stream.py" list --all --root "$CD" 2>/dev/null | grep -q '^review	.*a landing$' || fail "marker-stream read a split trailer block's landing as organic"
+ok "core-diff self: the review's own landings per file over a window in days, a marker on any body line, most net growth first; bookkeeping, organic, and older runs left out; marker-stream agrees"
 
 # ---- a mark a peer force-pushed: a plain fetch leaves the local tag behind, and every
 # script reading the mark refuses it and names the fetch that moves it
@@ -1044,4 +1062,62 @@ grep -q 'tracked changes' "$L/err5" || fail "dirty tree not named: $(cat "$L/err
 s checkout -q -- feature.txt
 (cd "$L/slice" && python3 "$lp" "$conf" --branch nosuch >/dev/null 2>"$L/err5b") && fail "landed on a branch the remote lacks"
 ok "land-process-commit: a dirty tree refuses; --branch is honored"
+# ---- scripts/workarounds.py: a workaround retires when its tool moves and its probe stops reproducing
+wa="$here/scripts/workarounds.py"
+W="$tmp/wa"; mkdir -p "$W/probes" "$W/docs" "$W/.claude" "$W/hooks"
+git -C "$W" init -q
+printf '# rules\n' > "$W/docs/rules.md"; printf '#!/bin/sh\n' > "$W/hooks/pre.sh"
+printf 'exit "$(cat probes/a.code)"\n' > "$W/probes/a.sh"; echo 0 > "$W/probes/a.code"
+printf 'exit "$(cat probes/b.code)"\n' > "$W/probes/b.sh"; echo 1 > "$W/probes/b.code"
+cat > "$W/.claude/workarounds.json" <<'EOF'
+{ "tools": { "fake": "fake --version", "gone": "false" },
+  "workarounds": [
+    { "id": "a", "tool": "fake", "observed": "1.2.0", "probe": "sh probes/a.sh", "sites": ["docs/rules.md#a"] },
+    { "id": "b", "tool": "fake", "observed": "1.2.0", "probe": "sh probes/b.sh", "sites": ["hooks/pre.sh"] },
+    { "id": "f", "tool": "fake", "observed": "1.2.0", "probe": "fake --quirk", "sites": ["docs/rules.md"] },
+    { "id": "m", "tool": "fake", "observed": "1.2.0", "probe": null, "retest": "start a session and relay an approval", "sites": ["docs/rules.md#m"] },
+    { "id": "g", "tool": "gone", "observed": "3.0", "probe": "true", "sites": ["docs/rules.md"] } ] }
+EOF
+# `fake` exists only as a function of this shell, as a harness-injected command does: the read
+# sees it only if it runs in the caller's shell, never in a subprocess of the script
+fake() { case "$1" in --version) echo "fake $FAKE_V (build 7)" ;; --quirk) return "$FAKE_Q" ;; esac; }
+wread() { eval "$(python3 "$wa" versions --root "$W")" | python3 "$wa" due --root "$W" "$@" | { eval "$(cat)"; } | python3 "$wa" record --root "$W" 2>/dev/null; python3 "$wa" status --root "$W"; }
+python3 "$wa" status --root "$W" >/dev/null 2>&1; [ $? -eq 3 ] || fail "workarounds did not skip with no workaroundsPath"
+echo '{"workaroundsPath": ".claude/workarounds.json"}' > "$W/.claude/threads.json"
+python3 "$wa" check --root "$W" 2>/dev/null || fail "check refused a valid register"
+python3 "$wa" status --root "$W" | head -1 | grep -q '5 — live 0 · retirable 0 · due 5 · broken 0; fake ?, gone ?' || fail "unread versions are not due"
+FAKE_V=1.2.0 FAKE_Q=0 wread > "$W/out" || fail "the read failed"
+head -1 "$W/out" | grep -q '5 — live 4 · retirable 0 · due 0 · broken 1; fake 1.2.0, gone ?$' || fail "at the observed version: $(head -1 "$W/out")"
+grep -q '^broken	g	gone ?	version unreadable' "$W/out" || fail "an unreadable version is not broken"
+[ -f "$W/.git/threads/workarounds-state.json" ] || fail "answers not kept in the git common dir"
+git -C "$W" status --porcelain | grep -q threads && fail "answers landed in the tree"
+ok "workarounds: no register skips; unread is due; the version is read in the caller's shell, a function included; state outside the tree"
+FAKE_V=1.3.0 FAKE_Q=1 wread > "$W/out" || fail "the read after a move failed"
+head -1 "$W/out" | grep -q 'live 1 · retirable 2 · due 1 · broken 1; fake 1.3.0' || fail "after a move: $(head -1 "$W/out")"
+grep -q '^retirable	b	fake 1.3.0	stopped reproducing at 1.3.0 on .* (observed at 1.2.0)	hooks/pre.sh$' "$W/out" || fail "a probe exiting 1 is not retirable with its sites"
+grep -q '^retirable	f	' "$W/out" || fail "a probe calling the caller's function was not answered by it"
+grep -q '^due	m	fake 1.3.0	.*re-test: start a session and relay an approval	docs/rules.md#m$' "$W/out" || fail "a re-test is not due with its steps after a move"
+[ -z "$(printf 'fake\t1.3.0\n' | python3 "$wa" due --root "$W")" ] || fail "due re-ran probes already answered at this version"
+ok "workarounds: a move makes them due; each probe runs once in the caller's shell, exit 1 retirable; a re-test is listed, never run"
+python3 "$wa" record m 1 --root "$W" 2>/dev/null || fail "record refused a re-test's answer"
+python3 "$wa" status --root "$W" | grep -q '^retirable	m	' || fail "a recorded re-test did not retire"
+echo 0 > "$W/probes/b.code"
+printf 'fake\t1.3.0\n' | python3 "$wa" due --id b --root "$W" | { eval "$(cat)"; } | python3 "$wa" record --root "$W" 2>/dev/null
+python3 "$wa" status --root "$W" | grep -q '^retirable	b' && fail "--id did not re-probe one workaround"
+python3 "$wa" due --id nosuch --root "$W" </dev/null >/dev/null 2>&1 && fail "--id accepted an unknown workaround"
+python3 "$wa" record nosuch 1 --root "$W" >/dev/null 2>&1 && fail "record accepted an unknown workaround"
+ok "workarounds: record takes a re-test's answer; --id re-probes one; unknown ids refuse"
+cat > "$W/.claude/workarounds.json" <<'EOF'
+{ "tools": { "fake": "fake --version" },
+  "workarounds": [
+    { "id": "x", "tool": "fake", "observed": "1.0", "sites": ["docs/rules.md"] },
+    { "id": "x", "tool": "other", "observed": "1.0", "probe": "sh probes/none.sh", "retest": "by hand", "sites": ["docs/nope.md#y"], "extra": 1 } ] }
+EOF
+python3 "$wa" check --root "$W" > "$W/out" 2>/dev/null && fail "check passed a malformed register"
+for want in 'x: needs a `probe` or, with `probe: null`, a `retest` — exactly one' 'x: id used twice' 'tool other is not in `tools`' 'site docs/nope.md#y: no such path' 'probe script probes/none.sh: no such file' 'unknown field `extra`'; do
+  grep -qF "$want" "$W/out" || fail "check missed: $want"
+done
+[ "$(grep -c 'exactly one' "$W/out")" -eq 2 ] || fail "check did not refuse both neither and both of probe and retest"
+python3 "$wa" status --root "$W" >/dev/null 2>&1; [ $? -eq 2 ] || fail "status ran on a malformed register"
+ok "workarounds: check names neither or both of probe and retest, a reused id, an undeclared tool, a missing site or probe script, an unknown field; status refuses"
 echo "all cases passed"

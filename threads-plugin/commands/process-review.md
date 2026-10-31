@@ -107,6 +107,11 @@ convention in the moment. Fields:
   path, a draw size `n`, a `weighting` (`window` or `uniform`), and an optional `floor`
   of change below which the rule is not sampled; the schema is
   [`commands/adherence.md`](adherence.md). Absent → step 0d narrates and skips.
+- `workaroundsPath` — optional: the **workaround register**, the rules, hooks, and config
+  lines that exist because a tool (the harness, a CLI, an app, a dependency) behaves as it
+  does today, each naming the version it was seen on and a probe that reproduces it, or
+  the re-test a person runs where no command can; the
+  schema is `scripts/workarounds.py --help`. Read at step 0f. Absent → narrate and skip.
 - `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
   short name passed through as given. Absent, the agent file's own pin applies.
 - `retroPlacement` — optional: `"full"` (default) or `"keys"`. `/threads:retro` under
@@ -134,7 +139,8 @@ spelling, and only the first is telemetry:
 - **review** — a commit this command landed: a candidate, its `LANDED` lines, a
   compaction, the ledger rewrite, the mark. **Every commit this command makes carries the
   trailer `Process-Review: <today's date>`** (`git commit --trailer 'Process-Review:
-  <date>'`; `land-process-commit.py` preserves it through the cherry-pick). Already
+  <date>'`; `land-process-commit.py` preserves it through the cherry-pick), read on any line
+  of the body, since a hand-written message can split git's trailer block. Already
   adjudicated: its sha is a `LANDED` ref, never churn. A review that counts its own
   landings as the next window's churn is ripe on itself the next morning, and spends
   most of its read on what it wrote.
@@ -233,7 +239,7 @@ rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a r
 conflict or a red gate; a run that has spent its budget is not thrown away for a clean
 rebase.
 
-0. **Free — the reads that size the run.** 0a–0c and 0e are cheap; none is optional where
+0. **Free — the reads that size the run.** 0a–0c, 0e, and 0f are cheap; none is optional where
    configured. Do them before looking at a single commit; 0d, the one paid step, follows.
 
    **0a — the core** (`invariantDocs`, in order). Read them whole. You are about to
@@ -245,7 +251,7 @@ rebase.
    each doc with a window, `core-diff.py diff <doc>`, each hunk classed **rule** (a
    predicate, a scope boundary, a named exception, a decision-relevant why) or **prose**
    (narration, a symbol enumeration, a restated why, a worked case restating a rule
-   already present). A slice PR's squash lands a paragraph in a core doc and no marker
+   already present, a tool's own behavior restated). A slice PR's squash lands a paragraph in a core doc and no marker
    names it; a doc read whole every run can still double unread. **Word count is one
    reason a written rule slips, never the target.** Read each window for three, each a
    **finding** beside step 4's: **growth** — prose-only, or prose outrunning rules (remedy:
@@ -270,6 +276,13 @@ rebase.
    **keyed read** (step 6): named by a finding, read at the moment it bears, never here.
    **The output names each doc opened whole and each read as its window.** Neither list
    → narrate and skip.
+
+   **Then the review's own weight**: `core-diff.py self` — per file, the words this
+   command's own landings added and removed over the 30 days back from its newest run,
+   which no window counts, since the mark passes them in the run that lands them. A file
+   the review grew in two or more of those runs and trimmed in none is a **growth** finding against the
+   review itself, ranked like any other, its remedy that file's trim; the record carries
+   the line. Read it whatever the lists hold: the file the review grows need not be core.
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
    window: a human accepted each one and a cold reader named its shape. Read it through
@@ -494,6 +507,22 @@ rebase.
    An escape naming a class the registry lacks is a misspelling or a class never written:
    fix the line at its source, or add the class. Exit 3 (no registry) → narrate and skip.
 
+   **0f — the workaround register** (`workaroundsPath`). Free unless a tool moved. The
+   script runs no command: a version and a probe's answer depend on the shell they run in,
+   so run the read in **your own Bash tool**, never a subprocess or a hook, as one call:
+   `w=${CLAUDE_PLUGIN_ROOT}/scripts/workarounds.py; eval "$(python3 "$w" versions)" |
+   python3 "$w" due | { eval "$(cat)"; } | python3 "$w" record; python3 "$w" status`. It
+   reads each tool's version, runs the probe of every workaround whose tool moved past
+   where it was last answered — none when nothing moved — and prints the counts, `live ·
+   retirable · due · broken`, with a line per workaround not live. The counts line goes to
+   the record. A **retirable** one is a candidate: delete its sites' text and its register
+   entry, classed `trim`, and a deletion is a row, never the unanswered line. A **due**
+   re-test (`probe: null`) is a row asking for that re-test, its steps quoted; the answer
+   is recorded with `workarounds.py record <id> <0|1>`, and it never retires unanswered. A
+   **broken** probe is a `tooling` candidate: repair it, or the workaround loses its
+   admission. A workaround is judged by its probe or its re-test, never by re-reading the
+   tool's behavior from the stream. Exit 3 (no register) → narrate and skip.
+
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
 expensive path and they are *conditional*, not automatic. **Its direction is expected
 value**: open the funnel, and rank inside it, by what a finding is likely to cost if left —
@@ -502,15 +531,15 @@ occurrence count is one input, and a floor: a slip that is frequent, cheap, and 
 is rarely captured, so where a script can detect the shape, its run over history is the rate. **The mechanism below is the current hypothesis**, not the
 definition: a recurrence, a fired cluster, or one `Escaped:` or `Gate-run:` occurrence opens the gate, and
 ranking puts escapes first, then targets read on every run, then count. Each marker commit
-body carries `Opened: <recurrence | escape | cluster | risk | ledger | deep> — <the keys, files, or classes>`
+body carries `Opened: <recurrence | escape | cluster | risk | workaround | ledger | deep> — <the keys, files, or classes>`
 beside `Tally:`, and a later review tests the hypothesis from what is already recorded: of
 the keys landed by runs each opener started, how many came back after `LANDED` (`view
 --recurred`), and how many runs it opened landed nothing. An opener whose landings recur, or
 that opens runs with nothing to land, is revised on that evidence.
 
-- **Nothing recurred** in 0b, 0c, 0d, or 0e (no key `--reached` shows after re-keying — an
+- **Nothing recurred** in 0b, 0c, 0d, 0e, or 0f (no key `--reached` shows after re-keying — an
   `Escaped:` or `Gate-run:` key shows at one occurrence — no placement cluster fires, no shape routed,
-  no risk proposal but leave-dormant), and
+  no risk proposal but leave-dormant, no workaround retirable, broken, or due a re-test), and
   no ledger signal fired → **stop and say so.** Report the pending
   captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
   the complete answer for the price of step 0; running the full funnel against it burns
@@ -657,7 +686,12 @@ retro-log count undercounts;
 it starts at `monitor` unless that count is near zero, and for a monitor check already
 configured `guards run.py --monitor` is the evidence for the next rung), `motion` (a backlog motion — a stub filed, a field re-formed, a plan moved or
 deleted — which is not a doc edit at all). `trim` and `amend` are the mechanical sentence by
-default; the rest are rows. The class predicts where judgment is likely; it groups, it does
+default; the rest are rows. **A doc admits only this repo's own decisions.** A candidate whose
+cause is a tool's own behavior, or a rule already enforced at the moment it fires by a hook,
+script, check, or config, is never a `rule` or an `amend` restating it: its remedy is in the
+owner — `tooling` or `config`, a register entry with its probe where `workaroundsPath`
+exists — or it is telemetry, `ADJUDICATED` count-only. The placer's `out of doc` is this
+disposition. The class predicts where judgment is likely; it groups, it does
 not gate — a `rule` the maintainer waves through is still a row, answered in a word.
 
 **The record**, below the block:

@@ -9,6 +9,25 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.26.0] — 2026-10-31
+
+### Added
+
+- **A workaround retires when its tool moves (step 0f).** `workaroundsPath` in `.claude/threads.json` names an adopter-owned register of the rules, hooks, and config lines that exist because a tool behaves as it does today. Each entry names the tool, the version it was observed on, the sites retiring it deletes, and either a probe that reproduces the limitation (exit 0 still reproduces, 1 no longer) or, where no command can, `probe: null` with a `retest` a person runs. A workaround with neither is not admitted. The new `scripts/workarounds.py` runs no command itself, because a version and a probe's answer depend on the shell they run in: `versions` and `due` print shell the agent runs in its own Bash tool, and `record` takes the answers back. Only the probes whose tool moved run, so the read is free on most runs, and `status` prints `live · retirable · due · broken`. Answers are per machine, kept in the git common dir. The review proposes deleting a retirable workaround's sites, asks for a due re-test, and repairs a broken probe; `workaround` joins the gate's `Opened:` vocabulary. `check` validates the register. On the reference adopter, a probe run as a subprocess read the system `grep` where the agent's shell runs a harness-injected one, and retired a workaround still live. `test.sh` proves a function defined only in the caller's shell answers the version and the probe, a move makes workarounds due and each probe runs once, exit 1 retires, a re-test is listed and retires only on a recorded answer, and the state stays out of the tree.
+- **The review reads its own growth (step 0a).** `core-diff.py self` prints, per file, the words the review's own `Process-Review:` landings added and removed over the 30 days back from its newest run (`--days`), and in how many runs each file grew and was trimmed. No window counts those commits, because the mark passes them in the run that lands them. A file the review grew in two or more runs and trimmed in none is a growth finding against the review. The window is in days, not runs, because a repo reviewed daily spends five runs in a week. On the reference adopter, 12 of the 38 commits that grew one process doc from 880 to 4,217 words were the review's own; over 30 days it reads `6 grew · 3 trimmed of 9 runs`. `test.sh` proves the per-file count, the ordering, the window, and that bookkeeping, organic, and older commits are left out.
+
+### Fixed
+
+- **A review landing is read from any line of its body.** `marker-stream.py`, `retro-log.py`, `adherence.py`, and `core-diff.py self` read `Process-Review:` through git's trailer parse, which sees only a message's last paragraph, so a hand-written body with a blank line before `Co-Authored-By:` read as organic churn. They now read the line anywhere in the body, as the review's own `git log --grep '^Process-Review: '` already did. On the reference adopter, two trims of one day read as organic. `test.sh` proves a landing whose marker sits outside the trailer block reads as review.
+
+### Changed
+
+- **A cause a tool owns gets no doc clause.** `finding-placer` now rules first whether a finding belongs in a doc at all: when its cause is a tool's own behavior, or the rule is already enforced at its moment by a hook, script, check, or config, it returns `out of doc` with the owner, a register entry with a probe or a re-test, or telemetry, and no doc edit or doc pointer, not even a fallback, never a clause restating the behavior. Key-only, the placer names a register entry as a probe only when a command reproduces the limitation, and a match turning only on a mechanism the existing key already covers is a match. `/threads:process-review` classes such a candidate `tooling`, `config`, or count-only, never `rule` or `amend`, and step 0a classes a restated tool behavior as prose. A key-only retro writes `Placement: out of doc — <the owner>`. On the reference adopter, about 30% of its seven always-read docs fell into these classes.
+
+### Contract
+
+- **A workaround register, one placement form, and one opener**, a stable grammar adopters write: the register at `workaroundsPath` (`tools` and `workarounds` entries, each with `probe` or `probe: null` and `retest`; schema `scripts/workarounds.py --help`), `Placement: out of doc — <the owner>` in the retro log, and `workaround` in a review's `Opened:` line. All are opt-in behind `workaroundsPath`; with none, nothing changes. Adopter edit, reference adopter: `workaroundsPath` in `.claude/threads.json` and a register seeded with its three current workarounds, owed by the adopter after this release, not made before it.
+
 ## threads [0.25.2] — 2026-10-30
 
 ### Fixed

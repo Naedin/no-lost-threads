@@ -12,8 +12,10 @@ yet to see, and counting them as if they were is how the review feeds its own tr
                retro's escape hatch, a rule landed by hand, a slice's process commit.
                The trigger and the review's ranking read these and only these.
   review       a commit the review landed — a candidate or its bookkeeping — carrying
-               the trailer `Process-Review: <date>` that the review writes on every
-               commit it makes. Already adjudicated; its sha is a LANDED ref, not churn.
+               the line `Process-Review: <date>` that the review writes on every
+               commit it makes, read on any line of the body: a hand-written message
+               that splits the trailer block leaves git's own trailer parse empty.
+               Already adjudicated; its sha is a LANDED ref, not churn.
   bookkeeping  a commit that touched nothing but the log, the ledger, or the capability
                store (`retroLogPath`, `ledgerPath`, `capabilityEvidencePath`): a capture,
                a status line, a compaction. A status flip changed no rule.
@@ -57,6 +59,14 @@ TRAILER = "Process-Review"
 ARC_TRAILER = "Arc"
 DEFAULT_PATTERN = "^docs(process"
 DEFAULT_MARK = "process-review-mark"
+REVIEW_LINE = re.compile(r"^" + TRAILER + r":[ \t]*(\S.*?)\s*$", re.M)
+
+
+def review_date(body):
+    """The first `Process-Review:` value on any line of a commit body, or ''. Read from the
+    body, never git's trailer parse, which sees only the last paragraph."""
+    m = REVIEW_LINE.search(body)
+    return m.group(1) if m else ""
 
 
 def refuse(msg):
@@ -143,17 +153,17 @@ def stream_config(root, pattern=None):
 def commits(root, rng):
     """[(sha, short, subject, trailer, files, date, arcs, time)] newest first, one git
     call; `time` is the author date, ISO 8601."""
-    fmt = ("%x00%H%x1f%h%x1f%s%x1f%(trailers:key=" + TRAILER + ",valueonly)%x1f%ad%x1f"
-           "%(trailers:key=" + ARC_TRAILER + ",valueonly)%x1f%aI%x1e")
+    fmt = ("%x00%H%x1f%h%x1f%s%x1f%ad%x1f"
+           "%(trailers:key=" + ARC_TRAILER + ",valueonly)%x1f%aI%x1f%b%x1e")
     raw = git(["log", *rng, "--format=" + fmt, "--date=short", "--name-only"], root)
     out = []
     for chunk in raw.split("\x00"):
         if not chunk.strip():
             continue
         head, _, rest = chunk.partition("\x1e")
-        sha, short, subject, trailer, date, arcs, time = (head.split("\x1f") + [""] * 7)[:7]
+        sha, short, subject, date, arcs, time, body = (head.split("\x1f", 6) + [""] * 7)[:7]
         files = [l.strip() for l in rest.splitlines() if l.strip()]
-        out.append((sha, short, subject, trailer.strip(), files, date.strip(),
+        out.append((sha, short, subject, review_date(body), files, date.strip(),
                     {a.strip() for a in arcs.splitlines() if a.strip()}, time.strip()))
     return out
 

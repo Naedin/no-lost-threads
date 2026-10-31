@@ -2,7 +2,7 @@
 """core-diff — each core doc's window, so step 0a reads the core as churn and not only
 as authority.
 
-  core-diff.py [summary|diff DOC] [--since REV] [--head REV] [--root DIR]
+  core-diff.py [summary|diff DOC|self] [--since REV] [--head REV] [--days N] [--root DIR]
 
 Step 0a reads `invariantDocs` whole every run and reports which bore on a ruling. A doc
 read whole can still grow unread: a slice PR's squash lands a paragraph in it, no marker
@@ -26,8 +26,19 @@ Modes:
   diff DOC the doc's diff over the range, as `git diff` prints it, for the hunk-by-hunk
            read: each hunk is classed rule (a predicate, a scope boundary, a named
            exception, a decision-relevant why) or prose (narration, a symbol enumeration,
-           a restated why, a worked case restating a rule already present). The classing
+           a restated why, a worked case restating a rule already present, a tool's own
+           behavior restated). The classing
            is the reader's; this prints what it reads.
+  self     what the review's own landings did to each file over `--days` days (default
+           30) back from its newest run: every commit with a `Process-Review: <date>`
+           line in its body, grouped by that date — commits no window reads, since the
+           mark moves past them in the run that lands them. A window in days, not runs,
+           because a repo reviewed daily spends five runs in a week. One header line, then
+           one line per file they touched, most net words first, `retroLogPath`,
+           `ledgerPath`, and `capabilityEvidencePath` left out:
+             <path>\t<words at head>\t+<added> -<removed>\t<g> grew · <t> trimmed of <n> runs
+           A file the review grew in two or more runs and trimmed in none is a growth
+           finding against the review itself. `--since` is not read.
 
 The range is `<markTag>..HEAD` (`markTag` from `.claude/threads.json`, default
 `process-review-mark`); `--since REV` replaces the start, `--head REV` the end (the
@@ -42,6 +53,7 @@ is a tag the remote holds elsewhere (`marker-stream.py` names the fetch), a doc 
 neither list, or git fails.
 """
 import argparse
+import datetime
 import importlib.util
 import json
 import pathlib
@@ -102,13 +114,61 @@ def changed_words(diff):
     return added, removed
 
 
+def own_growth(root, cfg, head, days):
+    if days < 1:
+        refuse("--days must be 1 or more")
+    ms = marker_stream()
+    skip = {cfg.get("retroLogPath") or ".claude/threads-retro-log.md",
+            cfg.get("ledgerPath") or ".claude/threads-review-ledger.md",
+            cfg.get("capabilityEvidencePath")}
+    by_run = {}
+    for sha, _, _, trailer, files, *_ in ms.commits(root, [head]):
+        if trailer:
+            by_run.setdefault(trailer.splitlines()[0].strip(), []).append(sha)
+    if not by_run:
+        print(f"core-diff self: no commit carries {ms.TRAILER}: — the review has landed nothing")
+        return
+    newest = max(by_run)
+    try:
+        start = (datetime.date.fromisoformat(newest[:10]) - datetime.timedelta(days=days)).isoformat()
+    except ValueError:
+        refuse(f"{ms.TRAILER}: {newest!r} is not a date")
+    dates = sorted((d for d in by_run if d[:10] >= start), reverse=True)
+    per = {}
+    for d in dates:
+        for sha in by_run[d]:
+            out = git(["show", "--format=", "--no-renames", sha], root)
+            for chunk in out.split("\ndiff --git ")[0:]:
+                m = chunk.split("\n", 1)[0]
+                path = m.rsplit(" b/", 1)[-1] if " b/" in m else None
+                if not path or path in skip:
+                    continue
+                added, removed = changed_words(chunk)
+                runs_of = per.setdefault(path, {})
+                ra, rr = runs_of.get(d, (0, 0))
+                runs_of[d] = (ra + added, rr + removed)
+    rows = []
+    for path, rs in per.items():
+        added = sum(x for x, _ in rs.values())
+        removed = sum(y for _, y in rs.values())
+        grew = sum(1 for x, y in rs.values() if x > y)
+        trimmed = sum(1 for x, y in rs.values() if x < y)
+        now = words_at(root, head, path)
+        rows.append((added - removed, f"{path}\t{'-' if now is None else now}\t+{added} -{removed}"
+                                      f"\t{grew} grew · {trimmed} trimmed of {len(rs)} runs"))
+    print(f"core-diff self: the review's own landings over {days} days, {len(dates)} runs "
+          f"({dates[-1]}..{dates[0]}), {len(rows)} files")
+    print("\n".join(r for _, r in sorted(rows, key=lambda x: (-x[0], x[1]))))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", nargs="?", default="summary", choices=["summary", "diff"])
+    ap.add_argument("mode", nargs="?", default="summary", choices=["summary", "diff", "self"])
     ap.add_argument("doc", nargs="?", default=None, help="the doc, for `diff`")
     ap.add_argument("--since", default=None, metavar="REV", help="range start (default: the mark)")
     ap.add_argument("--head", default="HEAD", metavar="REV", help="range end (default: HEAD)")
+    ap.add_argument("--days", type=int, default=30, metavar="N", help="self: N days back from the newest review run")
     ap.add_argument("--root", default=None, help="repo root (default: git top level)")
     a = ap.parse_args()
 
@@ -125,6 +185,8 @@ def main():
         refuse(".claude/threads.json: in both invariantDocs and windowOnlyDocs: "
                + ", ".join(both) + " (a doc is read whole or as its window, not both)")
     core, window = lists["invariantDocs"], lists["windowOnlyDocs"]
+    if a.mode == "self":
+        return own_growth(root, cfg, a.head, a.days)
     docs = core + window
     if not docs:
         print("core-diff: no invariantDocs or windowOnlyDocs configured — nothing to read as churn")

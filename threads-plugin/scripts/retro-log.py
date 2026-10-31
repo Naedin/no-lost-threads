@@ -681,11 +681,11 @@ def closed_outside(blocks, root, log, since_old):
     review = set()
     if shas:
         r = subprocess.run(["git", "log", "--no-walk=unsorted",
-                            f"--format=%h%x1f%(trailers:key={marker_stream().TRAILER},valueonly)%x1e",
-                            *shas], cwd=root, capture_output=True, text=True)
+                            "--format=%h%x1f%b%x1e", *shas], cwd=root, capture_output=True, text=True)
+        review_date = marker_stream().review_date
         for rec in r.stdout.split("\x1e"):
-            short, _, trailer = rec.strip().partition("\x1f")
-            if trailer.strip():
+            short, _, body = rec.strip().partition("\x1f")
+            if review_date(body):
                 review.add(short)
     out = {}
     for key, bs in keys_in_order(blocks).items():

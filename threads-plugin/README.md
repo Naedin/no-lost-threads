@@ -139,7 +139,9 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   diff, and the placer is the only whole read of an edit's target. The core's own window
   is read too (`scripts/core-diff.py`): a core doc grows through squashes no marker
   names, and one that doubled while bearing on nothing is a trim finding, never a reason
-  to stop reading it.
+  to stop reading it. So is the review's own weight (`core-diff.py self`): its landings
+  fall before the mark moves, so no window counts them, and a file it grows run after run
+  is a growth finding against the review.
 - **It samples whether a prose rule holds.** A lint proves itself at its gate; a rule an
   agent is supposed to apply — *a comment states only what the code makes true* — has no
   gate. A rule declared under `adherenceRules` (a whole-tree population command, your judge
@@ -164,6 +166,13 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   window's plan profiles with what escaped them, per class and, for unclassified work, by
   area. The review then proposes adding a class, revising a check, promoting a predicted
   class, or retiring one on evidence it is wrong. A dormant class is left alone.
+- **It retires workarounds when their tool moves.** A rule that exists because a tool
+  behaves as it does today sits in a register (`workaroundsPath`) with the version it was
+  seen on and a probe that reproduces it, or a re-test where no command can. The review
+  runs only the probes whose tool moved, in its own shell, and proposes deleting what no
+  longer reproduces. A finding whose
+  cause a tool owns, or a hook already enforces, is placed `out of doc`: fixed in its owner,
+  or counted, never restated as a rule.
 - **It closes with its own economics**, as questions to you, each carrying the review's
   own answer and the default it acts on, or why only you can answer it: what it read
   against what bore on a ruling, how much of the marker stream was its own weight, how
@@ -218,6 +227,7 @@ threads-plugin/
   scripts/marker-stream.py        The marker-commit stream since the mark, classified organic / review / bookkeeping
   scripts/land-process-commit.py  Land one marker commit on the default branch from a slice branch, through the repo's own hook
   scripts/risk-review.py          The slices risk registry against the window's escapes, per class and unclassified by area
+  scripts/workarounds.py          The workaround register: shell that reads each tool's version and probes the moved ones, and what is retirable
 ```
 
 **The retro log is an append-only stream, read through a view.** Sessions append; a

@@ -336,12 +336,11 @@ def cmd_draw(a):
             scope = "uniform"
         if floor:
             covered = {p for p, _ in whole}
-            log = git(["log", "--format=%x00%(trailers:key=Process-Review,valueonly)%x01",
-                       "--name-only", rng], repo)
-            moved = 0
+            log = git(["log", "--format=%x00%b%x01", "--name-only", rng], repo)
+            moved, review_date = 0, marker_stream().review_date
             for c in log.split("\x00")[1:]:
-                trailer, _, names = c.partition("\x01")
-                if not trailer.strip() and covered & {l.strip() for l in names.splitlines()
+                body, _, names = c.partition("\x01")
+                if not review_date(body) and covered & {l.strip() for l in names.splitlines()
                                                       if l.strip()}:
                     moved += 1
             if rule["weighting"] == "uniform":
@@ -569,12 +568,10 @@ def shapes_of(line):
 
 def cmd_recur(a):
     root = pathlib.Path(a.root or git(["rev-parse", "--show-toplevel"], None).strip()).resolve()
-    log = git(["log", a.head, "--grep=^Process-Review: ",
-               "--format=%x00%(trailers:key=Process-Review,valueonly,separator=%x2c)%x01%b"], root)
-    windows = {}
-    for rec in log.split("\x00")[1:]:
-        date, _, body = rec.partition("\x01")
-        date = date.strip().split(",")[0].strip() or "?"
+    log = git(["log", a.head, "--grep=^Process-Review: ", "--format=%x00%b"], root)
+    windows, review_date = {}, marker_stream().review_date
+    for body in log.split("\x00")[1:]:
+        date = review_date(body) or "?"
         for line in body.splitlines():
             rid, shapes = shapes_of(line)
             if rid and (a.rule is None or rid == a.rule):

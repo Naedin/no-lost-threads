@@ -163,7 +163,9 @@ Under `"keys"`:
   model, so `placerModel` is not what saves the cost here; the unread docs are.
 - **You write the pointer**, `Placement: <file> §<section>` — the home you would name,
   no quote and no edit. It routes the review's keyed read (`retro-log.py view --docs`),
-  and the review's placer writes the edit. No home you can name → `Placement: none`.
+  and the review's placer writes the edit. No home you can name → `Placement: none`; a
+  cause a tool owns, or one a hook or check already enforces → `Placement: out of doc —
+  <the owner>` (the placer's §3).
 - **`Caught:`** is written on the gate and the cost alone: a named gate stopped the slip
   and its catch was the whole cost. Nobody read the placement, so whether the rule was
   present is the review's to verify when it rules on the key; name the rule's place when
