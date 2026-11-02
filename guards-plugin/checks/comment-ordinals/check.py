@@ -44,6 +44,7 @@ files in scope).
 """
 import argparse
 import fnmatch
+import json
 import functools
 import os
 import pathlib
@@ -63,6 +64,27 @@ EXTENSIONS.update(dict.fromkeys("sh bash zsh ksh py rb pl pm awk".split(), HASH)
 INTERPRETER = re.compile(r"(sh|bash|zsh|ksh|dash|python[0-9.]*|ruby|perl|awk)|(node)")
 TAG = re.compile(r"§\s?[0-9]|(?<![A-Za-z0-9_])AC[\s-]?[0-9]"
                  r"|Impl\.?[\s-]?[Nn]ote\s*#?[0-9]")
+
+
+def tag_pattern(root):
+    """TAG, or this check's `tags` regexes from .claude/guards.json when it sets them."""
+    path = pathlib.Path(root) / ".claude" / "guards.json"
+    if not path.is_file():
+        return TAG
+    try:
+        tags = json.loads(path.read_text(encoding="utf-8"))["checks"][ID].get("tags")
+    except (KeyError, TypeError, AttributeError):
+        return TAG
+    except (OSError, UnicodeDecodeError, ValueError) as e:
+        refuse(f".claude/guards.json unreadable: {e}")
+    if tags is None:
+        return TAG
+    if not (isinstance(tags, list) and tags and all(isinstance(t, str) for t in tags)):
+        refuse(f'.claude/guards.json: "{ID}".tags must be a non-empty list of strings')
+    try:
+        return re.compile("|".join(f"(?:{t})" for t in tags))
+    except re.error as e:
+        refuse(f'.claude/guards.json: "{ID}".tags: {e}')
 
 
 def refuse(msg):
@@ -237,6 +259,7 @@ def main():
     if not scoped:
         refuse("no files in scope")
 
+    tags = tag_pattern(root)
     findings = []
     for rel, marker in scoped:
         try:
@@ -247,7 +270,7 @@ def main():
             m = marker.match(line)
             if not m or ALLOW in line:
                 continue
-            for t in TAG.finditer(line, m.end()):
+            for t in tags.finditer(line, m.end()):
                 findings.append((rel, n, f'numbered plan anchor "{t.group()}" in a '
                                  f'comment (cite a symbol or a §"Named section", '
                                  f'never a number)'))

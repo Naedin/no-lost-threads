@@ -18,12 +18,16 @@ file so listed that the tree lacks refuses by name, as the export dropped it. An
 is normalized (`./docs/*.md` is `docs/*.md`); one outside the root refuses.
 `--exclude` removes fnmatch patterns from it and applies after.
 
+A word ordinary in this repo's docs goes in this check's `allow` list in
+`.claude/guards.json`, matched case-insensitively.
+
 Findings on stdout, one per line: `<path>:<line>: <message>`.
 Exit 0 pass; 1 findings; 2 refused (root missing, a file in scope unreadable, no
 files in scope).
 """
 import argparse
 import fnmatch
+import json
 import functools
 import os
 import pathlib
@@ -38,6 +42,22 @@ NARRATIVE = re.compile(
     r"|was caught by|never arrived", re.IGNORECASE)
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 RUN = re.compile(r"`+")
+
+
+def allowed(root):
+    """This check's `allow` words from .claude/guards.json, lowercased."""
+    path = pathlib.Path(root) / ".claude" / "guards.json"
+    if not path.is_file():
+        return set()
+    try:
+        words = json.loads(path.read_text(encoding="utf-8"))["checks"][ID].get("allow", [])
+    except (KeyError, TypeError, AttributeError):
+        return set()
+    except (OSError, UnicodeDecodeError, ValueError) as e:
+        refuse(f".claude/guards.json unreadable: {e}")
+    if not (isinstance(words, list) and all(isinstance(w, str) for w in words)):
+        refuse(f'.claude/guards.json: "{ID}".allow must be a list of strings')
+    return {w.lower() for w in words}
 
 
 def strip_spans(line):
@@ -203,6 +223,7 @@ def main():
     if not files:
         refuse("no files in scope")
 
+    allow = allowed(root)
     findings = []
     for f in files:
         rel = f.relative_to(root).as_posix()
@@ -212,6 +233,8 @@ def main():
             refuse(f"unreadable: {rel}: {e}")
         for n, line in prose_lines(body):
             for m in NARRATIVE.finditer(line):
+                if m.group().lower() in allow:
+                    continue
                 findings.append((rel, n, f'narrative provenance "{m.group()}"'))
 
     for rel, n, msg in findings:

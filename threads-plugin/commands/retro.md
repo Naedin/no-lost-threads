@@ -54,6 +54,8 @@ Read the command's stderr and match:
   script directly if they know it.
 - **`no transcript found … set CLAUDE_CONFIG_DIR`** → their Claude data dir is
   non-default; suggest setting `CLAUDE_CONFIG_DIR`.
+- **`format has changed`** → the reader could not read the transcript, so the harness may
+  have moved its format; say so and name the harness version.
 
 Likewise, if the `Agent` tool or the `retro-auditor` agent isn't available (Step 2b),
 fall back the same way.
@@ -292,7 +294,7 @@ a paragraph:
 
 ```
 scope-leak/edit-landed-without-exercising-the-sibling-path
-  LANDED 9f60e91e — .claude/commands/land.md §Carriers: the sibling carrier is amended in the same commit as the primary, and the commit names both; the second carrier was the one the rule kept missing.
+  LANDED 9f60e91e — docs/release.md §Rollback: the sibling carrier is amended in the same commit as the primary, and the commit names both; the second carrier was the one the rule kept missing.
 ```
 
 - **A new finding** → key line + one occurrence line, continuations to **eight lines at
@@ -317,7 +319,7 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
 - **Every occurrence carries exactly one class line, and it says where the occurrence was
   stopped**: `Caught:`, `Gate-run:`, or `Escaped:` below, else `In-work: <what stopped it>`
   (the work itself, this session's own read, a cost spent inside the work). The first stop
-  decides: a maintainer who stopped it is `Escaped:`, while a question after a gate's stop
+  decides: a person who stopped it is `Escaped:`, while a question after a gate's stop
   stays with that gate. A reviewer that runs on its own, on a push or a PR, is a named gate.
   Another session's read that stopped it after a gate passed it is `Gate-run:` on that gate.
   Rankings read the line and never the prose. **A named gate's stop is a tag,
@@ -357,7 +359,7 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
 lines to an entry already in the file, even the last one: a union merge orders one
 side's lines after the other's, so continuation lines appended on a branch land under
 whatever block another session appended on the default branch, silently. A union merge
-also runs no pre-commit hook, so the adopter's landing step runs the `guards` checks on
+also runs no pre-commit hook, so the adopter's landing step runs its commit gate, where it has one, on
 the merged tree before the push; that is where a merged stream is judged.
 
 Compaction, re-keying, and retirement belong to `/threads:process-review`, which is
@@ -410,14 +412,15 @@ Fix the artifact in the retro when all three hold:
   present instead of fix.
 - **Same gate** — whatever checked the artifact when it landed (the adopter's landing
   step, the `guards` run) can check the fix the same way. "Fix it" means the artifact the
-  finding cites, never the source it describes; a source edit fails this gate in an
-  adopter whose docs lane rejects source, and correctly.
+  finding cites, never the source it describes; a source edit fails this gate in a
+  repo whose lightest lane rejects source, and correctly.
 
 Then **say what you are about to fix and where, one line per artifact, and fix it.** Don't
 ask — the edit is specified by the finding and this is its cheapest moment; don't do it
 silently either. If the original is not yet committed, the fix rides in the working tree
 with it. If it landed, land the fix through the lane the fix itself qualifies for — a
-docs-only fix takes the docs lane even when the original went through a code PR — as one
+docs-only fix takes the repo's lightest lane for docs even when the original went through a
+code PR — as one
 commit naming the artifacts. That commit is not a process change and takes no
 `markerPattern` marker; the log append goes wherever the adopter's capture normally goes.
 
@@ -463,7 +466,7 @@ skip the fetch):
   files`: the **organic** markers since the mark and how many files `trigger.concentration`
   or more of them touched. The review's own landings (the `Process-Review:` trailer) and
   commits that touched only the log and the ledger are classified out — counting them is
-  how a review comes out ripe on its own output the next morning.
+  how a review comes out ripe on its own output the next run.
 - **Clusters** — `retro-log.py view --placements --ripe --since <markTag>`: a file placed
   at by `trigger.cluster` or more live keys with an escaped or gate-run occurrence, one of
   them new since the mark, fires — single findings that together say one doc is not being

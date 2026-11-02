@@ -3,7 +3,7 @@
 # index is exported to a temporary tree and the runner runs there, so a check that
 # reads across files sees exactly what the commit will contain.
 #
-# Install, from a checkout that carries the plugin:
+# Install: python3 <plugin>/adapters/git/install.py; a repo carrying the plugin in its tree:
 #   git config core.hooksPath guards-plugin/adapters/git
 # Inert when the index carries no .claude/guards.json: exit 0, one stderr line saying
 # so — a silent pass reads the same as a working one.

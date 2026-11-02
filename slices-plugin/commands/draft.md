@@ -29,7 +29,7 @@ fields. `draftDir` is where §2 writes the new plan — a repo whose drafted pla
 a subdirectory (`Plans/active/drafted`) sets it, and `plansDir` stays the root the §1
 sweep covers; absent, the plan is written in `plansDir`. `planTemplate` is a path to an
 adopter-supplied plan template. `planTemplate` is opt-in:
-absent (this repo's own config, and the common case), §2 writes the built-in plan
+absent (the common case), §2 writes the built-in plan
 unchanged; a repo sets it only to carry sections beyond the invariant shape. Bootstrap
 never invents one. A `planTemplate` path that does not resolve to a readable file is
 narrated and the built-in plan is written — never refuse; the missing template is the
@@ -94,7 +94,7 @@ each is a plain `git rm` (or removing the file, when it was never tracked). With
 ## 1. Audit the premise before drafting on it
 
 **The light lane comes first.** A concern that touches no shipped behavior — a doc, a
-config value, a reversible chore, a plugin's own command text — needs no plan. Say so,
+config value, a reversible chore — needs no plan. Say so,
 and stop here: the stub is implemented directly and the verification that guards landing
 still runs. Unsure → draft.
 
@@ -159,9 +159,10 @@ claim like any other, settled here by measurement:
   line says whether the shape needs what the blocker delivers (a mechanism dependency) or
   only follows it in sequence.
 - **The neighbouring states.** Walk outward from the stub's case: each surface the change
-  touches shown alone, beside the others, and not at all; every legitimate answer the user
-  has to what the change asks of them — accept, decline, put off, ignore — and who is right
-  to give each, which sizes how many users the stub's case leaves out; what undoes the
+  touches (a screen, an API, a command, an output) used alone, beside the others, and not at
+  all; every legitimate response whoever meets it (a user, a caller, an operator) has to what
+  it asks of them — accept, decline, put off, ignore; succeed, fail, retry, skip — and who is
+  right to give each, which sizes how many the stub's case leaves out; what undoes the
   trigger a week on. Walk today's behaviour in the same states: it is what a shape can
   regress.
 - **The shapes, weighed on value and cost.** The candidates are the stub's shape; **doing
@@ -215,7 +216,7 @@ site-opening pass): `ledger-row.py add <stub> '<claim>' '<command>'` writes unde
 Then the record goes to a context that has not read the drafting rationale: use the
 `Agent` tool with this plugin's `frame-checker` agent (`subagent_type:
 slices:frame-checker`), passing **only the stub's path** — *"Review the frame record in
-`<path>`."* — plus, when `draftBrief` is set, *"Its sizing rules are in `<draftBrief
+`<path>`."* — plus, when `draftBrief` is set, *"Its frame rules are in `<draftBrief
 path>`."* — and *"The row re-runner is `${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py`."*,
 the variable expanded. Nothing else: not the invocation's brief, not the premise audit's
 narration, not what you are unsure of; the record is the whole argument, as the plan is to
@@ -312,7 +313,7 @@ contradicts it rewrites the claim, never narrows the command to fit it. **A coun
 of its own.** A number the plan states about a set of sites, anywhere in it — a Note's
 "all six tests", a test plan's "the 21 existing cases", a claim's "two consumers" — comes
 from a command that counts (`rg -c <file>`, `… | wc -l`), never from tallying a listing,
-and the writer records it as a bare number: `<claim> — \`rg -c '@Test' <file>\` —
+and the writer records it as a bare number: `<claim> — \`rg -c 'def test_' <file>\` —
 \`21\``. The prose that uses the count repeats that number. A site the pass could not open
 is an `unverified` row, never a sentence in the body. The rows are what `/slices:check`
 re-runs before it hunts, against the current tree.
@@ -338,12 +339,12 @@ named slice clears it. A sentence in the plan body is found by nobody; a stub is
 the next triage.
 
 **Every Out item answers the dependency test before it is written:** *which in-scope
-surface is wrong, or hands the user a chore, without this?* Walk the slice's own copy,
-behavior, and timing against the item's absence. Copy that hands the user something to
-remember, track, or time — "test after 8 PM", "check back tomorrow", "keep an eye on" — is
-the tell that a capability was deferred, and copy rules that forbid promising an unshipped
-capability only make it quieter, since the copy is then written as instructions and every
-string check still passes. The answer is recorded on the item's line, so a reader sees it,
+surface is wrong, or hands whoever meets it a chore, without this?* Walk the slice's own
+copy or output, behavior, and timing against the item's absence. Text that hands them
+something to remember, track, or time — "run this again after the deploy", "check back
+tomorrow", "keep an eye on" — is the tell that a capability was deferred, and rules that
+forbid promising an unshipped capability only make it quieter, since the text is then written
+as instructions and every string check still passes. The answer is recorded on the item's line, so a reader sees it,
 in one of three forms, and only these go Out:
 
 - `- Out: <item> — without it: none` — no surface needs it; a deferral, to a stub as above.

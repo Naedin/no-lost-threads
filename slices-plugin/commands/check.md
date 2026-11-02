@@ -193,8 +193,8 @@ With no stop, reconcile as below.
   is not resolving the call; **never silently resolve a judgment call the checker
   escalated.** It escalated it because the call isn't yours.
 - **Before an escalated question's ruling is recorded**, check it against
-  `invariantDocs` in `.claude/threads.json` (absent → `docs/principles.md` and
-  `docs/direction.md`). On conflict, cite the doc and surface the conflict to the
+  `invariantDocs` in `.claude/threads.json` (absent → say no authority docs are named and
+  record the ruling). On conflict, cite the doc and surface the conflict to the
   user instead of recording the ruling.
 
 A clean report is a first-class outcome. Don't pressure the checker for findings,

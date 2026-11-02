@@ -30,9 +30,11 @@ the report, one line each, after the findings.
 **Read the frame before any row.** Precision spent on a frame that is too narrow is
 spent twice. Before re-running anything, read what the plan says it delivers — the Shape,
 the Scope, the frame's tension, the row that sizes the harm — and re-run that row first.
-Then walk outward from the plan's case as a user meets it: each surface the change touches
-shown alone, beside the others, and not at all; every legitimate answer the user has to
-what it asks — accept, decline, put off, ignore — and who is right to give each; what
+Then walk outward from the plan's case as whoever consumes the change meets it (a user, a
+caller, an operator): each surface it touches (a screen, an API, a command, an output) used
+alone, beside the others, and not at all; every legitimate response they have to what it
+asks — accept, decline, put off, ignore; succeed, fail, retry, skip — and who is right to
+give each; what
 undoes it a week on. A frame narrower than the problem — a design that
 holds only in the stub's case, a harm carried unsized as a premise, a cheaper delivery of
 as much value left unnamed when it would win — is a shape finding: report **MIS-CARVED**
@@ -95,13 +97,13 @@ Work in this order:
    commit carries it; a ruling or tension in the plan that changes a recorded decision
    without naming that decision's own amendment in scope.
 4. **Then every Out item, against the slice's own surfaces.** For each item Scope puts
-   Out, find an in-scope surface — copy, behavior, timing — that is wrong, or hands the
-   user a chore, without it; an item's recorded `without it:` answer is a claim like any
-   other, checked here. Copy that hands the user something to remember, track, or time
-   ("test after 8 PM", "check back tomorrow", "keep an eye on") is the tell that a
+   Out, find an in-scope surface — copy or output, behavior, timing — that is wrong, or
+   hands whoever meets it a chore, without it; an item's recorded `without it:` answer is a claim like any
+   other, checked here. Text that hands them something to remember, track, or time
+   ("run this again after the deploy", "check back tomorrow", "keep an eye on") is the tell that a
    capability was deferred, all the more when string checks pass on it. Two answers are
    not hits once checked: a `refinement:` whose surface does differ without the item but
-   stays correct and asks the user to carry nothing, and a `limit:` naming why no
+   stays correct and asks them to carry nothing, and a `limit:` naming why no
    capability in any seam's reach could supply the item — a limit whose capability is only
    unbuilt is a hit, and a limit's surface whose copy does not keep the chore to the moment
    it matters is a defect of the plan's. Each hit is
@@ -130,7 +132,7 @@ what the defect cites — `lands: plan` or `lands: outside — <path or code are
 only corrects the plan's own text about code — a claim, a line number, a symbol, a count —
 lands in the plan, whatever file it cites. A fix lands outside only when it needs code
 outside the changed files to change, or to behave differently than the plan assumes. A
-plan that reads `Store.swift:40` where the symbol now sits at `:52` is `lands: plan`; a plan
+plan that reads `store.py:40` where the symbol now sits at `:52` is `lands: plan`; a plan
 whose new caller needs `Store.load()` to stop throwing on an empty file it is not changing
 is `lands: outside — Store.load()`, and a dependency finding as well. When the ledger holds a `gap-checked at` record
 carrying `touched: <sections>` below its newest `drafted at` or `reframed at` record — the

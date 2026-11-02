@@ -109,7 +109,7 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   siblings that should co-evolve did, then git-blames the survivors to point at their
   stalest sections. Staleness alone earns a scrutiny note, never a rewrite proposal.
 - **It reads what's pending first.** Findings captured by `/threads:retro` are the only
-  already-adjudicated material in a window — you accepted each one — so the review leads
+  already-adjudicated material in a window — you ran the retro that captured each one — so the review leads
   with them, ranks any key that shows up more than once, and is free to re-rank what a
   single session called urgent now that it can see across sessions. Findings that each
   stayed at one occurrence but pile up on one doc are a cluster, read together as one
@@ -128,7 +128,7 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   `Process-Review: <date>` trailer, and a commit that touched only the log or the ledger
   is bookkeeping; `scripts/marker-stream.py` classifies the stream into organic, review,
   and bookkeeping, and only the organic commits feed the trigger and the ranking. Without
-  that, a review that lands twenty commits makes the next morning's review look ripe on
+  that, a review that lands twenty commits makes the next review look ripe on
   its own output.
 - **It reads a small core, then only what its findings name.** `invariantDocs` is the
   handful of docs stating your repo's authority order and the review's own conventions,
@@ -170,7 +170,8 @@ reconciliation and structural candidates, ranked, with the commits that feed eac
   behaves as it does today sits in a register (`workaroundsPath`) with the version it was
   seen on and a probe that reproduces it, or a re-test where no command can. The review
   runs only the probes whose tool moved, in its own shell, and proposes deleting what no
-  longer reproduces. A finding whose
+  longer reproduces. An optional changelog read, filtered to the surfaces you name, catches
+  what a version number and a probe cannot, such as a new capability that replaces a workaround. A finding whose
   cause a tool owns, or a hook already enforces, is placed `out of doc`: fixed in its owner,
   or counted, never restated as a rule.
 - **It closes with its own economics**, as questions to you, each carrying the review's
@@ -269,12 +270,17 @@ process docs. It discovers where lessons live (a `CLAUDE.md`, a patterns/traps d
 failure catalog, a hooks dir) and proposes landing changes there — or just surfaces
 candidates if your repo has no such place.
 
-`scripts/extract-record.py` is the one **harness-specific** piece: it reads Claude
-Code's transcript format. The fresh-context audit's *principle* (distill the record to a
-compact timeline → hand it to a fresh reviewer) ports to any environment; that script is
-one concrete implementation of it.
+The audit's record is portable; the plugin is not. The commands and agents are Claude Code
+plugin files that spawn Claude Code sub-agents. `scripts/extract-record.py` splits a
+harness-specific reader from a renderer: a reader yields `(kind, text)` events, and the kinds
+(`human`, `unattributed`, `peer`, `brief`, `harness`, `said`, `did`) are what the auditor's brief
+relies on. Supporting another harness's transcripts takes one reader, which yields
+`unattributed` for any turn whose author it cannot tell. The only reader today parses Claude
+Code's undocumented JSONL. A session with no events fails to the self-pass; a record with no
+human turn says so.
 
-`/threads:process-review` needs only **git** — no `jq`, no network. Its conventions are
+`/threads:process-review` needs **git** and **Python 3**, plus network access only to fetch
+the remote it compares against. Its conventions are
 deliberately not hardcoded: the marker pattern, process-doc paths, the log locations,
 thresholds, and write consent all live in your repo's `.claude/threads.json`, negotiated
 at bootstrap rather than dictated. The retro log's *vocabulary* isn't configured at all —

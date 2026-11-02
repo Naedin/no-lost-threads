@@ -9,6 +9,39 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.19.0] — 2026-11-02
+
+### Added
+
+- **`adapters/git/install.py` wires the gate from an installed copy.** It writes the clone's `pre-commit`, calling the newest installed version, and keeps a repo's own hook or `core.hooksPath`, printing the lines to add instead.
+- **A repo's vocabulary is config:** `allow` on `war-stories`, `tags` on `comment-ordinals`.
+
+## slices [0.13.0] — 2026-11-02
+
+### Changed
+
+- **The draft and check walks fit any consumer.** The frame checker, gap checker, and draft read "whoever meets the change (a user, a caller, an operator)", and their examples no longer assume an app with on-screen copy.
+- **`/slices:check` with no `invariantDocs` says so and records the ruling.** It used to fall back to two paths that were this repo's own layout.
+
+## threads [0.28.0] — 2026-11-02
+
+### Added
+
+- **The workaround register can read a tool's changelog.** An optional `changelogs` entry names a URL and the surfaces a repo depends on, and the review prints what changed there since the last read: what a version number and a probe cannot say.
+- **`extract-record.py --probe`** says whether the reader still understands a transcript, for a tool watch.
+
+### Fixed
+
+- **The audit record says who said what.** A human turn keeps its words behind a harness block, and slash commands, messages queued mid-turn, `AskUserQuestion` answers, and tool rejections now reach `USER`. Another agent's message reads `PEER`, injected text reads `HARNESS` at a small cap, and a turn with no author mark reads `USER?`, so none of them passes as the human's. The auditor brief says only `USER` authorizes and a `USER?` turn cannot ground a finding.
+- **The record shows what the agent told others and what its commands changed.** A message sent, a session started, or a sub-agent spawned reads as `SAID` with its recipient, by title once the transcript gives one, and body. A `Bash` line lists the state-changing `git` and `gh` commands and the scripts it runs past its cut, and other `DID` lines name a skill and its arguments, a question asked, else a tool's first string field. A started session's brief reads `BRIEF` at a longer cap, and a report relayed from a started session reads `PEER`.
+- **An unreadable transcript fails to the self-pass** rather than writing an empty record, and a record with no human turn says so on its first lines.
+- **`view` no longer doubles the "to"** when an `Escaped:` destination opens with it.
+- **The README says the review needs Python 3**, and shipped text no longer assumes `guards` is installed, one decision owner, or one repo's lanes and doc paths. `/threads:adherence` reads a hit's own comment leader when a rule sets no `block`.
+
+### Changed
+
+- **`extract-record.py` splits a harness-specific reader from a renderer,** with event kinds as the contract. The README stops calling the script the plugin's only harness-specific piece.
+
 ## guards [0.18.0] — 2026-11-01
 
 ### Added

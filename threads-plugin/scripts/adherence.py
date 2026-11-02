@@ -130,6 +130,8 @@ import sys
 
 DEFAULT_MARK = "process-review-mark"
 DEFAULT_BLOCK = r"^\s*(//|/\*|\*)"
+HASH_BLOCK = r"^\s*#"
+HASH_SUFFIXES = {".py", ".sh", ".bash", ".zsh", ".rb", ".pl", ".yml", ".yaml", ".toml"}
 VERDICTS = ("TRUE", "DRIFTED", "HISTORY")
 SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 HIT = re.compile(r"^(?:\./)?([^:]+):(\d+):")
@@ -214,6 +216,11 @@ def read_lines(root, path, cache):
     return cache[path]
 
 
+def default_block(path):
+    """A rule with no `block`: the comment leader of the hit's language."""
+    return re.compile(HASH_BLOCK if pathlib.PurePath(path).suffix in HASH_SUFFIXES else DEFAULT_BLOCK)
+
+
 def expand(lines, lineno, block_re):
     """The 1-based inclusive span of the contiguous block around `lineno`."""
     if not 1 <= lineno <= len(lines):
@@ -290,7 +297,7 @@ def cmd_draw(a):
     cfg_path = pathlib.Path(a.config).resolve() if a.config else root / ".claude" / "threads.json"
     cfg = load_config(cfg_path)
     rule = pick_rule(cfg, a.rule, cfg_path)
-    block_re = re.compile(rule.get("block", DEFAULT_BLOCK))
+    set_block = re.compile(rule["block"]) if "block" in rule else None
     if a.judge_prompt:
         prompt = pathlib.Path(a.judge_prompt).resolve()
     else:
@@ -359,7 +366,7 @@ def cmd_draw(a):
     for path, lineno in order:
         if len(blocks) >= limit:
             break
-        span = expand(read_lines(root, path, cache), lineno, block_re)
+        span = expand(read_lines(root, path, cache), lineno, set_block or default_block(path))
         if span is None:
             refuse(f"{path}:{lineno}: past the end of the file at {root}")
         if (path, span) in seen:

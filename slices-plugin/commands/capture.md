@@ -10,7 +10,7 @@ allowed-tools: Bash, Read, Grep, Glob, Write, Edit
 immediately as **one pickable concern**, self-disclosing as low-trust, without
 derailing the task at hand. Lifecycle is expressed by directory, never by mutable
 status metadata. A dropped claim gets re-discovered; a wrong gate rots invisibly —
-so a blocker is a **named, checkable condition** or it is omitted entirely; the field spellings are the reference adopter's, verbatim.
+so a blocker is a **named, checkable condition** or it is omitted entirely; use the field spellings below verbatim.
 
 Speed is a correctness property here. This runs mid-anything: one grep, one write,
 one confirmation line, back to work.
@@ -19,8 +19,7 @@ one confirmation line, back to work.
 
 Read `.claude/slices.json`. Use `inboxDir` for where the stub lands and
 `stubTemplate` — **optional** — for a path to an adopter-supplied stub template.
-`stubTemplate` is opt-in: when it is absent (this repo's own config, and the common
-case) §2 writes the built-in stub unchanged; a repo sets it only to carry fields beyond
+`stubTemplate` is opt-in: when it is absent (the common case) §2 writes the built-in stub unchanged; a repo sets it only to carry fields beyond
 the invariant shape. If the config file is absent, this is first use — bootstrap
 minimally, by inspection:
 

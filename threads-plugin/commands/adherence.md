@@ -24,7 +24,7 @@ block list in a checkout pinned to a commit.
 "adherenceRules": [
   {
     "id": "comment-truth",
-    "population": "rg -n --type swift '^\\s*///?\\s*\\S.{30,}' Sources",
+    "population": "rg -n --type py '^\\s*#\\s*\\S.{30,}' src",
     "judgePrompt": "Plans/templates/adherence-comment-truth.md",
     "n": 20,
     "weighting": "window",
@@ -137,5 +137,5 @@ edited, completed, or assembled by hand — and let the script check it.
 - Standalone: one closing sentence saying nothing was committed and the mark did not move.
 
 **What the adopter does with a verified drift** — fix it in the run, file it, or only
-record it — is the adopter's rule, stated in its own process-review extensions; this
+record it — is the adopter's rule, stated in its own process docs; this
 command measures and reports.

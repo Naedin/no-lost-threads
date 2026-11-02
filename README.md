@@ -83,10 +83,8 @@ One script per check, with a stable id, fixtures, and exit codes meaning pass,
 findings, refused. `.claude/guards.json` names the checks a repo has turned on and
 each one's rung, `warn` or `block`, so enforcement climbs by config and never by
 migration. A git pre-commit adapter judges the index and is inert in a repo with
-no config. Two checks ship: `anchors` (every in-repo section link resolves to an
-explicit anchor; every relative link target exists) and `war-stories` (narrative
-provenance in process docs). Installed from the marketplace, this version is
-inert; the gate installs from a checkout that carries the plugin. Full contract:
+no config, with checks for doc links, narrative provenance, plan sweeps, and the threads
+logs. Installed from the marketplace, `adapters/git/install.py` wires the gate. Full contract:
 [`guards-plugin/README.md`](guards-plugin/README.md).
 
 ## Install

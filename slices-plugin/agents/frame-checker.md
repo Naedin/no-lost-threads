@@ -17,8 +17,9 @@ the shape the record under-weighs, not to confirm the drafter's pick.
 
 Your Bash access is for read-only inspection (`git log`, `git show`, `git grep`, `rg`, runs
 of the record's commands) — you change nothing in the repo **except the `## Frame` section
-of the stub**, which you correct in place before you report. If your brief names a sizing
-rules file, read it: it says where the repo's data lives and how a harm is counted.
+of the stub**, which you correct in place before you report. If your brief names a frame
+rules file, read it: it says where the repo's data lives, how a harm is counted, and any
+states or authority this repo adds to the walk below.
 
 **A shape is never chosen on value alone.** The higher-value shape always wins a value
 comparison; what it costs to converge and what it regresses are what a cheaper shape avoids.
@@ -50,7 +51,7 @@ Work in this order:
    read every hit. Read the stub's named neighbours too — every stub,
    plan, or pattern it links or names, under the plans root with `grep -r` or `rg
    --no-ignore` (an ignore file can hide an archive from plain `rg`). A neighbour's shape
-   that would make this one smaller — a card layout it settles, a mechanism it ships, a
+   that would make this one smaller — a layout or an interface it settles, a mechanism it ships, a
    decision it owns — is a candidate shape. A record that puts it aside as "that stub's
    decision" without weighing it has missed it.
 3. **Name the shapes the record lacks.** Doing less is always one. A **split by risk** — the
@@ -61,15 +62,16 @@ Work in this order:
 4. **Write every cost line from the code, not the stub.** For each shape, first its
    **mechanism**: how it works, what it derives or decides and from what. A shape line that
    names an outcome with no mechanism cannot be costed; write the mechanism the shape needs,
-   and walk it through the states where existing rules meet it — a band edge, a threshold,
-   a shoulder, a default. Then: the seams it
+   and walk it through the states where existing rules meet it — a boundary value, a threshold,
+   a default. Then: the seams it
    touches (files or modules, opened); each mechanism it needs that does not exist yet, by
-   name — a new outcome type, a new across-readings rule, a new matching predicate; the user
-   states it must specify, counted against the record's `states walked:` line — every state a user can be in where the change is
-   visible (each setting the user may or may not have logged, a drain, an emergency, a
-   missing input, each answer a user can give); and each **regression**: walk today's
-   shipped behaviour through those states and name every one where the shape leaves the
-   user worse off than today — less margin, a step lost, a warning gone — or write `none`
+   name — a new outcome type, a new aggregation rule, a new matching predicate; the
+   consumer states it must specify, counted against the record's `states walked:` line —
+   every state whoever meets the change (a user, a caller, an operator) can be in where it
+   is visible (each earlier input present or absent, a rare or urgent case, a missing input,
+   each response they can give); and each **regression**: walk today's
+   shipped behaviour through those states and name every one where the shape leaves them
+   worse off than today — less margin, a step lost, a warning or an error gone — or write `none`
    after the walk. A cost line the drafter wrote that the code contradicts is corrected.
    A `risk:` field's `suggested <class>` decisions are read the same way: a confirm whose
    shape does nothing the class's check is for, or a dismissal whose shape does, is

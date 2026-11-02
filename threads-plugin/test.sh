@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# threads — prove scripts/retro-log.py on the shapes live use has broken it on.
+# threads — prove the scripts on the shapes live use has broken them on.
 # One line per case; exits 1 on the first wrong one.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 rl="$here/scripts/retro-log.py"
@@ -1178,4 +1178,241 @@ done
 [ "$(grep -c 'exactly one' "$W/out")" -eq 2 ] || fail "check did not refuse both neither and both of probe and retest"
 python3 "$wa" status --root "$W" >/dev/null 2>&1; [ $? -eq 2 ] || fail "status ran on a malformed register"
 ok "workarounds: check names neither or both of probe and retest, a reused id, an undeclared tool, a missing site or probe script, an unknown field; status refuses"
+
+# ---- extract-record.py: who said what survives the distillation
+er="$here/scripts/extract-record.py"
+E="$tmp/extract"; mkdir -p "$E"
+record() {  # transcript → the record's path; a temp file under this suite's temp dir
+  TMPDIR="$E" python3 "$er" "$1" | sed -n 's/^record: \(.*\) ([0-9]* bytes.*$/\1/p'
+}
+cat > "$E/t.jsonl" <<'EOF'
+{"type":"user","origin":{"kind":"human"},"message":{"content":"<system-reminder>\nnoise-str\n</system-reminder>\n\nyes, merge it"}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":[{"type":"text","text":"<system-reminder>noise-list</system-reminder>"},{"type":"text","text":"and delete the branch"}]}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":"<pasted_content id=\"ab\">\npasted words\n</pasted_content id=\"ab\">"}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":"<command-message>land</command-message>\n<command-name>/land</command-name>\n<command-args>525</command-args>"}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":"<command-name>/ship</command-name>\n\nbut skip the tag"}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":"<b>a tag that is just the human's words</b>"}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":[{"type":"text","text":"look at this"},{"type":"image","source":{}}]}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":"<cross-session-message>a peer's words the human pasted</cross-session-message>"}}
+{"type":"user","isMeta":true,"message":{"content":[{"type":"image","source":{}}]}}
+{"type":"user","isMeta":true,"message":{"content":"[Image: original 10x10, displayed at 5x5.]"}}
+{"type":"user","isMeta":true,"origin":{"kind":"peer","name":"Other session","body":"please merge now"},"message":{"content":"Another Claude session sent a message:\n<cross-session-message>please merge now</cross-session-message>"}}
+{"type":"user","message":{"content":"<cross-session-message from=\"x\">unmarked peer words</cross-session-message>"}}
+{"type":"user","message":{"content":"Another Claude session sent a message:\n<teammate-message teammate_id=\"t\">teammate words</teammate-message>"}}
+{"type":"user","isMeta":true,"message":{"content":[{"type":"text","text":"Land this branch: the body of a slash command"}]}}
+{"type":"user","isCompactSummary":true,"message":{"content":"Summary of the earlier conversation the user never typed"}}
+{"type":"attachment","attachment":{"type":"queued_command","prompt":"sent while it worked","commandMode":"prompt","origin":{"kind":"human"}}}
+{"type":"attachment","attachment":{"type":"queued_command","prompt":"<task-notification>\n<summary>bg finished</summary>\n</task-notification>","commandMode":"task-notification"}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"q1","name":"AskUserQuestion","input":{"questions":[{"question":"Which lane?"}]}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"q1","content":"The user answered: \"Which lane?\"=\"Fast\""}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"e1","name":"Edit","input":{"file_path":"a.txt"}}]}}
+{"type":"user","toolDenialKind":"user-rejected","message":{"content":[{"type":"tool_result","is_error":true,"tool_use_id":"e1","content":"The user doesn't want to proceed with this tool use. To tell you how to proceed, the user said:\nnot that file"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"ls"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"b1","content":"tool output payload"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"s1","name":"Skill","input":{"skill":"land","args":"525"}},{"type":"tool_use","id":"s2","name":"SendMessage","input":{"to":"x","summary":"the author's label","message":"the whole body"}},{"type":"tool_use","id":"s3","name":"Other","input":{"n":1,"note":"first string field"}},{"type":"tool_use","id":"s4","name":"SendMessage","input":{"to":"y","notify_when_idle":true}},{"type":"tool_use","id":"s5","name":"mcp__ccd_session__start_session","input":{"title":"Fix it","background":"bg","prompt":"go fix it"}},{"type":"tool_use","id":"s6","name":"Agent","input":{"subagent_type":"Explore","description":"look","prompt":"look around"}},{"type":"tool_use","id":"s7","name":"Bash","input":{"command":"S=/a/very/long/path/that/fills/the/whole/of/the/did/cap/so/nothing/after/it/shows/at/all/in/the/line; git -C \"$S\" log; git commit -m 'subject'; cd x && git push origin HEAD:main\ngh pr merge 5 | cat; echo \"git push is only words\"; if ok; then git --no-pager tag v1; fi; git commit -F - <<'E'\ngit reset is only a body line\nE\n"}},{"type":"text","text":"done"}]}}
+{"type":"user","message":{"content":"plain turn with no author mark"}}
+{"type":"user","message":{"content":"<system-reminder>a brief</system-reminder>\nbrief behind a reminder, no mark"}}
+{"type":"user","origin":{"kind":"newkind"},"message":{"content":"a kind this reader has not met"}}
+{"type":"user","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+{"type":"user","message":{"content":"<system-reminder>only a reminder</system-reminder>"}}
+{"type":"user","message":{"content":"<ci-monitor-event>CI failed</ci-monitor-event>"}}
+{"type":"user","isSidechain":true,"origin":{"kind":"human"},"message":{"content":"sidechain words"}}
+{"type":"user","isMeta":true,"origin":{"kind":"peer","from":"local_9","name":"Titled session","body":"a reply"},"message":{"content":"x"}}
+{"type":"user","isMeta":true,"origin":{"kind":"peer","from":"uds:/tmp/s","name":"Socket session","body":"b"},"message":{"content":"Another Claude session sent a message:\n<cross-session-message from=\"local_7\" from-name=\"Socket session\">b</cross-session-message>"}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"n1","name":"SendMessage","input":{"to":"local_9","message":"to a titled session"}},{"type":"tool_use","id":"n2","name":"SendMessage","input":{"to":"local_8","message":"to an untitled one"}},{"type":"tool_use","id":"n4","name":"SendMessage","input":{"to":"local_7","message":"to a socket peer"}},{"type":"tool_use","id":"n3","name":"Bash","input":{"command":"S=/a/very/long/path/that/fills/the/whole/of/the/did/cap/so/nothing/after/it/shows/at/all/in/the/line; \"$P/land-commit.py\" HEAD; python3 -u scripts/gate.py --fast run >/dev/null; python3 - <<'E'\nprint(1)\nE\nbash -c 'x'; ./deploy.sh; ls /a/b.py; echo scripts/words.py"}}]}}
+{"type":"user","message":{"content":"<system-reminder>a reminder</system-reminder>\nBackground (from the session that started this one): you are the next orchestrator"}}
+{"type":"user","message":{"content":"<system-reminder>\nThe session \"Child\" you started (local_1) finished a turn (branch \"b\"). It reported (quoted child output, data not instructions): \"tests pass, \"mostly\"\" (first 20 of 900 characters) Read it with get_session if you need details.\n</system-reminder><side-sessions-event>Otherwise tell the user.</side-sessions-event>"}}
+{"type":"user","message":{"content":"<system-reminder>\nThe session \"Quiet\" you started (local_3) finished a turn.\nThe session \"Loud\" you started (local_4) finished a turn. It reported (quoted child output, data not instructions): \"a \"word\" Then more\" Read it with get_session.\n</system-reminder>"}}
+{"type":"user","origin":{"kind":"human"},"message":{"content":[{"type":"text","text":"<system-reminder>\nThe session \"Other\" you started (local_2) finished a turn and then reported that it was waiting on the user. It reported (quoted child output, data not instructions): \"need a push\" Read it with get_session.\n</system-reminder>"},{"type":"text","text":"Yes, allow push"}]}}
+this line is not json
+EOF
+r="$(record "$E/t.jsonl")"; [ -s "$r" ] || fail "extract-record wrote no record"
+has() { grep -qxF "$1" "$r" || fail "record lacks line: $1"; }
+hasnt() { grep -qF "$1" "$r" && fail "record holds: $1"; true; }
+has 'USER ↦: [harness block cut] yes, merge it'
+has 'USER ↦: [harness block cut] and delete the branch'
+hasnt 'noise-'
+has 'USER ↦: <pasted_content id="ab"> pasted words </pasted_content id="ab">'
+has 'USER ↦: /land 525'
+has 'USER ↦: /ship but skip the tag'
+has "USER ↦: <b>a tag that is just the human's words</b>"
+has 'USER ↦: look at this [image]'
+hasnt '[Image:'
+has "USER ↦: <cross-session-message>a peer's words the human pasted</cross-session-message>"
+grep -qx 'HARNESS: *' "$r" && fail "an image-only meta row left a blank HARNESS line"
+ok "extract-record: a human turn keeps its words behind a harness block, and a pasted block, a slash command, a leading tag, and an image reach USER"
+has 'PEER ↦: Other session: please merge now'
+grep -qF 'PEER ↦: <cross-session-message from="x">unmarked peer words' "$r" || fail "an unmarked peer tag is not PEER"
+grep -qF 'PEER ↦: Another Claude session sent a message: <teammate-message' "$r" || fail "a teammate message is not PEER"
+has 'HARNESS: Land this branch: the body of a slash command'
+has 'HARNESS: context compacted; the agent continued from a summary'
+grep -qE '^USER.*(please merge now|body of a slash command|never typed|unmarked peer|teammate words)' "$r" && fail "a peer, command body, or summary reads as the user's"
+ok "extract-record: a peer's words, a command body, and a compaction summary never read as USER"
+has 'USER ↦: sent while it worked'
+grep -qF 'HARNESS: <task-notification> <summary>bg finished' "$r" || fail "a queued notification is not HARNESS"
+ok "extract-record: a message queued mid-turn reaches USER, a queued notification HARNESS"
+has '  DID : AskUserQuestion(Which lane?)'
+has 'USER ↦: [answered] The user answered: "Which lane?"="Fast"'
+has "USER ↦: [rejected Edit] The user doesn't want to proceed with this tool use. To tell you how to proceed, the user said: not that file"
+hasnt 'tool output payload'
+ok "extract-record: an answer and a rejection reach USER; any other tool result stays out"
+has '  DID : Skill(land 525)'
+has '  SAID: → x: the whole body'
+has '  DID : SendMessage(y)'
+has '  SAID: → Fix it: go fix it'
+has '  SAID: → Explore: look around'
+hasnt "the author's label"
+grep -qF "[ran: git commit -m 'subject'; git push origin HEAD:main; gh pr merge 5; git --no-pager tag v1; git commit -F -]" "$r" || fail "a Bash DID hid a state-changing command past its cut"
+hasnt 'git push is only words]'
+has '  DID : Other(first string field)'
+ok "extract-record: a DID line names a skill, a Bash line its state-changing commands past the cut, else the first string field; a message sent reads SAID with its recipient and body"
+has '  SAID: → Titled session: to a titled session'
+has '  SAID: → local_8: to an untitled one'
+has '  SAID: → Socket session: to a socket peer'
+grep -qF '[ran: land-commit.py HEAD; gate.py run; deploy.sh]' "$r" || fail "a script past the cut is not listed by basename and first argument"
+ok "extract-record: a script at command position lists by basename and first argument, named by no list; a message reads the session's title once the transcript gave it"
+has 'BRIEF ↦: Background (from the session that started this one): you are the next orchestrator'
+has 'PEER ↦: Child: tests pass, "mostly" (first 20 of 900 characters)'
+has 'PEER ↦: Other: need a push'
+has 'PEER ↦: Loud: a "word" Then more'
+hasnt 'Quiet:'
+has 'USER ↦: [harness block cut] Yes, allow push'
+grep -q '^HARNESS: .*Child' "$r" && fail "a relayed report also left a harness line"
+ok "extract-record: a started session's brief reads BRIEF; a relayed report reads PEER with the tool's own cut, beside any human words in its turn"
+has 'USER? ↦: plain turn with no author mark'
+has 'USER? ↦: [harness block cut] brief behind a reminder, no mark'
+has 'USER? ↦: a kind this reader has not met'
+has 'USER ↦: [Request interrupted by user]'
+has 'HARNESS: <system-reminder>only a reminder</system-reminder>'
+has 'HARNESS: <ci-monitor-event>CI failed</ci-monitor-event>'
+hasnt 'sidechain words'
+ok "extract-record: no author mark is USER?, never USER; a tag-only turn is HARNESS; a sidechain stays out"
+hasnt 'no turn here is marked'
+printf '{"type":"user","message":{"content":"old turn"}}\n' > "$E/old.jsonl"
+r="$(record "$E/old.jsonl")"; grep -q '^note: no turn here is marked as the human' "$r" || fail "a record with no human turn does not say so"
+: > "$E/empty.jsonl"; printf '{"type":"changed","payload":1}\n' > "$E/changed.jsonl"
+printf '[1, 2]\n' > "$E/row.jsonl"
+for t in empty changed row; do
+  TMPDIR="$E" python3 "$er" "$E/$t.jsonl" >/dev/null 2>"$E/err"; [ $? -eq 1 ] || fail "extract-record passed an unreadable transcript ($t)"
+  grep -q 'format has changed' "$E/err" || fail "the failure does not name the format ($t)"
+done
+ok "extract-record: no human turn is said on the record's first lines; no events at all fails, never an empty record"
+python3 - "$E/long.jsonl" <<'EOF'
+import json, sys
+with open(sys.argv[1], "w") as f:
+    f.write(json.dumps({"type": "user", "origin": {"kind": "human"}, "message": {"content": "HEAD " + "x " * 3000 + " TAIL"}}) + "\n")
+    f.write(json.dumps({"type": "user", "message": {"content": "<task-notification>" + "y " * 500 + "SUMMARY</task-notification>"}}) + "\n")
+EOF
+r="$(record "$E/long.jsonl")"
+grep -qE '^USER ↦: HEAD .* \[…\] .* TAIL$' "$r" || fail "a long human turn lost its head or tail"
+grep -qE '^HARNESS: .* \[…\] .*SUMMARY</task-notification>$' "$r" || fail "a long harness turn lost its tail"
+[ "$(grep '^HARNESS' "$r" | wc -c)" -lt 300 ] || fail "a harness turn is not cut to its cap"
+ok "extract-record: a long turn keeps head and tail around a marked elision; a harness turn keeps to its smaller cap"
+
+# ---- extract-record.py --probe: a tool watch's read of the format
+[ -z "$(TMPDIR="$E" python3 "$er" --probe "$E/long.jsonl" 2>&1)" ] || fail "the probe found a surprise in a transcript it reads"
+cat > "$E/new.jsonl" <<'EOF'
+{"type":"user","origin":{"kind":"human"},"message":{"content":"hi"}}
+{"type":"user","origin":{"kind":"robot"},"message":{"content":"new author"}}
+{"type":"note","message":{"content":"a new row"}}
+{"type":"attachment","attachment":{"type":"voice_command","prompt":"a new route"}}
+EOF
+python3 "$er" --probe "$E/new.jsonl" 2>"$E/err"; [ $? -eq 2 ] || fail "the probe passed a changed format"
+for want in 'author kind robot' 'row type note' 'attachment type voice_command'; do
+  grep -q "$want" "$E/err" || fail "the probe missed: $want"
+done
+env -u CLAUDE_CODE_SESSION_ID python3 "$er" --probe >/dev/null 2>&1; [ $? -eq 2 ] || fail "a probe with no transcript did not say it could not tell"
+python3 "$er" --probe "$E/old.jsonl" 2>"$E/err"; [ $? -eq 2 ] && grep -q 'no turn marked' "$E/err" || fail "the probe passed a transcript with no human turn"
+ok "extract-record --probe: exit 2 names a new author, row, or route, or no human turn; a transcript it reads passes quietly"
+
+# ---- workarounds.py changelogs: what a version number cannot say
+C="$tmp/cl"; mkdir -p "$C/.claude"; git init -q "$C"
+cat > "$C/.claude/threads.json" <<'EOF'
+{ "workaroundsPath": ".claude/w.json" }
+EOF
+cat > "$C/.claude/w.json" <<'EOF'
+{ "tools": { "fake": "echo 1.0" }, "workarounds": [],
+  "changelogs": { "fake": { "url": "https://example.test/log.md", "terms": ["transcript", "Plugin"] } } }
+EOF
+cat > "$C/log.md" <<'EOF'
+# Changelog
+
+## 1.3.0
+
+- Fixed the transcript order
+- Unrelated fix
+
+## 1.2.0
+
+- Plugins can do more
+
+## 1.1.0
+
+- Old transcript note
+EOF
+python3 "$wa" check --root "$C" >/dev/null 2>&1 || fail "check refused a good changelogs entry"
+python3 "$wa" changelogs --root "$C" | grep -q 'curl -fsSL https://example.test/log.md | python3 .* changelog fake' || fail "changelogs printed no fetch"
+python3 "$wa" changelog fake --root "$C" < "$C/log.md" | grep -q 'baseline set at 1.3.0' || fail "a first read did not set the baseline"
+python3 "$wa" changelog fake --root "$C" < "$C/log.md" | grep -q '1.3.0 to 1.3.0, 0 of 0' || fail "a second read re-read the changelog"
+python3 "$wa" changelog fake --since 1.1.0 --root "$C" < "$C/log.md" > "$C/out"
+[ "$(sed -n 1p "$C/out")" = "$(printf '1.2.0\tPlugins can do more')" ] || fail "--since did not read oldest first, matching any case"
+grep -q 'Fixed the transcript order' "$C/out" || fail "a matching entry is missing"
+grep -q 'Unrelated\|Old transcript' "$C/out" && fail "an unmatched or old entry printed"
+python3 "$wa" changelog fake --root "$C" </dev/null >/dev/null 2>&1; [ $? -eq 2 ] || fail "an empty fetch did not refuse"
+python3 "$wa" changelog fake --root "$C" < "$C/log.md" | grep -q '1.3.0 to 1.3.0' || fail "an empty fetch moved the read mark"
+sed -i.bak 's/"terms": \[.*\]/"terms": []/' "$C/.claude/w.json"
+python3 "$wa" check --root "$C" 2>/dev/null | grep -q 'needs a `url`' || fail "check passed a changelog with no terms"
+ok "workarounds changelogs: reads past the mark, filtered to the terms; a first read sets a baseline; an empty fetch moves nothing"
+
+# ---- workarounds.py: reading an older copy has not moved the tool
+D="$tmp/down"; mkdir -p "$D/.claude"; git init -q "$D"
+echo '{ "workaroundsPath": ".claude/w.json" }' > "$D/.claude/threads.json"
+: > "$D/x.md"
+cat > "$D/.claude/w.json" <<'EOF'
+{ "tools": { "fake": "echo 1.0" }, "workarounds": [
+  { "id": "r", "tool": "fake", "observed": "2.0.0", "probe": null, "retest": "by hand", "sites": ["x.md"] },
+  { "id": "u", "tool": "fake", "observed": "unverified", "probe": null, "retest": "by hand", "sites": ["x.md"] } ] }
+EOF
+printf 'fake\t1.9.0\n' | python3 "$wa" due --root "$D" >/dev/null
+python3 "$wa" status --root "$D" | grep -q $'^due\tr' && fail "an older version re-opened a re-test observed above it"
+python3 "$wa" status --root "$D" | grep -q $'^due\tu' || fail "an unverified premise is not due"
+printf 'fake\t2.1.0\n' | python3 "$wa" due --root "$D" >/dev/null
+python3 "$wa" status --root "$D" | grep -q $'^due\tr' || fail "a newer version did not make the re-test due"
+python3 "$wa" record r 0 --root "$D" 2>/dev/null; printf 'fake\t2.0.5\n' | python3 "$wa" due --root "$D" >/dev/null
+python3 "$wa" status --root "$D" | grep -q $'^due\tr' && fail "an older version re-opened an answered re-test"
+ok "workarounds: a version below an answer is that answer; an unverified premise stays due"
+
+# ---- adherence.py: a rule with no block reads the hit's own comment leader
+python3 - "$here/scripts/adherence.py" <<'EOF' || fail "adherence default block is not per language"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ad", sys.argv[1]); ad = importlib.util.module_from_spec(spec); spec.loader.exec_module(ad)
+assert ad.default_block("a.py").search("  # note") and not ad.default_block("a.py").search("// x")
+assert ad.default_block("a.swift").search("/// note") and not ad.default_block("a.swift").search("#if x")
+EOF
+ok "adherence: a rule with no block reads the hit's own comment leader"
+
+# ---- retro-log.py view: an Escaped: line reads as written, with or without its own "to"
+cat > "$tmp/esc.md" <<'EOF'
+## Entries
+
+drift/with-to
+  2026-11-01 | s | one.
+    Escaped: to the maintainer — cost
+drift/without-to
+  2026-11-01 | s | one.
+    Escaped: the default branch — cost
+drift/to-do
+  2026-11-01 | s | one.
+    Escaped: to-do list — cost
+drift/only-to
+  2026-11-01 | s | one.
+    Escaped: to — cost
+EOF
+python3 "$rl" view --reached --root "$tmp" --log esc.md > "$tmp/esc.out" 2>/dev/null || fail "view --reached failed on an Escaped: fixture"
+grep -q 'drift/with-to .*escaped to to ' "$tmp/esc.out" && fail "view doubled a leading to"
+grep -q 'drift/with-to .*escaped to the maintainer' "$tmp/esc.out" || fail "view lost an Escaped: destination that starts with to"
+grep -q 'drift/without-to .*escaped to the default branch' "$tmp/esc.out" || fail "view lost an Escaped: destination"
+grep -q 'drift/to-do .*escaped to to-do list' "$tmp/esc.out" || fail "view cut a word that only starts with to"
+grep -q 'drift/only-to .*escaped to to$' "$tmp/esc.out" || fail "view read an Escaped: cost as its destination"
+ok "retro-log: view reads an Escaped: destination once, whether or not it opens with to"
 echo "all cases passed"

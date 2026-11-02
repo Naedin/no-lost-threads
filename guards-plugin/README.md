@@ -101,12 +101,12 @@ judged nothing never reads as one that passed.
 | id | finds | universe without `paths` |
 |---|---|---|
 | `anchors` | a `](path#frag)` whose `frag` is not an explicit `<a id="frag">` in the target (heading-derived slugs fail by design); a relative `](path)` whose target exists neither in the tree nor in the index listing the git adapter hands over, so an export narrower than the link graph is not a broken link. External links are skipped. | every `*.md` in the index listing the git adapter hands over, else every tracked `*.md` when the root is a git checkout, else every `*.md` under it |
-| `war-stories` | narrative provenance in prose: `this session`, `maintainer:`, `user:`, `had to say/redirect/point/stop`, `emergency`, `was caught by`, `never arrived`. A rule states its mechanism and its rung; the incident goes in the commit message. | none; `paths` is required |
+| `war-stories` | narrative provenance in prose: `this session`, `maintainer:`, `user:`, `had to say/redirect/point/stop`, `emergency`, `was caught by`, `never arrived`. A word that is ordinary in this repo's docs goes in the check's `allow` list (`"allow": ["emergency"]`). A rule states its mechanism and its rung; the incident goes in the commit message. | none; `paths` is required |
 | `retro-log` | a line the retro log's grammar cannot read: not a key line (`<class>/<shape>`), an occurrence (`YYYY-MM-DD \| source \| text`), a one-line status (`LANDED\|RETIRED\|UPSTREAM\|FILED\|NOTED\|HELD\|REOPENED <ref> — text`) or annotation (`ADJUDICATED <date> — text`, `ARC <slug> [<date>] — text`), a continuation, or blank; an unknown status token; an arc name that is not a slug; a date after the ref on any token but `ARC`; a status or annotation entry over one line or inside an occurrence; a section after the entries; under the staged diff, an occurrence the commit writes with no class line (`Caught:`, `Gate-run:`, `Escaped:`, `In-work:`); one it moves, carries from the other side of a merge, cherry-pick, rebase, or revert, or repairs by hand on the same date is not judged. Warned, never a finding: an occurrence tagged `Caught:` whose text names more than one round of a gate (`rounds 3 and 4`, `three rounds`), which is `Gate-run:`. The grammar is the `threads` plugin's `scripts/retro-log.py`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
 | `retro-log-size` | an occurrence in the retro log over 8 lines, counted from its dated line through its last continuation. Separate from `retro-log` so the grammar can sit at `block` while existing entries come under the cap at `warn`. | `retroLogPath` in `.claude/threads.json`, default `.claude/threads-retro-log.md` |
 | `plan-sweeps` | a backticked `rg …` in a plan that cannot have run: `rg` exits 2 (a malformed regex, a path it cannot open) or does not finish within 20 seconds; a count the plan states beside a sweep that the sweep does not find; and a sweep piped through `head` or `tail` at any stage, whose output describes the truncation window rather than the population — the message names the remedy (drop it, or state the count off `\| wc -l`) and the span is not run. Each single-line code span beginning `rg ` is split to argv without a shell and run in the checkout; a span the shell would act on (`;`, `\|` other than a trailing `\| wc -l`, `&`, `$`, a redirect, or a glob character outside quotes; `$` or a backtick inside double quotes) and one carrying `--pre`, `--pre-glob`, or `--search-zip` is skipped, never run, and counted on stderr. Exit 0 and 1 are both sane. A number directly after the span — after `→`, `—`, `(`, `:`, `=`, or `returns` — with a unit (`hits`, `matches`, `lines`, `sites` count matching lines; `files` count files; one adjective may sit between; bare or `today` after `→` counts lines; `≥N` / `≤N` are bounds), on the span's line or the next when the span ends its line, is compared with the run's count and a mismatch is a finding naming both numbers. `173:` is an output line and `(4 → 0)` a pair, neither a count. A counting sweep (`-c`, `--count`, `--count-matches`, or `\| wc -l`) followed by a separator alone and a code span holding only an integer (a ledger row's written output) states that integer, compared the same way; a listing's integer span is a line number and is not read. When a claim row states a population — a quantifier or number word (`only`, `exactly`, `all`, `every`, `both`, `one` … `twelve`) in the clause before the sweep or the output's prose, outside parentheses — and its output opens with a file citation, every citation in the rest of the block is read as the sweep's whole output (`File.ext:N`, `N–M`, `,` or `/` lists, `:N` or a bare `N` for a named file, `File.ext` for the whole file, `Stem × N` stating its hits), and a hit none covers is a finding naming it — except a header hit (a line declaring what the sweep matched, a `///` doc comment, a `// MARK:` line), which a caller census rightly leaves out; a witness row with no population word is not compared, nor is a hit in the plan itself or a sweep printing no lines. The stderr summary counts `listings compared` beside `counts compared`. Under a heading beginning with a `targetHeadings` entry (default `Acceptance`) the sweep runs but the count is a target and is not compared. A sweep is judged at the commit that writes it: under the git adapter, only when the staged diff (`GUARDS_DIFF`) adds or changes a line of its block, so a row whose tree has since moved, or a plan moved whole, is neither run nor compared — every finding above is scoped so — and the stderr summary counts it `untouched by the commit`, as under `run.py --diff-range`; run by hand without it, every sweep is judged, the audit read. Fenced blocks are not read. `rg` must be on `PATH`. | none; `paths` is required |
 | `referents` | a name a code span carries that nothing answers to: a script under a `scriptDirs` entry (default `scripts`) that the index does not hold; a `/command` with no `<commandDirs entry>/<name>.md` (default `.claude/commands`) and no match in `knownCommands` (an entry ending `:` is a prefix, `threads:`; any other is the whole name, `code-review`); a word beginning with an `envPrefixes` entry that occurs in no non-markdown file of the index (through `git grep --cached` in the checkout; no prefixes, class off). Spans only, so a prose `/tmp` never matches; a word carrying `<`, `>`, or an ellipsis is a placeholder. The three lists sit in the check's own `.claude/guards.json` entry beside `rung`. | none; `paths` is required |
-| `comment-ordinals` | a numbered plan anchor on a leading code-comment line, in three tags and no others (`Slice 4`, `Risk 2`, or a doc named beside `rule 8` is not one): `§` then a digit (`§4`, `§ 4`); `AC` then a digit after at most one space or hyphen, no word character before it (`AC3`, `AC-3`, `AC 3`); `Impl-Note` then a number (`Impl-Note 7`, `Impl. note #7`). A plan renumbers as it is edited and is retired when it ships, so the comment names the symbol or the §"Named section" instead. The comment marker is the file's: `//`, `///`, `/*`, or a block-interior `*` for C-family, Swift, JS/TS, Go, Rust, JVM, C#, and Dart sources; `#` for shell, Python, Ruby, Perl, and awk; for a file with no extension, the marker its shebang's interpreter takes. A trailing comment, a docstring, and a bare letter-and-digit tag (`T4`, a legitimate case id) are not read. A glob in `paths` drops a file whose syntax it does not know, naming on stderr each dropped file with no extension, since `scripts/githooks/*` reads green over a shebang-less file it matched; a literal naming one refuses. | every file with a known source extension; a file with no extension enters only by name, e.g. `scripts/githooks/*` |
+| `comment-ordinals` | a numbered plan anchor on a leading code-comment line, in three tags (a `tags` list of regexes in the check's entry replaces them) and no others (`Slice 4`, `Risk 2`, or a doc named beside `rule 8` is not one): `§` then a digit (`§4`, `§ 4`); `AC` then a digit after at most one space or hyphen, no word character before it (`AC3`, `AC-3`, `AC 3`); `Impl-Note` then a number (`Impl-Note 7`, `Impl. note #7`). A plan renumbers as it is edited and is retired when it ships, so the comment names the symbol or the §"Named section" instead. The comment marker is the file's: `//`, `///`, `/*`, or a block-interior `*` for C-family, Swift, JS/TS, Go, Rust, JVM, C#, and Dart sources; `#` for shell, Python, Ruby, Perl, and awk; for a file with no extension, the marker its shebang's interpreter takes. A trailing comment, a docstring, and a bare letter-and-digit tag (`T4`, a legitimate case id) are not read. A glob in `paths` drops a file whose syntax it does not know, naming on stderr each dropped file with no extension, since `scripts/githooks/*` reads green over a shebang-less file it matched; a literal naming one refuses. | every file with a known source extension; a file with no extension enters only by name, e.g. `scripts/githooks/*` |
 | `deferral-trailer` | an inbox stub a landing range adds (or copies, or renames in from outside the scope) with no trailer naming it on any commit in the range. A stub amended, renamed within the scope, or deleted is not judged: no diff tells a deferral from a rewording or a consolidation. A trailer names a stub when its value is the stub's basename without `.md`, alone or followed by whitespace (`Why-not-now: feat-x — the reason`); the key is `trailerKey` in the check's own entry, default `Why-not-now`. The range is `GUARDS_RANGE`, which `run.py --diff-range` sets (`A...B` from the merge base, `A..B`, or a single rev to `HEAD`); without one — the git adapter's pre-commit run, where the message does not exist yet — nothing is judged, and stderr says so. Findings read `<path>:1: added with no <key>: trailer naming <basename>`. Its cases are ranges in a repo `test.sh` builds. | none; `paths` is required |
 | `review-ledger` | a section other than Live, Falsifications, or Resolved; a dated window line inside a Live entry (`09-04: no fire`, `Re-deferred 2026-09-02:`) where one `last checked: <date> — <state>` line belongs; a Live entry over 12 lines; a Resolved entry over 3 lines. | `ledgerPath` in `.claude/threads.json`, default `.claude/threads-review-ledger.md` |
 
@@ -138,7 +138,18 @@ a check runs. When the index carries no `.claude/guards.json`
 it exits 0 with one stderr line saying nothing was judged, so the adapter is inert in a
 repo that never opted in and a vacuous pass never reads as a working one.
 
-Install, from a checkout that carries this plugin in its tree:
+Install, once per clone, from wherever the plugin lives:
+
+```
+python3 <plugin>/adapters/git/install.py
+```
+
+It writes the clone's `pre-commit`, shared by its worktrees, calling the newest installed
+copy, so a plugin update reaches the gate on its own. A repo that already has a hook, or sets
+`core.hooksPath`, keeps it: the installer changes nothing and prints the lines to add to it
+(`--print` prints them any time, and `--runner` a line finding `run.py` for a landing step).
+
+A repo carrying the plugin in its own tree can point at it instead:
 
 ```
 git config core.hooksPath guards-plugin/adapters/git
@@ -148,18 +159,9 @@ Keep that path relative: git resolves it against each worktree's own top level, 
 linked worktree runs the adapter it carries. An absolute path points every worktree at
 one checkout's copy, and an edit to the hook in a worktree then does nothing.
 
-That install line assumes the plugin lives in the repo. A repo with its own hook that
-wants the gate from a sibling checkout of this plugin calls this adapter, which judges the
-index the way the hook does, and resolves the path through the primary's `.git`, not the
-current worktree, or the gate is inert in every worktree:
-
-```bash
-guards="$(git rev-parse --path-format=absolute --git-common-dir)/../../no-lost-threads/guards-plugin/adapters/git/pre-commit"
-if [ -f "$guards" ]; then bash "$guards" || exit $?
-else echo "pre-commit: guards skipped, plugin not beside this checkout" >&2; fi
-```
-
-`exit $?`, not `exit 1`: git aborts on either, but a wrapper that rewrites 2 to 1 tells
+A hook resolving a checkout of the plugin beside the repo resolves through
+`git rev-parse --git-common-dir`, not the current worktree, or the gate is inert in every
+worktree. `exit $?`, not `exit 1`: git aborts on either, but a wrapper that rewrites 2 to 1 tells
 its caller the gate found something when the gate could not run.
 
 Calling `run.py` directly from a hook judges the working tree instead, and an unstaged
@@ -173,8 +175,7 @@ judges the claims this landing writes, against the tree it lands on. Run bare, t
 same step is the audit read: it judges every standing claim in every file in scope, and
 refuses the landing over a claim another branch wrote whose tree has since moved.
 
-Installed from the marketplace, this version is inert: it ships no hook file and no command, and the
-adapter it carries is not wired to anything. The Claude blocking-hook adapter, and a
+The Claude blocking-hook adapter, and a
 `--vendor` option that copies a check into the adopting repo for a frozen gate, are the
 versions after this one.
 

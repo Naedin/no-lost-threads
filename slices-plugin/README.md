@@ -60,9 +60,7 @@ Two policies ship as stated rules rather than machinery, deliberately:
 - **The two-lane rule.** Full drafting and checking for changes to shipped
   behavior whose shape is not yet clear; low-risk work (docs, reversible chores) may
   skip the front of the pipeline — but whatever verification guards landing is
-  **never** skipped. A change to a plugin's own command text takes the light lane:
-  edit, run the command once from the working tree, commit with a changelog line. No
-  plan and no gap check; the run is the check.
+  **never** skipped.
 - **Process telemetry** belongs to the [`threads`](../threads-plugin/README.md)
   plugin (marker commits, retro capture, cross-session review). The kits compose;
   neither duplicates the other.

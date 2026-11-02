@@ -18,6 +18,10 @@ behavior goes stale the day the tool changes, and nothing says so. The register 
     ]
   }
 
+A tool's command must report the copy that actually runs: where one tool ships twice, as a
+desktop app and a CLI on PATH, the two can differ, and reading the wrong one judges every
+workaround against a version nothing here runs on.
+
 A **probe** reproduces the limitation: exit 0 means it still reproduces, exit 1 means it
 no longer does, anything else means the probe could not tell. A behavior no command can
 reproduce — the harness refusing an approval, a session tool stranding a sub-agent — has
@@ -36,12 +40,19 @@ come back on stdin. The whole read, in one call:
   w=<plugin>/scripts/workarounds.py
   eval "$(python3 "$w" versions)" | python3 "$w" due | { eval "$(cat)"; } | python3 "$w" record; python3 "$w" status
 
+A version says a tool moved, not what changed, and a probe only tests a limit someone
+already wrote down. An optional `changelogs` object catches what neither can, such as a new
+capability that would replace a workaround; its terms are the surfaces this repo depends on:
+
+  "changelogs": { "<tool>": { "url": "<plain-text changelog>", "terms": ["<word>", …] } }
+
 Each workaround is in one state, measured against its tool's version as last read:
 
   live       reproduces at that version: `observed` is it, or a probe or re-test at it said so
   retirable  a probe or re-test at that version said it no longer reproduces: the sites can go
-  due        the version moved past `observed` and nothing has answered at it yet, or the
-             version has not been read
+  due        the version moved past `observed` and past the last answer, or the version has
+             not been read. A version below an answer is that answer, so a read that flips
+             between a desktop app and a CLI re-opens nothing
   broken     the probe at that version could not tell, or the version is unreadable
 
 Answers are per machine, so they are kept outside the tree, in
@@ -57,6 +68,11 @@ Modes:
   record    read `<id>\\t<exit>` lines on stdin, or one `ID EXIT` pair as arguments — a
             re-test's answer is recorded this way, 0 still reproduces, 1 no longer — at the
             tool's version as last read
+  changelogs  shell fetching each tool's changelog and handing it to `changelog`
+  changelog TOOL  read that changelog on stdin; print the entries past the version last read
+            that match the tool's terms, as `<version>\t<entry>`, and record the newest as
+            read. `--since VERSION` reads from there instead. A first read with no `--since`
+            sets the baseline and prints no entries.
   check     validate the register: required fields, a probe or a re-test, a declared
             tool, unique ids, sites and a probe script that exist. One finding per line.
 
@@ -115,6 +131,17 @@ def findings(root, reg):
             out.append(f"tool {t}: a tool name is letters, digits, `.`, `_`, `-`")
         if not isinstance(cmd, str) or not cmd.strip():
             out.append(f"tool {t}: its version command must be a non-empty string")
+    logs = reg.get("changelogs", {})
+    if not isinstance(logs, dict):
+        out.append("`changelogs` must be an object")
+        logs = {}
+    for t, spec in logs.items():
+        if t not in tools:
+            out.append(f"changelog {t}: tool is not in `tools`")
+        if not (isinstance(spec, dict) and isinstance(spec.get("url"), str) and spec["url"]
+                and isinstance(spec.get("terms"), list) and spec["terms"]
+                and all(isinstance(x, str) and x for x in spec["terms"])):
+            out.append(f"changelog {t}: needs a `url` and a non-empty list of `terms`")
     for n, w in enumerate(reg["workarounds"], 1):
         if not isinstance(w, dict):
             out.append(f"workaround {n}: not an object")
@@ -169,6 +196,13 @@ def save(path, state):
         f.write("\n")
 
 
+def not_past(now, answered):
+    """True when a version read is at or below one already answered. The copy that runs can
+    differ by surface, and reading an older one has not moved the tool."""
+    a, b = version_key(now), version_key(answered or "")
+    return bool(a and b) and a <= b
+
+
 def classify(w, now, results):
     """(state, detail) for one workaround at its tool's version as last read."""
     if now is None:
@@ -176,9 +210,11 @@ def classify(w, now, results):
     if now == "":
         return "broken", "version unreadable"
     r = results.get(w["id"])
+    if r and not_past(now, r.get("version")):
+        now = r["version"]
     if not r or r.get("version") != now:
-        if now == w["observed"]:
-            return "live", f"observed at {now}"
+        if not_past(now, w["observed"]):
+            return "live", f"observed at {w['observed']}"
         how = f"re-test: {w['retest']}" if not w.get("probe") else "probe"
         return "due", f"observed at {w['observed']}, nothing answered at {now} — {how}"
     if r["exit"] == 0:
@@ -200,10 +236,57 @@ def pairs(lines, what):
     return out
 
 
+def version_key(v):
+    return tuple(int(x) for x in re.findall(r"\d+", v))
+
+
+def changelog_mode(a, root, reg):
+    logs = reg.get("changelogs", {})
+    q = shlex.quote
+    if a.mode == "changelogs":
+        for t, spec in logs.items():
+            print(f"curl -fsSL {q(spec['url'])} | python3 {q(os.path.abspath(__file__))} "
+                  f"changelog {q(t)} --root {q(root)}")
+        return
+    if len(a.answer) != 1 or a.answer[0] not in logs:
+        refuse(f"changelog takes one tool with a `changelogs` entry; have: {', '.join(logs) or 'none'}")
+    tool = a.answer[0]
+    terms = [t.lower() for t in logs[tool]["terms"]]
+    sections, current = [], None
+    for line in sys.stdin:
+        m = re.match(r"#+\s*\[?v?(\d+(?:\.\d+)+)", line)
+        if m:
+            current = m.group(1)
+            sections.append((current, []))
+        elif current and line.lstrip().startswith(("- ", "* ")):
+            sections[-1][1].append(" ".join(line.split())[2:])
+    if not sections:
+        refuse(f"changelog {tool}: no versions on stdin; nothing recorded")
+    spath = state_path(root)
+    state = load(spath, spath) if os.path.isfile(spath) else {}
+    read = state.setdefault("changelogRead", {})
+    newest = max((v for v, _ in sections), key=version_key)
+    since = a.since or read.get(tool)
+    if not since:
+        read[tool] = newest
+        save(spath, state)
+        print(f"changelog {tool}: baseline set at {newest}; pass --since VERSION to read further back")
+        return
+    fresh = sorted((s for s in sections if version_key(s[0]) > version_key(since)), key=lambda s: version_key(s[0]))
+    hits = [(v, e) for v, entries in fresh for e in entries if any(t in e.lower() for t in terms)]
+    for v, e in hits:
+        print(f"{v}\t{e}")
+    total = sum(len(entries) for _, entries in fresh)
+    print(f"changelog {tool}: {since} to {newest}, {len(hits)} of {total} entries match")
+    read[tool] = newest
+    save(spath, state)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("mode", nargs="?", default="status", choices=("status", "versions", "due", "record", "check"))
-    ap.add_argument("answer", nargs="*", help="record: ID EXIT")
+    ap.add_argument("mode", nargs="?", default="status", choices=("status", "versions", "due", "record", "check", "changelogs", "changelog"))
+    ap.add_argument("answer", nargs="*", help="record: ID EXIT; changelog: TOOL")
+    ap.add_argument("--since", default=None, help="changelog: read past this version")
     ap.add_argument("--all", action="store_true", help="due: every probed workaround, not only the due ones")
     ap.add_argument("--id", action="append", default=[], help="due: only this workaround (repeatable)")
     ap.add_argument("--root", default=None, help="repo root (default: git top level)")
@@ -222,6 +305,9 @@ def main():
     for i in a.id:
         if i not in by_id:
             refuse(f"--id {i}: no such workaround in {rel}")
+
+    if a.mode in ("changelogs", "changelog"):
+        return changelog_mode(a, root, reg)
 
     # stdin first: in the one-call read, `record` starts beside `due`, and its input ends only
     # once `due` has written the versions it must load

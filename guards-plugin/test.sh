@@ -717,4 +717,58 @@ else
   exit 1
 fi
 
+# war-stories and comment-ordinals: a repo's vocabulary is config.
+V="$tmp/vocab"; mkdir -p "$V/.claude" "$V/src"; git init -q "$V"
+echo 'An emergency drain is a state.' > "$V/a.md"
+printf '# see AC3\n# see TICKET-9\n' > "$V/src/a.py"
+git -C "$V" add -A
+ws="$here/checks/war-stories/check.py"; co="$here/checks/comment-ordinals/check.py"
+python3 "$ws" --root "$V" --paths a.md >/dev/null 2>&1; [ $? -eq 1 ] || { echo "FAIL  war-stories: the default vocabulary"; exit 1; }
+python3 "$co" --root "$V" --paths 'src/*' 2>/dev/null | grep -q 'AC3' || { echo "FAIL  comment-ordinals: the default tags"; exit 1; }
+cat > "$V/.claude/guards.json" <<'EOF'
+{ "checks": { "war-stories": { "rung": "warn", "allow": ["Emergency"] },
+              "comment-ordinals": { "rung": "warn", "tags": ["TICKET-[0-9]"] } } }
+EOF
+python3 "$ws" --root "$V" --paths a.md >/dev/null 2>&1 || { echo "FAIL  war-stories: an allowed word still fires"; exit 1; }
+python3 "$co" --root "$V" --paths 'src/*' > "$V/out" 2>/dev/null
+grep -q 'TICKET-9' "$V/out" && ! grep -q 'AC3' "$V/out" || { echo "FAIL  comment-ordinals: tags did not replace the defaults"; exit 1; }
+printf 'ok    %s\n' "war-stories allow and comment-ordinals tags: a repo's vocabulary is config"
+
+# install.py: wires the newest installed copy, once per clone; a repo's own hook is kept.
+I="$tmp/inst"; R="$I/repo"; mkdir -p "$R"; git init -q "$R"
+for v in 0.9.0 0.10.0; do
+  d="$I/cache/m/guards/$v/adapters/git"; mkdir -p "$d"
+  cp "$here/adapters/git/install.py" "$d/"
+  printf '#!/usr/bin/env bash\necho ran-%s\nexit 0\n' "$v" > "$d/pre-commit"
+done
+python3 "$I/cache/m/guards/0.9.0/adapters/git/install.py" --repo "$R" 2>/dev/null \
+  || { echo "FAIL  install: refused a plain repo"; exit 1; }
+h="$(git -C "$R" rev-parse --path-format=absolute --git-common-dir)/hooks/pre-commit"
+[ -x "$h" ] || { echo "FAIL  install: wrote no executable hook"; exit 1; }
+"$h" | grep -q 'ran-0.10.0' || { echo "FAIL  install: the hook does not call the newest copy"; exit 1; }
+python3 "$here/adapters/git/install.py" --repo "$R" 2>/dev/null || { echo "FAIL  install: its own hook blocks a re-install"; exit 1; }
+"$h" >/dev/null 2>&1
+R2="$I/repo2"; mkdir -p "$R2"; git init -q "$R2"
+h2="$(git -C "$R2" rev-parse --path-format=absolute --git-common-dir)/hooks/pre-commit"
+mkdir -p "$(dirname "$h2")"; printf '#!/bin/sh\necho mine\n' > "$h2"
+python3 "$here/adapters/git/install.py" --repo "$R2" 2>/dev/null | grep -q 'guards=' || { echo "FAIL  install: printed no lines for a repo with its own hook"; exit 1; }
+grep -q 'echo mine' "$h2" && ! grep -q guards "$h2" || { echo "FAIL  install: displaced a repo's own hook"; exit 1; }
+R3="$I/repo3"; mkdir -p "$R3"; git init -q "$R3"; git -C "$R3" config core.hooksPath hooks
+python3 "$here/adapters/git/install.py" --repo "$R3" 2>/dev/null | grep -q 'guards=' || { echo "FAIL  install: ignored core.hooksPath"; exit 1; }
+F="$I/home"; d="$F/.claude/cache/m/guards/1.0.0/adapters/git"; mkdir -p "$d"
+cp "$here/adapters/git/install.py" "$d/"; printf '#!/usr/bin/env bash\necho ran\nexit 0\n' > "$d/pre-commit"; : > "$F/.claude/cache/m/guards/1.0.0/run.py"
+HOME="$F" python3 "$d/install.py" --print > "$I/lines"
+grep -q '"$HOME"/' "$I/lines" && ! grep -qF "$F" "$I/lines" || { echo "FAIL  install: the printed lines name one machine"; exit 1; }
+HOME="$F" python3 "$d/install.py" --runner | grep -q '^runner=.*"$HOME"/.*run.py' || { echo "FAIL  install: --runner printed no line"; exit 1; }
+{ echo 'set -euo pipefail'; cat "$I/lines"; } > "$I/strict"
+HOME="$F" bash "$I/strict" | grep -q '^ran$' || { echo "FAIL  install: the lines do not run the copy under strict mode"; exit 1; }
+rm -rf "$F/.claude/cache/m/guards/1.0.0"
+out="$(HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: a missing plugin is not a named skip under strict mode"; exit 1; }
+S="$I/with space/guards"; mkdir -p "$S/adapters/git"; cp "$here/adapters/git/install.py" "$S/adapters/git/"
+printf '#!/usr/bin/env bash\necho spaced\nexit 0\n' > "$S/adapters/git/pre-commit"
+python3 "$S/adapters/git/install.py" --print > "$I/spaced"
+bash "$I/spaced" | grep -q '^spaced$' || { echo "FAIL  install: a path with a space does not run"; exit 1; }
+python3 "$here/adapters/git/install.py" --repo "$I/nope" >/dev/null 2>&1; [ $? -eq 2 ] || { echo "FAIL  install: passed a non-checkout"; exit 1; }
+printf 'ok    %s\n' "install: wires the newest installed copy; a repo's own hook is kept and its lines printed"
+
 echo "all cases passed"

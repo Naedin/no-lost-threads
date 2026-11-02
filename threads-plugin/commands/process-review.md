@@ -6,6 +6,8 @@ allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent, SendMessage
 
 # /threads:process-review — the cross-session process review
 
+"The maintainer" below means whoever decides for this repo, one person or several.
+
 The second altitude of the threads family. `/threads:retro` reviews **one session**;
 this reviews **across sessions** — the accumulated process changes — hunting patterns no
 single session can see: several over-specific local rules that should reconcile into one
@@ -78,7 +80,7 @@ convention in the moment. Fields:
   is its only mutator, through `scripts/retro-log.py compact` and re-keying.
 - `invariantDocs` — optional, **ordered** (highest authority first): **the core** — the
   docs that state the repo's authority order and this review's own contract (its
-  conventions, its extensions). Read whole at step 0a, every run, before any commit, so
+  conventions, anything it adds to this command). Read whole at step 0a, every run, before any commit, so
   it is short by construction: a doc belongs here only if it outranks the commit stream
   on *every* run. A domain doc — a traps catalogue, a UI guideline, a testing strategy —
   is not core however true it is: it is read at step 6 when a finding names it (a
@@ -94,11 +96,10 @@ convention in the moment. Fields:
   to a core doc that bore on nothing for two runs and is not the authority order or this
   review's contract; it is never the answer for a doc that is.
 - `capabilityEvidencePath` — optional: a log of findings about *capabilities* — contracts
-  and rungs rather than doc sections. Only relevant where the repo builds tooling it also
-  uses. It is the one input that can yield a non-doc proposal; without it the funnel is
+  and rungs rather than doc sections. Only relevant where the repo builds tooling others adopt. It is the one input that can yield a non-doc proposal; without it the funnel is
   doc-churn-shaped end to end. Written by this command alone — no other step in the system
-  appends here. Absent → narrate and skip, except in a repo that builds tooling it also
-  uses (a `scripts/` dir, hook scripts, checks, a plugin directory), where the narration is
+  appends here. Absent → narrate and skip, except in a repo that ships tooling to others
+  (a plugin directory, a published package of checks), where the narration is
   a question the review asks **once**: set the path, or record `null` here to decline, and
   the question is not asked again. Unset in such a repo, the review's only non-doc input is
   missing and every upstream-bound finding has no store.
@@ -142,7 +143,7 @@ spelling, and only the first is telemetry:
   <date>'`; `land-process-commit.py` preserves it through the cherry-pick), read on any line
   of the body, since a hand-written message can split git's trailer block. Already
   adjudicated: its sha is a `LANDED` ref, never churn. A review that counts its own
-  landings as the next window's churn is ripe on itself the next morning, and spends
+  landings as the next window's churn is ripe on itself the next run, and spends
   most of its read on what it wrote.
 - **bookkeeping** — a commit touching nothing but `retroLogPath`, `ledgerPath`, or
   `capabilityEvidencePath`: a retro's capture, a status line. A status flip changed no
@@ -181,8 +182,8 @@ then negotiate with the answers in hand; do not interview blind.
      become the default workflow sets for the staleness sweep.
    - Enhancements present: `gh` on PATH + a GitHub remote? An agent memory store
      (`MEMORY.md`)?
-   - Tooling the repo builds and uses: a `scripts/` dir, hook scripts, checks, a plugin
-     directory. Present → `capabilityEvidencePath` has a job here, and step 4 asks for it.
+   - Tooling the repo ships to others: a plugin directory, a published package of checks.
+     Present → `capabilityEvidencePath` has a job here, and step 4 asks for it.
 2. **Report** what you detected, which inputs you'll use, and which fallback tiers apply.
 3. **Negotiate the marker** — propose the default `docs(process/<scope>):`, *or* an
    adaptation fitting the repo's existing style (e.g. a `chore(...)` repo → offer
@@ -229,12 +230,11 @@ the check exists for. The mark needs its own fetch,
 force-push, and a plain `git fetch` never moves a tag this clone already has. The scripts
 that read the mark refuse a local tag the remote holds elsewhere and name that fetch.
 Where the harness exposes a session listing, look: a peer is identified by its **working
-directory and branch**, never by a worktree name, which a later session on another repo
-can carry — a review on this repo already in flight means stop and say so. Then,
+directory and branch**, since a worktree name can repeat across repos — a review on this repo already in flight means stop and say so. Then,
 **immediately before the first write** (a log append, the ledger edit, `compact`, the
 tag), fetch the same two ways and re-read both facts. Either moved → a peer landed while this
 one ran: **re-derive, then write** — rebase onto `origin/<default>` (the log merges by
-union; the ledger is a working file), run the `guards` gate on the rebased tree since a
+union; the ledger is a working file), run the repo's commit gate, where it has one, on the rebased tree since a
 rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a rebase
 conflict or a red gate; a run that has spent its budget is not thrown away for a clean
 rebase.
@@ -285,7 +285,8 @@ rebase.
    the line. Read it whatever the lists hold: the file the review grows need not be core.
 
    **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
-   window: a human accepted each one and a cold reader named its shape. Read it through
+   window: a retro captured each one in front of whoever ran it, and a cold reader named its
+   shape unless the retro was `quick`. Read it through
    the view's filters, never whole — the reads below are the run's reads, in order, and
    each is one tool result at any log size. Note the commit they read the log at (`git
    rev-parse HEAD`); the mark's advance reads what landed after it:
@@ -446,7 +447,7 @@ rebase.
    they are the only input that can produce a non-doc proposal. Without it, every input in
    this funnel is doc-churn-shaped and the output can only ever be doc edits. Count keys
    the same way. Absent → narrate and skip; absent **and unset** (no `null` in the config)
-   in a repo that builds tooling it uses → the narration is the once-only question in
+   in a repo that ships tooling to others → the narration is the once-only question in
    Config: ask for a path or a `null`, record the answer, and do not ask again. A store
    that stays unset for the life of an adopter is the funnel silently doc-shaped.
 
@@ -525,6 +526,9 @@ rebase.
    **broken** probe is a `tooling` candidate: repair it, or the workaround loses its
    admission. A workaround is judged by its probe or its re-test, never by re-reading the
    tool's behavior from the stream. Exit 3 (no register) → narrate and skip.
+   Where the register has `changelogs`, run `eval "$(python3 "$w" changelogs)"` too: each entry
+   it prints is a changed surface this repo named. One that could retire a workaround, or
+   falsify a rule, is a candidate row; the rest are read and dropped.
 
 **The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
 expensive path and they are *conditional*, not automatic. **Its direction is expected
@@ -605,7 +609,7 @@ that opens runs with nothing to land, is revised on that evidence.
    --docs` (the docs the *recurred* keys' placements, landings, and stubs point at;
    never the whole since-mark set, which on a busy repo outweighs the core), each path
    resolved by basename against the `processDocs` trees — a placement writes
-   `worktrees.md`, the doc is `Plans/active/worktrees.md` — and a path that resolves to no
+   `conventions.md`, the doc is `docs/process/conventions.md` — and a path that resolves to no
    process doc dropped (the flag also returns scripts and stubs, which route a read and
    are not one), plus the docs a **fired** ledger signal names. Read each once, here,
    where a candidate is about to be reasoned against it; a doc named by nothing this run
@@ -855,14 +859,14 @@ as a check at the write than as an executor sub-agent between judgment and landi
 - **Maintain the retro log (`retroLogPath`) — you are its only mutator.** Retro appends
   and never edits, so everything below is yours, and nothing else in the system will do
   it. Under `read-only`, propose these rather than applying them. The `guards`
-  `retro-log` check is the shape gate; run it after.
+  `retro-log` check, where the repo runs it, is the shape gate; run it after.
   - **A finding that landed** gets the key + one `LANDED <sha> — <where>` line appended,
     if the landing session did not append it. **A retirement** is the key + one
     `RETIRED <date> — <why>` line; **one that must land elsewhere** is `UPSTREAM <ref>`;
     **one routed to a stub or plan** is `FILED <ref>` — the key stays live, so a further
     occurrence counts against the stub instead of vanishing into a closed key.
   - **A status line's where names its section or item, never its number alone** —
-    `land.md §Carriers`, `check-brief.md *Real-gate vs proxy*`, not `§4` or `class 9`. A
+    `release.md §Rollback`, `review.md *Data migrations*`, not `§4` or `class 9`. A
     numbered list renumbers when an item is inserted or removed, and an append-only line
     cannot be re-pointed afterwards. Lines already written stay as they are.
   - **A candidate this run proposed and held** (an autonomous run, or one the user did
@@ -935,7 +939,7 @@ as a check at the write than as an executor sub-agent between judgment and landi
     for the whole dedup mechanism.
 - Update the ledger (`ledgerPath`) — a working file the review reads in full every run,
   so it holds current state and never a window's narrative. Three sections, each entry a
-  top-level bullet; the `guards` `review-ledger` check is the gate:
+  top-level bullet; the `guards` `review-ledger` check, where the repo runs it, is the gate:
   - **Live** — what was deferred, why, its **promoting signal**, and one
     `last checked: <date> — <state>` line, rewritten in place each run; each entry at most
     12 lines — the cap is per entry, the section has none.
