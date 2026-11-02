@@ -762,8 +762,15 @@ grep -q '"$HOME"/' "$I/lines" && ! grep -qF "$F" "$I/lines" || { echo "FAIL  ins
 HOME="$F" python3 "$d/install.py" --runner | grep -q '^runner=.*"$HOME"/.*run.py' || { echo "FAIL  install: --runner printed no line"; exit 1; }
 { echo 'set -euo pipefail'; cat "$I/lines"; } > "$I/strict"
 HOME="$F" bash "$I/strict" | grep -q '^ran$' || { echo "FAIL  install: the lines do not run the copy under strict mode"; exit 1; }
+if command -v shellcheck >/dev/null; then
+  { echo '#!/usr/bin/env bash'; cat "$I/strict"; HOME="$F" python3 "$d/install.py" --runner; echo 'echo "$runner"'; } > "$I/linted"
+  shellcheck "$I/linted" >/dev/null || { echo "FAIL  install: the printed lines fail shellcheck at its default severity"; exit 1; }
+  printf 'ok    %s\n' "install: the printed lines pass shellcheck at its default severity"
+fi
 rm -rf "$F/.claude/cache/m/guards/1.0.0"
 out="$(HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: a missing plugin is not a named skip under strict mode"; exit 1; }
+rm -rf "$F/.claude"
+out="$(HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: a missing cache is not a named skip under strict mode"; exit 1; }
 S="$I/with space/guards"; mkdir -p "$S/adapters/git"; cp "$here/adapters/git/install.py" "$S/adapters/git/"
 printf '#!/usr/bin/env bash\necho spaced\nexit 0\n' > "$S/adapters/git/pre-commit"
 python3 "$S/adapters/git/install.py" --print > "$I/spaced"

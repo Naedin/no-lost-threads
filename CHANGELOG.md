@@ -9,6 +9,16 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.19.1] — 2026-11-02
+
+### Fixed
+
+- **The lines `install.py` prints pass ShellCheck at its default severity,** so a repo that checks its hooks can paste them. They find the newest copy with `find` rather than `ls`.
+
+### Contract
+
+- **The printed lines changed.** A hook carrying the 0.19.0 lines keeps working. Adopter-side edit: a repo that pasted them with `# shellcheck disable=SC2012` replaces them with what `install.py --print` and `--runner` now print, and drops the disable.
+
 ## guards [0.19.0] — 2026-11-02
 
 ### Added

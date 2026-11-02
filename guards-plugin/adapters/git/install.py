@@ -38,7 +38,9 @@ def locate(plugin, rel):
     keeps that a value under `set -e` and `pipefail`, not an exit."""
     parent, version = os.path.split(plugin)
     if re.fullmatch(r"\d+(?:\.\d+)+[0-9A-Za-z.+-]*", version):
-        return f'$(ls -d {under_home(parent)}/*/{rel} 2>/dev/null | sort -V | tail -n 1 || true)'
+        depth = rel.count("/") + 2
+        return (f"$(find {under_home(parent)} -maxdepth {depth} -path '*/{rel}' 2>/dev/null "
+                "| sort -V | tail -n 1 || true)")
     return under_home(os.path.join(plugin, rel))
 
 
