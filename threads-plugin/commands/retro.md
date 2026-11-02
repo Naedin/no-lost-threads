@@ -268,7 +268,8 @@ block is the copy that ships with the script:
 
 ```
 <class>/<shape>[ (uncold)]                    key line, column 0
-  YYYY-MM-DD | <source> | <text>              an occurrence; continuation lines below it
+  YYYY-MM-DD | <source> | <text>              an occurrence; continuation lines below it,
+                                              one of them its class line (§4a)
   LANDED <sha> — <where it landed>            status lines. Each is ONE physical line,
   FILED <ref> — <the stub carrying it>        however long — a wrapped one reads as
   NOTED <date> — <what worked and why>        continuation prose and the guard refuses it.
@@ -297,7 +298,7 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
 - **A new finding** → key line + one occurrence line, continuations to **eight lines at
   most**: the cited moment, the cost, the placement (`Placement: file §section — amend
   "…"`, or key-only the bare `Placement: file §section`). What does not fit goes where the placement points; the `guards`
-  `retro-log-size` check holds the cap.
+  `retro-log-size` check holds the cap where a repo enables it.
 - **A pointer names its section or item, never its number alone** — `Placement:`,
   `Caught:`, a status line's where. A numbered list renumbers when an item is inserted or
   removed, and an append-only line cannot be re-pointed afterwards.
@@ -308,16 +309,23 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   the gate's own catch, and — full placement — the placer reports the rule **present**
   (§3b); key-only, the gate and the cost suffice and the review verifies the rule (§3c). Any cost spent past the gate — a maintainer question the finding raised, a
   fix batch, a revision, code that ran — is the shape reaching implementation, and the
-  occurrence goes untagged so it ranks. The view counts the occurrence and `--reached` does not rank it, so the
+  occurrence is `Gate-run:` with the rule present and `In-work:` with it absent, never
+  `Caught:`, so it ranks. Key-only, a rule you did not read counts as present, and the review
+  verifies it. The view counts the occurrence and `--reached` does not rank it, so the
   review reads the count without re-ruling the doctrine each window; the next occurrence
   no gate catches ranks the key regardless of count. It counts against the eight.
-- **Every occurrence says where it was stopped** — by the work itself, by a named gate
-  (and which round), or past the merge; the review classes occurrences from that sentence
-  and cannot class one without it. **A named gate's stop is a tag, never prose alone**:
+- **Every occurrence carries exactly one class line, and it says where the occurrence was
+  stopped**: `Caught:`, `Gate-run:`, or `Escaped:` below, else `In-work: <what stopped it>`
+  (the work itself, this session's own read, a cost spent inside the work). The first stop
+  decides: a maintainer who stopped it is `Escaped:`, while a question after a gate's stop
+  stays with that gate. A reviewer that runs on its own, on a push or a PR, is a named gate.
+  Another session's read that stopped it after a gate passed it is `Gate-run:` on that gate.
+  Rankings read the line and never the prose. **A named gate's stop is a tag,
+  never prose alone**:
   an occurrence whose text says a gate stopped it — *stopped by `/slices:check`*, *caught
   by the pre-commit hook* — carries `Caught:` when the bullet above licenses it, `Gate-run:`
-  when the gate cost more than its first catch, and otherwise names the rule absent at the
-  placement. Prose saying a gate caught it, with no tag, is read as untagged: `--reached`
+  when the gate cost more than its first catch, and `In-work:` naming the gate and the
+  absent rule when the placement had none. Prose saying a gate caught it, with no tag, is read as untagged: `--reached`
   ranks it as a repeat.
 - **A finding about how a gate ran** — a misfire, a skipped step, a stop path that failed,
   a finding it dropped or misjudged, rounds after its first catch → the ordinary key +
@@ -334,6 +342,10 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   compress the moment or the cost to make room — never the placement. No status line:
   the artifact is corrected, the lesson is still open, and a status line would close it.
   §4b runs before this append, so the sha exists when the line is written.
+- **After appending, read your own lines**: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py
+  view --untagged --since HEAD` prints each new occurrence with no class line. Write the
+  line now, while this session holds the facts; a review cannot recover them, and where a
+  repo runs it the `guards` `retro-log` check refuses the commit.
 - **A recurrence** → the *same key* again + a new occurrence line. The occurrence count
   is the dated lines under a key, so an occurrence appended for any other reason reports
   a recurrence that never happened.
@@ -508,5 +520,6 @@ backlog earns a sentence on each run.
 - **Calling a review ripe on pending captures**, or on a marker count that includes the
   last review's own landings — ripe is an escape or gate-run since the mark, a fired
   cluster of them, or an organic bar.
-- **Writing a gate's catch as prose.** *Stopped by `/slices:check`* with no `Caught:` or
-  `Gate-run:` line ranks as a repeat the gate already handled.
+- **Writing a stop as prose.** *Stopped by `/slices:check`* with no `Caught:` or `Gate-run:`
+  line ranks as a repeat the gate already handled; *stopped by the maintainer* with no
+  `Escaped:` line stays below the review's gate at one occurrence, whatever it cost.

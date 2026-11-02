@@ -23,7 +23,13 @@ occurrence nor a status; an unknown status token; an arc name that is not a slug
 entry longer than one
 line (the narrative belongs in the commit); a status or annotation line inside an
 occurrence entry (each is its own entry, key line repeated); a section after the
-entries.
+entries; under the git adapter's staged diff (`GUARDS_DIFF`), an occurrence the commit adds
+with no class line, `Caught:`, `Gate-run:`, `Escaped:`, or `In-work:`. Only what the commit
+writes is judged, so a log older than the class line passes as it stands: not an occurrence
+it leaves alone, nor a line the diff also removes (moved, as a compaction moves it), nor a
+line the other side of an in-progress merge, cherry-pick, rebase, or revert already holds
+(carried, and another session's to class), nor a dated line replacing a removed line of the same date
+(a hand repair).
 
 Scope: `--paths` names the log(s) — each entry a root-relative file, or an fnmatch
 glob where `*` crosses `/` as in a git pathspec; a literal is tried first, so a name
@@ -64,11 +70,15 @@ STATUS = re.compile(r"^  (" + "|".join(TOKENS) + r") (\S+(?: \+ \S+)*)(?: (\d{4}
                     r"(?:\s+[—-]+\s+(.*))?$")
 STATUS_LIKE = re.compile(r"^  ([A-Z][A-Z -]{2,})\b")
 CAUGHT = re.compile(r"^\s{2,}Caught: ")
+CLASSED = re.compile(r"^\s{2,}(?:Caught|Gate-run|Escaped|In-work): ")
 ROUNDS = re.compile(r"\brounds \d+(?:\s*(?:,|and|&|to|–|-)\s*\d+)+"
                     r"|\b(?:two|three|four|five|six|several|multiple|[2-9]) (?:more )?rounds\b", re.I)
 DETAIL = re.compile(r"^  ")
 HEADING = re.compile(r"^## ")
 ENTRIES = "## Entries"
+DIFF = os.environ.get("GUARDS_DIFF")
+DATED = re.compile(r"\d{4}-\d{2}-\d{2}\b")
+IN_PROGRESS = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REBASE_HEAD", "REVERT_HEAD^")
 
 
 def refuse(msg):
@@ -257,6 +267,89 @@ def check(rel, text):
     return out
 
 
+def diff_path(header):
+    """The new-side path of a `+++ ` header line, or None for `/dev/null`: git adds a tab
+    after a path holding a space and C-quotes one holding a quote, backslash, or control
+    byte, so the escapes are undone over the path's UTF-8 bytes."""
+    raw = header[4:].rstrip("\n").rstrip("\t")
+    if raw == "/dev/null":
+        return None
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1].encode("utf-8").decode("unicode_escape") \
+            .encode("latin-1").decode("utf-8", "replace")
+    return raw[2:] if raw.startswith("b/") else raw
+
+
+def carried(rel):
+    """The stripped lines of `rel` on the other side of an in-progress merge, cherry-pick,
+    rebase, or revert, whose other side is the reverted commit's parent. Only the adapter's hook runs inside one, in the checkout's own git state,
+    so the export's root is not where this looks."""
+    if not os.environ.get("GUARDS_TREE"):
+        return set()
+    out = set()
+    for ref in IN_PROGRESS:
+        r = subprocess.run(["git", "show", f"{ref}:{rel}"], capture_output=True,
+                           encoding="utf-8", errors="replace")
+        if r.returncode == 0:
+            out |= {l.strip() for l in r.stdout.splitlines()}
+    return out
+
+
+def staged_new(rel):
+    """The stripped lines the staged diff writes into `rel`: added, and neither removed,
+    carried, nor a dated line repairing a removed line of its date. None with no diff
+    handed over."""
+    if not DIFF:
+        return None
+    try:
+        text = pathlib.Path(DIFF).read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        refuse(f"GUARDS_DIFF unreadable: {e}")
+    added, removed, path, header = set(), set(), None, False
+    for line in text.split("\n"):
+        if line.startswith("diff --git "):
+            path, header = None, True
+        elif header and line.startswith("+++ "):
+            path = diff_path(line)
+        elif line.startswith("@@"):
+            header = False
+        elif path == rel and not header and line[:1] == "+":
+            added.add(line[1:].strip())
+        elif path == rel and not header and line[:1] == "-":
+            removed.add(line[1:].strip())
+    new, gone = added - removed - carried(rel), sorted(removed - added)
+    for line in sorted(new):
+        m = DATED.match(line)
+        hit = next((g for g in gone if g.startswith(m.group(0))), None) if m else None
+        if hit:
+            gone.remove(hit)
+            new.discard(line)
+    return new
+
+
+def unclassed(text, new):
+    """(line, key) per occurrence whose dated line is in `new` and that carries no class
+    line under it."""
+    out, key, cur = [], None, None
+    def close():
+        if cur and not cur[1]:
+            out.append((cur[0], key))
+    lines = text.splitlines()
+    start = next((i + 1 for i, l in enumerate(lines) if l.strip() == ENTRIES), 0)
+    for n, line in enumerate(lines[start:], start + 1):
+        if OCCURRENCE.match(line):
+            close()
+            cur = [n, False] if line.strip() in new else None
+        elif cur and DETAIL.match(line) and not STATUS.match(line):
+            cur[1] = cur[1] or bool(CLASSED.match(line))
+        elif line.strip():
+            close()
+            cur = None
+            key = KEY.match(line).group(1) if KEY.match(line) else key
+    close()
+    return out
+
+
 def multi_round_catches(text):
     """(line, rounds phrase) per occurrence tagged `Caught:` whose text names more than one
     round: the shape `Gate-run:` exists for."""
@@ -311,6 +404,11 @@ def main():
         except (OSError, UnicodeDecodeError) as e:
             refuse(f"unreadable: {rel}: {e}")
         findings += [(rel, n, msg) for n, msg in check(rel, body)]
+        new = staged_new(rel)
+        if new:
+            findings += [(rel, n, f"new occurrence with no class line ({key}); add Caught:, "
+                                  "Gate-run:, Escaped:, or In-work:, which says where it stopped")
+                         for n, key in unclassed(body, new)]
         for n, phrase in multi_round_catches(body):
             print(f"{ID}: warning: {rel}:{n}: a Caught: occurrence names {phrase}; rounds past "
                   "a gate's first catch are Gate-run:, not Caught:", file=sys.stderr)

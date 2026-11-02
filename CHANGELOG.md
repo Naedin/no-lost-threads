@@ -9,6 +9,31 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.18.0] — 2026-11-01
+
+### Added
+
+- **`retro-log` refuses a new occurrence with no class line.** Under the staged diff, an occurrence a commit writes must carry `Caught:`, `Gate-run:`, `Escaped:`, or `In-work:`. Older occurrences are not judged, nor is a line the commit moves, carries from the other side of a merge, cherry-pick, rebase, or revert, or repairs by hand on the same date. `run.py` by hand judges no diff.
+
+### Contract
+
+- **A new commit refusal on the retro log.** Release with threads, whose retro writes the class line. Adopter-side edit: none; a branch holding a classless capture adds the line when it lands.
+
+## threads [0.27.0] — 2026-11-01
+
+### Changed
+
+- **Every occurrence names its class at capture.** Retro now writes one class line on every occurrence, adding `In-work: <what stopped it>` for the case that had no line, so a missing class is an omission a tool can see. The first stop decides: a maintainer who stopped it is `Escaped:`, a reviewer that runs on its own is a named gate, a rule a key-only retro did not read counts as present, and another session's read after a gate passed it is `Gate-run:` on that gate. A gate's catch with no rule at the placement is `In-work:`, and that line also silences the view's prose-stop warning; the review ranks it by count as a rule-absent finding. Retro reads its own appends through the new `view --untagged --since HEAD`. `In-work:` ranks as an untagged occurrence does, and old entries read as before.
+
+### Fixed
+
+- **`compact` keeps a live key's status lines whole.** It cut every status at its first sentence end, so a `HELD` proposal or `ADJUDICATED` ruling on a live key lost the rest of its text with exit 0. A closed key's lines are still reduced.
+- **`compact` refuses a second status line under one key line.** It folded the two into one line, or cut the second at the first's sentence end and lost it, then exited 0, so `view --held` read 0 held. `parse` now names it a violation: `view` warns and `compact` exits 2, as for a status inside an occurrence.
+
+### Contract
+
+- **One new continuation, `In-work:`.** Release with guards, whose `retro-log` check refuses a new occurrence without a class line. Adopter-side edit: none; the log's older occurrences stay as they are.
+
 ## threads [0.26.0] — 2026-10-31
 
 ### Added

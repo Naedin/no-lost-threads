@@ -107,6 +107,78 @@ printf '%s' "$out" | grep -q '2 of the 4 lines the sweep finds are not cited: `s
   || { echo "FAIL  plan-sweeps: a listing finding names the uncited hits"; exit 1; }
 printf 'ok    %-52s\n' "plan-sweeps: a listing finding names the uncited hits"
 
+# retro-log: under GUARDS_DIFF a new occurrence needs a class line. An occurrence the commit
+# leaves alone, and one a compaction moves, is not judged; by hand no diff judges none.
+rc="$tmp/retro-class"; mkdir -p "$rc"; git -C "$rc" init -q
+git -C "$rc" config user.email t@t; git -C "$rc" config user.name t
+printf '## Entries\n\nd/old\n  2026-09-01 | s | predates the class line.\n' > "$rc/log.md"
+git -C "$rc" add log.md; git -C "$rc" commit -qm base
+rcheck() { git -C "$rc" add log.md; git -C "$rc" diff --cached > "$tmp/rc.diff"
+  GUARDS_DIFF="$tmp/rc.diff" python3 "$here/checks/retro-log/check.py" --root "$rc" --paths log.md; }
+printf 'd/new\n  2026-10-01 | s | stopped by the maintainer.\n    Cost: two days.\n' >> "$rc/log.md"
+expect 1 "retro-log: a new occurrence with no class line is a finding" rcheck
+rcheck 2>/dev/null | grep -q '^log.md:[0-9]*: new occurrence with no class line (d/new)' \
+  || { echo "FAIL  retro-log: the finding did not name the line and key"; fails=$((fails + 1)); }
+expect 0 "retro-log: by hand, with no diff, a new occurrence is not judged" \
+  python3 "$here/checks/retro-log/check.py" --root "$rc" --paths log.md
+for tag in 'Caught: the guards — doc.md §X' 'Gate-run: the guards — misfired' 'Escaped: main — a revert' 'In-work: the work itself'; do
+  printf '## Entries\n\nd/old\n  2026-09-01 | s | predates the class line.\nd/new\n  2026-10-01 | s | text.\n    %s\n' "$tag" > "$rc/log.md"
+  expect 0 "retro-log: ${tag%%:*} classes a new occurrence" rcheck
+done
+git -C "$rc" add log.md; git -C "$rc" commit -qm classed --no-verify
+printf '## Entries\n\nd/new\n  2026-10-01 | s | text.\n    In-work: the work itself\nd/old\n  2026-09-01 | s | predates the class line.\n' > "$rc/log.md"
+expect 0 "retro-log: an occurrence a compaction moves is not new" rcheck
+# Through the real hook: a commit finishing a conflicted merge, cherry-pick, or rebase
+# carries the other side's occurrences, classless ones included, and answers for its own.
+# A hand repair of an old dated line is not a new occurrence.
+rh="$tmp/retro-hook"; mkdir -p "$rh/.claude"; git -C "$rh" init -q -b main
+git -C "$rh" config user.email t@t; git -C "$rh" config user.name t
+printf '{ "checks": { "retro-log": { "rung": "block" } } }\n' > "$rh/.claude/guards.json"
+printf '## Entries\n\nd/old\n  2026-09-01 | s | predates the class line.\n' > "$rh/.claude/threads-retro-log.md"
+printf 'base\n' > "$rh/f"; git -C "$rh" add -A; git -C "$rh" commit -qm base
+git -C "$rh" switch -qc side
+printf 'side\n' > "$rh/f"; git -C "$rh" commit -qam side-f
+git -C "$rh" switch -q main
+printf 'main\n' > "$rh/f"
+printf 'd/peer\n  2026-10-01 | s | another session, no class line.\n' >> "$rh/.claude/threads-retro-log.md"
+git -C "$rh" commit -qam main-work
+git -C "$rh" switch -q side
+git -C "$rh" merge main >/dev/null 2>&1
+printf 'resolved\n' > "$rh/f"; git -C "$rh" add -A
+expect 0 "retro-log: a conflicted merge carries the other side's occurrence" hook "$rh"
+printf 'd/mine\n  2026-10-02 | s | written in the merge commit.\n' >> "$rh/.claude/threads-retro-log.md"; git -C "$rh" add -A
+expect 1 "retro-log: a merge commit answers for its own occurrence" hook "$rh"
+git -C "$rh" merge --abort
+git -C "$rh" cherry-pick main >/dev/null 2>&1
+printf 'resolved\n' > "$rh/f"; git -C "$rh" add -A
+expect 0 "retro-log: a conflicted cherry-pick carries the picked occurrence" hook "$rh"
+git -C "$rh" cherry-pick --abort
+git -C "$rh" switch -qc up main~1; printf 'up\n' > "$rh/f"; git -C "$rh" commit -qam up-f
+git -C "$rh" switch -qc replay main~1; printf 'replay\n' > "$rh/f"
+printf 'd/replayed\n  2026-10-03 | s | replayed, no class line.\n' >> "$rh/.claude/threads-retro-log.md"
+git -C "$rh" add -A; git -C "$rh" commit -qm replay --no-verify
+git -C "$rh" rebase up >/dev/null 2>&1
+printf 'resolved\n' > "$rh/f"; git -C "$rh" add -A
+expect 0 "retro-log: a conflicted rebase carries the replayed occurrence" hook "$rh"
+git -C "$rh" rebase --abort
+# A conflicted revert restores what the reverted commit removed.
+git -C "$rh" switch -qc undo main~1
+printf 'd/peer2\n  2026-10-04 | s | classless, removed below.\n' >> "$rh/.claude/threads-retro-log.md"
+git -C "$rh" add -A; git -C "$rh" commit -qm add-peer2 --no-verify
+git -C "$rh" revert --no-edit HEAD >/dev/null 2>&1
+printf 'undo\n' > "$rh/f"; git -C "$rh" commit -qam undo-f
+sed -i.bak '/2026-09-01/d' "$rh/.claude/threads-retro-log.md"; rm "$rh/.claude/threads-retro-log.md.bak"
+printf 'gone\n' > "$rh/f"; git -C "$rh" add -A; git -C "$rh" commit -qm drop --no-verify
+printf 'after\n' > "$rh/f"; git -C "$rh" commit -qam after-f
+git -C "$rh" revert --no-edit HEAD~1 >/dev/null 2>&1
+printf 'resolved\n' > "$rh/f"; git -C "$rh" add -A
+expect 0 "retro-log: a conflicted revert carries the lines it restores" hook "$rh"
+git -C "$rh" revert --abort
+git -C "$rh" switch -q main
+sed -i.bak 's/^  2026-09-01 | s | predates the class line\.$/  2026-09-01 | s | predates the class line, repaired./' "$rh/.claude/threads-retro-log.md"; rm "$rh/.claude/threads-retro-log.md.bak"; git -C "$rh" add -A
+expect 0 "retro-log: a hand repair of an old dated line is not new" hook "$rh"
+
+
 # plan-sweeps: under GUARDS_DIFF a sweep is judged only when the diff adds or changes a
 # line it is read from — its block, or the next line holding its count; the rest are
 # counted untouched. The diff is written as git writes it: a tab after a path holding a

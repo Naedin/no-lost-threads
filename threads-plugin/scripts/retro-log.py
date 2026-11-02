@@ -37,6 +37,11 @@ The entry grammar (the guards `retro-log` check enforces the same one):
                                                   finding, rounds after its first catch).
                                                   Retro writes it; `--reached` ranks it
                                                   as it ranks an `Escaped:` one
+      In-work: <what stopped it>                  continuation: none of the three above;
+                                                  the occurrence stopped inside the work.
+                                                  Retro writes it, so a missing class is
+                                                  an omission and not a reading; it ranks
+                                                  as any occurrence with no tag does
     LANDED <sha> — <where it landed, one line>    status line — one physical line,
                                                   however long; a wrapped one reads as
                                                   continuation prose
@@ -85,7 +90,9 @@ keys with an `Escaped:` occurrence since their last closing status, each marked 
 <where>`.
 Compaction keeps every block of a live key, merging only runs of occurrence blocks
 under one key line; a status or annotation block keeps its own key line, since a
-status inside an occurrence entry is invisible to the grammar. A closed key keeps its
+status inside an occurrence entry is invisible to the grammar, and a second status line
+under one key line is a violation, since compacting that block would fold or cut it. A
+closed key keeps its
 closing status line and any annotation after it. Compacting a canonical log changes
 nothing. A key's occurrence count is its dated occurrence lines across every block
 that carries the key; an annotation never counts. A live key that recurred after a closing
@@ -184,10 +191,13 @@ whatever the window, so keys closing after it never raise the bar. Its row says 
 
 A view warns on stderr about an occurrence whose text says a named gate stopped it —
 *stopped by `/slices:check`*, *caught only by the pre-commit hook*, *caught by lens E* —
-with no `Caught:`, `Gate-run:`, or `Escaped:` line: its class is unread, so `--reached`
+with no `Caught:`, `Gate-run:`, `Escaped:`, or `In-work:` line: its class is unread, so `--reached`
 ranks it as a repeat and `--ripe` never counts it. Up to three are named by key and date;
 past that one line counts them, and `--untagged` prints, instead of the view, each one as
-`<date>\t<key>\t<the phrase>`. A warning never changes the exit.
+`<date>\t<key>\t<the phrase>`. A warning never changes the exit. `--untagged --since
+DATE|REV` lists instead each occurrence new in that window with no `Caught:`, `Gate-run:`,
+`Escaped:`, or `In-work:` line, as `<date>\t<key>\tno class line`: retro's read over its own
+appends, `--since HEAD`, while the session that can class them still holds the facts.
 
 `--occurrences` prints, for each `--key`, its occurrences and nothing a review wrote: the
 key line with its count and span, then every occurrence block's lines — no status,
@@ -217,7 +227,7 @@ CAUGHT = re.compile(r"^\s{2,}Caught: (\S.*?)(?:\s+[—-]+\s.*)?$")
 ESCAPED = re.compile(r"^\s{2,}Escaped: (\S.*?)(?:\s+[—-]+\s.*)?$")
 GATE_RUN = re.compile(r"^\s{2,}Gate-run: (\S.*?)(?:\s+[—-]+\s.*)?$")
 RIPE = (("escaped", ESCAPED), ("gate-run", GATE_RUN))
-TAGGED = re.compile(r"^\s{2,}(?:Caught|Gate-run|Escaped): ")
+CLASSED = re.compile(r"^\s{2,}(?:Caught|Gate-run|Escaped|In-work): ")
 GATE_STOP = re.compile(
     r"(?<!not )(?<!never )\b(?:stopped|caught)(?: only)? (?:by|at) (?:(?:the|a) )?(?:[\w-]+ ){0,2}?"
     r"(?:/[a-z][\w:-]*|(?:pre-commit|commit-msg|pre-push)(?: hook| doc-lint)?|hook|guards?"
@@ -382,6 +392,10 @@ def parse(text):
             violations.append(
                 f"line {n}: status line inside an occurrence entry ({cur.key}); a status is its "
                 "own entry: the key line again, then the status line")
+        elif STATUS.match(line):
+            violations.append(
+                f"line {n}: second status line under one key line ({cur.key}); each status is "
+                "its own entry: the key line again, then the status line")
         cur.lines.append(line)
         cur.nums.append(n)
     for b in blocks:
@@ -453,26 +467,45 @@ def escapes(blocks_for_key):
     return out
 
 
+def occurrence_groups(block):
+    """(date, dated line, its continuations) per occurrence in an occurrence block."""
+    occ = []
+    for l in block.lines:
+        m = OCCURRENCE.match(l)
+        if m:
+            occ.append((m.group(1), l, []))
+        elif occ:
+            occ[-1][2].append(l)
+    return occ
+
+
 def untagged_stops(blocks):
     """(date, key, phrase) per occurrence whose text names a gate that stopped it and
-    that carries no `Caught:`, `Gate-run:`, or `Escaped:` line: a stop left unclassed."""
+    that carries no class line: a stop left unclassed."""
     out = []
     for b in blocks:
         if b.status:
             continue
-        occ = []
-        for l in b.lines:
-            m = OCCURRENCE.match(l)
-            if m:
-                occ.append([m.group(1), [m.group(3)], False])
-            elif occ and TAGGED.match(l):
-                occ[-1][2] = True
-            elif occ:
-                occ[-1][1].append(l.strip())
-        for d, text, tagged in occ:
-            hit = GATE_STOP.search(" ".join(text))
-            if hit and not tagged:
+        for d, dated, rest in occurrence_groups(b):
+            if any(CLASSED.match(l) for l in rest):
+                continue
+            hit = GATE_STOP.search(" ".join([OCCURRENCE.match(dated).group(3)]
+                                            + [l.strip() for l in rest]))
+            if hit:
                 out.append((d, b.key, hit.group(0)))
+    return out
+
+
+def unclassed(blocks, since, since_old):
+    """(date, key) per occurrence new since DATE or the log at REV with no class line."""
+    out = []
+    for b in blocks:
+        if b.status:
+            continue
+        for d, dated, rest in occurrence_groups(b):
+            new = d >= since if since_old is None else dated.strip() not in since_old
+            if new and not any(CLASSED.match(l) for l in rest):
+                out.append((d, b.key))
     return out
 
 
@@ -517,15 +550,16 @@ def reached(blocks_for_key):
     return False
 
 
-def one_line(block):
-    """A status block reduced to one line: joined, cut at the first sentence end."""
+def one_line(block, whole=False):
+    """A status block reduced to one line: joined and, unless `whole`, cut at the first
+    sentence end."""
     text = " ".join(l.strip() for l in block.lines)
     m = STATUS.match("  " + text)
     if not m:
         return "  " + text
     tail = m.group(4) or ""
     cut = tail.find(". ")
-    if cut != -1:
+    if cut != -1 and not whole:
         tail = tail[:cut + 1]
     return (f"  {m.group(1)} {m.group(2)}" + (f" {m.group(3)}" if m.group(3) else "")
             + (f" — {tail}" if tail else ""))
@@ -1190,7 +1224,7 @@ def render_compact(header, blocks):
         open_run = False
         for b in bs:
             if b.status:
-                out += [key_line, one_line(b)]
+                out += [key_line, one_line(b, whole=True)]
                 open_run = False
             else:
                 if not open_run:
@@ -1222,8 +1256,9 @@ def main():
                     help="view --since REV: keys a LANDED, RETIRED, UPSTREAM, or FILED line new "
                          "since REV closed or filed, written by no review commit")
     ap.add_argument("--untagged", action="store_true",
-                    help="view: each occurrence naming a gate stop in prose with no Caught:, "
-                         "Gate-run:, or Escaped: line, `<date>\\t<key>\\t<phrase>`, instead of the view")
+                    help="view: each occurrence naming a gate stop in prose with no class "
+                         "line, `<date>\\t<key>\\t<phrase>`, instead of the view; "
+                         "with --since, each new occurrence with no class line")
     ap.add_argument("--docs", action="store_true",
                     help="view: the files the shown keys name, `<keys>\\t<path>`, instead of the keys")
     ap.add_argument("--chain", action="store_true",
@@ -1263,17 +1298,21 @@ def main():
     if args.mode == "view":
         for v in violations:
             print(f"retro-log: warning: {v}", file=sys.stderr)
+        if args.untagged and args.since:
+            sys.stdout.write("".join(f"{d}\t{k}\tno class line\n"
+                                     for d, k in unclassed(blocks, args.since, since_old)))
+            return 0
         stops = untagged_stops(blocks)
         if args.untagged:
             sys.stdout.write("".join(f"{d}\t{k}\t{p}\n" for d, k, p in stops))
             return 0
         if 0 < len(stops) <= 3:
             for d, k, _ in stops:
-                print(f"retro-log: warning: {k} {d}: a gate stop in prose with no Caught:, "
-                      "Gate-run:, or Escaped: line; its class is unread", file=sys.stderr)
+                print(f"retro-log: warning: {k} {d}: a gate stop in prose with no class line; "
+                      "its class is unread", file=sys.stderr)
         elif stops:
             print(f"retro-log: warning: {len(stops)} occurrences name a gate stop in prose with "
-                  "no Caught:, Gate-run:, or Escaped: line; their class is unread "
+                  "no class line; their class is unread "
                   "(--untagged lists them)", file=sys.stderr)
         if args.arcs:
             sys.stdout.write(render_arcs(blocks))

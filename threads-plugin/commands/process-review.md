@@ -386,10 +386,13 @@ rebase.
      is the gate working, not a defect to fix. A **gate** is a named step whose job is to
      stop defects before a boundary — a check, a hook, a review or gap-check command, a
      suite run as a step; a red test while writing, a tool refusal, or another agent's
-     passing notice is the work itself. The **boundary** is the merge, or the hand-on as
+     passing notice is the work itself, unless a gate had already passed the slip, which makes
+     it gate-run on that gate. The **boundary** is the merge, or the hand-on as
      ready; a step rerunning checks just before it is a gate, not the boundary. Class each occurrence of every key and
      cluster this run rules on, from its text:
-     - **in-work** — stopped by the work itself before any gate;
+     - **in-work** — stopped by the work itself before any gate. An `In-work:` line naming a
+       gate and an absent rule is the rule-absent finding under **caught** below: it ranks by
+       count, as an untagged occurrence does, and the split counts it under caught;
      - **caught** — stopped by a named gate before the boundary, rework before the gate's
        first catch included. A `Caught:` tag claims this on the gate and the cost, as
        `Gate-run:` and `Escaped:` claim theirs; verify the rule was

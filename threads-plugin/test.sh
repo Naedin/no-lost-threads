@@ -404,6 +404,65 @@ python3 "$rl" view --keys --root "$tmp" --log stop.md 2>&1 >/dev/null | grep -q 
 [ "$(python3 "$rl" view --untagged --root "$tmp" --log stop.md | grep -c $'^2026-10-[01][0-9]\ts/')" -eq 4 ] || fail "--untagged did not list each untagged stop"
 ok "a prose gate stop with no tag warns on view, by key up to three and by count past; --untagged lists them; tagged, negated, and non-gate stops do not"
 
+# 11d. --untagged --since lists what a window added with no class line; In-work: classes one
+#      without changing its rank, and a gate's stop with its rule absent is classed by it
+U="$tmp/unclassed"; mkdir -p "$U"; git -C "$U" init -q; git -C "$U" config user.email t@t; git -C "$U" config user.name t
+printf '## Entries\n\no/old\n  2026-09-01 | s | predates the class line.\n' > "$U/log.md"
+git -C "$U" add log.md; git -C "$U" commit -qm base
+cat >> "$U/log.md" <<'EOF2'
+n/bare
+  2026-10-01 | s | stopped by the maintainer, past the command.
+    Cost: two days.
+n/worked
+  2026-10-02 | s | fixed in the same edit.
+    In-work: the work itself
+n/escaped
+  2026-10-03 | s | reached main.
+    Escaped: the default branch — a revert
+n/gate
+  2026-10-04 | s | stopped by the pre-commit hook.
+    In-work: the pre-commit hook
+EOF2
+[ "$(python3 "$rl" view --untagged --since HEAD --root "$U" --log log.md)" = "$(printf '2026-10-01\tn/bare\tno class line')" ] || fail "--untagged --since REV did not list only the new occurrence with no class line: $(python3 "$rl" view --untagged --since HEAD --root "$U" --log log.md)"
+python3 "$rl" view --untagged --since 2026-09-15 --root "$U" --log log.md | grep -q '^2026-10-01' || fail "--untagged --since DATE missed a new occurrence with no class line"
+python3 "$rl" view --untagged --since 2026-09-15 --root "$U" --log log.md | grep -q 'o/old' && fail "--untagged --since DATE read an occurrence before the window"
+python3 "$rl" view --untagged --root "$U" --log log.md | grep -q 'n/gate' && fail "In-work: naming a gate with its rule absent still warned"
+printf 'n/worked\n  2026-10-05 | s | again.\n    In-work: the work itself\n' >> "$U/log.md"
+python3 "$rl" view --keys --reached --root "$U" --log log.md 2>/dev/null | grep -q '^n/worked ' || fail "In-work: changed how a repeat ranks"
+python3 "$rl" view --keys --ripe --root "$U" --log log.md 2>/dev/null | grep -q '^n/worked ' && fail "In-work: made a key ripe"
+ok "--untagged --since lists new occurrences with no class line; In-work: classes one, ranks as untagged, is never ripe, and classes a rule-absent gate stop"
+
+# 11e. two status lines under one key line: view warns and reads the first, compact refuses
+#      and leaves the file, with or without a sentence end to cut at
+for first in 'ruling one.' 'ruling one'; do
+  printf '## Entries\n\nd/a\n  2026-10-01 | s | text\nd/a\n  ADJUDICATED 2026-10-02 — %s\n  HELD 2026-10-02 — proposal.\n' "$first" > "$tmp/fold.md"
+  cp "$tmp/fold.md" "$tmp/fold.before"
+  python3 "$rl" compact --root "$tmp" --log fold.md >/dev/null 2>"$tmp/fold.err"; rc=$?
+  [ "$rc" -eq 2 ] || fail "compact did not refuse two status lines under one key line (rc $rc)"
+  grep -q 'second status line under one key line' "$tmp/fold.err" || fail "compact's refusal did not name the second status line: $(cat "$tmp/fold.err")"
+  cmp -s "$tmp/fold.md" "$tmp/fold.before" || fail "a refused compact changed the log"
+  python3 "$rl" view --held --keys --root "$tmp" --log fold.md 2>&1 >/dev/null | grep -q 'second status line' || fail "view did not warn on two status lines under one key line"
+done
+ok "two status lines under one key line: view warns, compact refuses and writes nothing"
+
+# 11f. compaction keeps a live key's status text whole and still reduces a closed key's
+cat > "$tmp/whole.md" <<'EOF2'
+## Entries
+
+d/live
+  2026-10-01 | s | text
+d/live
+  HELD 2026-10-02 — the proposal. The reason it was held.
+d/closed
+  2026-10-01 | s | text
+d/closed
+  LANDED abc1234 — where it landed. The narrative.
+EOF2
+python3 "$rl" compact --root "$tmp" --log whole.md 2>/dev/null || fail "compact refused a valid log"
+grep -q 'HELD 2026-10-02 — the proposal. The reason it was held.$' "$tmp/whole.md" || fail "compact cut a live key's status"
+grep -q 'LANDED abc1234 — where it landed.$' "$tmp/whole.md" || fail "compact stopped reducing a closed key's status"
+ok "compact keeps a live key's status whole and reduces a closed key's"
+
 # 12. --placements: live keys clustered by resolved placement file, command docs first; caught,
 #     count-only, and pre-landing occurrences uncounted; --since narrows firing, never counting;
 #     a weighed cluster fires on the bar's worth of keys after its newest weighing
@@ -682,7 +741,6 @@ cat > "$K/.claude/risk.json" <<'JSON'
 JSON
 printf '# old\n\n## Verification ledger\n\n- profiled at 0000000, 2026-09-01, slices 0.12.0 — classes: copy\n- escaped at 0000000, 2026-09-01 — found by pre-pr: before the window — at src/x.swift; class: state-machine\n' > "$K/Plans/done/old.md"
 k_ add -A; k_ commit -q -m base; k_ tag mark
-in1="$(k_ rev-parse --short HEAD)"
 printf 'x\n' > "$K/f"; k_ add -A; k_ commit -q -m work; w="$(k_ rev-parse --short HEAD)"
 cat > "$K/Plans/a.md" <<PLAN
 # a
@@ -1081,7 +1139,7 @@ EOF
 # `fake` exists only as a function of this shell, as a harness-injected command does: the read
 # sees it only if it runs in the caller's shell, never in a subprocess of the script
 fake() { case "$1" in --version) echo "fake $FAKE_V (build 7)" ;; --quirk) return "$FAKE_Q" ;; esac; }
-wread() { eval "$(python3 "$wa" versions --root "$W")" | python3 "$wa" due --root "$W" "$@" | { eval "$(cat)"; } | python3 "$wa" record --root "$W" 2>/dev/null; python3 "$wa" status --root "$W"; }
+wread() { eval "$(python3 "$wa" versions --root "$W")" | python3 "$wa" due --root "$W" | { eval "$(cat)"; } | python3 "$wa" record --root "$W" 2>/dev/null; python3 "$wa" status --root "$W"; }
 python3 "$wa" status --root "$W" >/dev/null 2>&1; [ $? -eq 3 ] || fail "workarounds did not skip with no workaroundsPath"
 echo '{"workaroundsPath": ".claude/workarounds.json"}' > "$W/.claude/threads.json"
 python3 "$wa" check --root "$W" 2>/dev/null || fail "check refused a valid register"
