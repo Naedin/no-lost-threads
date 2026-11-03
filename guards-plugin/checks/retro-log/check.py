@@ -22,8 +22,9 @@ occurrence nor a status; an unknown status token; an arc name that is not a slug
 (lowercase words joined by `-`); a date after the ref on any token but `ARC`; a status
 entry longer than one
 line (the narrative belongs in the commit); a status or annotation line inside an
-occurrence entry (each is its own entry, key line repeated); a section after the
-entries; under the git adapter's staged diff (`GUARDS_DIFF`), an occurrence the commit adds
+occurrence entry (each is its own entry, key line repeated); two class lines on one
+occurrence (a union merge keeps a corrected line beside the one it replaced); a section
+after the entries; under the git adapter's staged diff (`GUARDS_DIFF`), an occurrence the commit adds
 with no class line, `Caught:`, `Gate-run:`, `Escaped:`, or `In-work:`. Only what the commit
 writes is judged, so a log older than the class line passes as it stands: not an occurrence
 it leaves alone, nor a line the diff also removes (moved, as a compaction moves it), nor a
@@ -217,7 +218,7 @@ def check(rel, text):
         else:
             return []
     out = []
-    key, first, status_lines = None, True, 0
+    key, first, status_lines, classed = None, True, 0, False
     for n, line in enumerate(lines[start:], start + 1):
         if not line.strip():
             continue
@@ -226,7 +227,7 @@ def check(rel, text):
             key = None
             continue
         if KEY.match(line):
-            key, first, status_lines = KEY.match(line).group(1), True, 0
+            key, first, status_lines, classed = KEY.match(line).group(1), True, 0, False
             continue
         if not DETAIL.match(line):
             out.append((n, "not a key line, a detail line, or blank"))
@@ -264,6 +265,13 @@ def check(rel, text):
         elif STATUS.match(line):
             out.append((n, f"status line inside an occurrence entry ({key}); a status is its own "
                            "entry: the key line again, then the status line"))
+        elif OCCURRENCE.match(line):
+            classed = False
+        elif CLASSED.match(line):
+            if classed:
+                out.append((n, f"second class line on one occurrence ({key}); an occurrence carries "
+                               "one, and after a union merge over a correction, keep the correction"))
+            classed = True
     return out
 
 

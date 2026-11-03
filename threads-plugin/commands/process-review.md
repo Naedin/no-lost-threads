@@ -77,7 +77,8 @@ convention in the moment. Fields:
 - `retroLogPath` — retro log: what *sessions* captured and no review has adjudicated yet.
   Default `.claude/threads-retro-log.md`. An append-only stream `/threads:retro` writes;
   `scripts/retro-log.py view` derives each key's state and count from it, and this command
-  is its only mutator, through `scripts/retro-log.py compact` and re-keying.
+  is its only mutator, through `scripts/retro-log.py compact`, re-keying, and the two
+  corrections under *Maintain the retro log*.
 - `invariantDocs` — optional, **ordered** (highest authority first): **the core** — the
   docs that state the repo's authority order and this review's own contract (its
   conventions, anything it adds to this command). Read whole at step 0a, every run, before any commit, so
@@ -327,8 +328,9 @@ rebase.
      match anything, so counting before re-keying yields a number the re-key invalidates,
      after every ranking decision has already been made against it. Read every key as a
      set, rewrite the ones still carrying their session's nouns — a re-key edits the key
-     line wherever it appears, the one edit the stream permits, and only this command
-     makes it — then `compact`, *then* count from the view. Keys flagged `(uncold)` come
+     line wherever it appears; besides the two corrections under *Maintain the retro log*
+     it is the one edit the stream permits, and only this command makes it — then
+     `compact`, *then* count from the view. Keys flagged `(uncold)` come
      first, but the sweep is over all of them.
    - **Read each key's chain before counting it.** Occurrences are not independent: a
      session patches what it hit in the lag before a review, often in part, and parallel
@@ -867,8 +869,9 @@ as a check at the write than as an executor sub-agent between judgment and landi
     occurrence counts against the stub instead of vanishing into a closed key.
   - **A status line's where names its section or item, never its number alone** —
     `release.md §Rollback`, `review.md *Data migrations*`, not `§4` or `class 9`. A
-    numbered list renumbers when an item is inserted or removed, and an append-only line
-    cannot be re-pointed afterwards. Lines already written stay as they are.
+    numbered list renumbers when an item is inserted or removed, and nothing notices. A
+    line already written stays as it is until its target moves or goes (the correction
+    below).
   - **A candidate this run proposed and held** (an autonomous run, or one the user did
     not answer) is `HELD <today's date> — <letter, class, the proposal in one line>` on
     its key, and the lines ride **this run's marker commit** — the date is the ref because
@@ -888,6 +891,31 @@ as a check at the write than as an executor sub-agent between judgment and landi
     where the key is instead of in a commit body. A count-only ruling on a key whose
     every occurrence carries `Caught:` is already written: `--reached` does not show it,
     and an `ADJUDICATED` line restating that is the re-ruling the tag exists to stop.
+  - **A correction edits one line in place**, after this run's chain reads and before
+    `compact`, in one of two cases:
+    - **A class line the log's own text contradicts** — the occurrence's text, or another
+      occurrence naming it. Replace `Caught:`, `Escaped:`, `Gate-run:`, or `In-work:` with
+      the class that text states, its where and cost taken from that text, so `--reached`
+      reads what the text says. A class resting on your reading rather than the text is a
+      ruling, and an occurrence with no class line is classed as above.
+    - **A status line's where whose target moved or was removed.** The token and the ref
+      stay, since state and `closed citing` read them. When the file changes, keep the old
+      path in the line, `new.md §X (was old.md §Y)`: `--chain` finds a key's markers by
+      the paths its status lines name, so a marker on the old file leaves the chain when
+      the line stops naming it. A target gone with no successor reads `old.md §Y (removed)`.
+
+    Nothing else is corrected: not an occurrence's dated line or text, and not an
+    `ADJUDICATED` or `ARC` line, which records what was decided then. The trace is the
+    commit, which names each line's key and its old and new text; a correction adds no
+    `ADJUDICATED` line, since it decides nothing the log did not already say. The
+    `Process-Review:` trailer is load-bearing here: `--outside` reads a corrected closing
+    line by the commit that last wrote it. Sessions never correct; retro captures a wrong
+    line as a finding.
+    **Union merge keeps both sides of a corrected last line of the file** when a branch
+    forked before the correction lands after it, a rebased tree on your side
+    notwithstanding; any line above the last merges clean. The view and the `guards`
+    `retro-log` check name the result, two class lines or two status lines where one
+    belongs, and the repair keeps the correction.
   - **A judgment about several keys at once** — this stub field, that trailer, and the
     pinned form are one deferral converging; this deprecation and its reversal are one
     spelling arc; a layer proposed "to be proved out" and its later instances — is an
@@ -920,7 +948,7 @@ as a check at the write than as an executor sub-agent between judgment and landi
     ruling.
   - **Then compact:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact` — one
     block per key, closed keys reduced to their status line. It is the only rewrite of
-    the file and it is deterministic; a violation it refuses on is repaired by hand first.
+    the whole file and it is deterministic; a violation it refuses on is repaired by hand first.
   - **Re-key before you retire.** Entries flagged `key (uncold)` were keyed by the
     session that did the work, which is the context least able to write a domain-free
     key — re-key those first, and never read their failure to match as evidence of a
@@ -977,7 +1005,8 @@ as a check at the write than as an executor sub-agent between judgment and landi
 - **Retiring retro-log entries on age alone**, or retiring one that is merely mis-keyed —
   re-key first; blind retirement hides the failure it should surface.
 - **Writing a window's narrative into the ledger**, or editing a log line other than a key
-  being re-keyed. The commit body is the narrative's home; the stream is append-only.
+  being re-keyed or one of the two corrections. The commit body is the narrative's home;
+  the stream is otherwise append-only.
 - **Treating retro's disposition as settled.** You have better standing to rank than the
   session that set it; use it, and record the re-rank.
 - **Counting keys before re-keying them** — the count is then invalidated by your own

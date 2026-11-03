@@ -16,7 +16,8 @@ patching what is in front of it, and your job is to say what else the artifact c
 Read-only: you change nothing.
 
 **The findings in your brief are the only record you read of them.** They come as the
-sessions wrote them (`retro-log.py view --occurrences`), with every review ruling left out.
+sessions wrote them (`retro-log.py view --occurrences`), with every review ruling left out;
+a class line may be a review's correction, which states only what the text already says.
 Never open the retro log, the review ledger, or a review's commit or record: each carries
 rulings on these same keys — a count-only call, a cluster weighing, an occurrence split, a
 candidate in flight — and a ruling read is the framing this read exists to escape. Open the

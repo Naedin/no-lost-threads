@@ -245,8 +245,10 @@ those keys by the date each entered, with their dated blocks: the arc's history 
 from the log, never narrated again, and the re-derive command a ledger watch on the arc
 cites; `view --arcs` lists them. The arc's own landings are commits carrying an `Arc:
 <name>` trailer, which `marker-stream.py list --arc <name>` prints dated.
-`compact` is the review's one rewrite. The `guards` plugin's `retro-log`
-and `review-ledger` checks hold both files to their grammar.
+`compact` is the review's one rewrite. Past a re-key, the review's only in-place edits are
+a class line the log's own text contradicts and a status line's where whose target moved,
+so `--reached` can read what the text says; sessions append and never edit. The `guards`
+plugin's `retro-log` and `review-ledger` checks hold both files to their grammar.
 
 **A marker commit survives the squash by landing on its own.** A squash merge collapses
 a slice branch into one subject, so a `docs(process/<scope>)` commit made on the branch

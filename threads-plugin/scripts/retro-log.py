@@ -12,7 +12,10 @@ change is therefore an append, never an edit, and the current state of a key is
 derived by reading the stream. `view` derives it. `compact` rewrites the stream to
 its canonical form and is the review's mutation — one key block per key, closed
 keys reduced to their final status line — which is why the review is the only
-caller that may run it against the file.
+caller that may run it against the file. The review alone also edits a line in place: a
+re-key, and the two corrections its command names, a class line the log's own text
+contradicts and a status line's where whose target moved. Neither touches a dated line,
+a token, or a ref, so a key's state and count and `--chain`'s capture times hold.
 
 The entry grammar (the guards `retro-log` check enforces the same one):
 
@@ -91,7 +94,9 @@ keys with an `Escaped:` occurrence since their last closing status, each marked 
 Compaction keeps every block of a live key, merging only runs of occurrence blocks
 under one key line; a status or annotation block keeps its own key line, since a
 status inside an occurrence entry is invisible to the grammar, and a second status line
-under one key line is a violation, since compacting that block would fold or cut it. A
+under one key line is a violation, since compacting that block would fold or cut it. So
+are two class lines on one occurrence, which is what a union merge leaves when a branch
+forked before a correction meets a corrected last line of the file: it keeps both. A
 closed key keeps its
 closing status line and any annotation after it. Compacting a canonical log changes
 nothing. A key's occurrence count is its dated occurrence lines across every block
@@ -114,11 +119,13 @@ count; the key line says `escaped <gate>`; and a key whose state is REOPENED, a 
 half, at any count, since a compaction before the ruling may have dropped its occurrences), `--since DATE` (keys with an occurrence,
 status, or annotation dated on or after DATE), `--since REV` (keys with a detail line the
 log at REV did not hold — what was appended after that commit, to the commit and not to
-the day; compaction and re-keying move no line into it: the read for "since the mark";
+the day; compaction and re-keying move no line into it, and a correction's line is in it
+until the mark passes that commit: the read for "since the mark";
 a REV naming a local tag the remote holds elsewhere refuses, naming the fetch that moves it),
 `--ripe` (what retro's ripeness nudge reads: keys holding an occurrence tagged `Escaped:`
 or `Gate-run:` after their last closing status — with `--since`, that occurrence itself
-new in the window — since a caught or in-work occurrence never changes a ruling alone),
+new in the window, read by its dated line, so a corrected class line does not make it
+new — since a caught or in-work occurrence never changes a ruling alone),
 `--live` (no closed section), `--outside` (with `--since REV`: keys whose deciding status —
 a LANDED, RETIRED, UPSTREAM, or FILED line — is new since REV and was written by a commit
 with no `Process-Review` trailer, or is not yet committed: what a retro, a slice, or a release
@@ -202,8 +209,9 @@ appends, `--since HEAD`, while the session that can class them still holds the f
 `--occurrences` prints, for each `--key`, its occurrences and nothing a review wrote: the
 key line with its count and span, then every occurrence block's lines — no status,
 `ADJUDICATED`, `HELD`, or `ARC` block, and no marker on the key line. It is the read a
-cold reader is handed, so a ruling already on the key never frames it. It takes `--key`
-and nothing else.
+cold reader is handed, so a ruling already on the key never frames it. The one line a
+review may have written there is a corrected class line, which states only what the log's
+text already says. It takes `--key` and nothing else.
 """
 import argparse
 import datetime
@@ -401,6 +409,16 @@ def parse(text):
     for b in blocks:
         if not b.lines:
             violations.append(f"line {b.line_no}: key with no detail ({b.key})")
+        classed = False
+        for l, n in zip(b.lines, b.nums):
+            if OCCURRENCE.match(l):
+                classed = False
+            elif CLASSED.match(l):
+                if classed:
+                    violations.append(
+                        f"line {n}: second class line on one occurrence ({b.key}); an occurrence "
+                        "carries one, and after a union merge over a correction, keep the correction")
+                classed = True
     return header, blocks, violations
 
 
@@ -640,7 +658,8 @@ def capture_times(root, log):
 def lines_at(root, log, rev):
     """The stripped detail lines the log held at `rev`: what `--since REV` reads as old.
     Compaction moves lines and re-keying edits key lines, neither of which makes a detail
-    line new; a log absent at `rev` holds none."""
+    line new; a correction does, its line being one `rev` did not hold. A log absent at
+    `rev` holds none."""
     if subprocess.run(["git", "rev-parse", "--verify", "-q", rev + "^{commit}"], cwd=root,
                       capture_output=True).returncode != 0:
         refuse([f"--since takes YYYY-MM-DD or a commit, not {rev}"])

@@ -682,6 +682,61 @@ python3 "$rl" view --keys --since no-such-rev --root "$C" >/dev/null 2>"$C/err" 
 grep -q 'takes YYYY-MM-DD or a commit' "$C/err" || fail "a bad --since was not named: $(cat "$C/err")"
 ok "view --chain: occurrences and the placement's organic markers on one clock, in order; a same-day pair one burst; a broad marker bracketed; an open PR in flight; the window's unkeyed patch named; an uncommitted line dated by its own; --since REV to the commit, a re-key and a compaction not new"
 
+# ---- a review's correction: a class line the text contradicts, a status line's where. The
+# ranking follows the tag; the occurrence's capture and newness do not move; a moved file's
+# old path keeps its markers in the chain; a union merge's leftover is named
+F="$tmp/correct"; mkdir -p "$F/.claude" "$F/docs"
+git init -q -b main "$F"; f_() { git -C "$F" "$@"; }
+f_ config user.email t@t; f_ config user.name t
+fat() { GIT_AUTHOR_DATE="$1" GIT_COMMITTER_DATE="$1" git -C "$F" commit -q -m "$2"; }
+printf '{ "markerPattern": "^docs(process", "retroLogPath": ".claude/log.md" }\n' > "$F/.claude/threads.json"
+printf '.claude/log.md merge=union\n' > "$F/.gitattributes"
+printf '# old\n' > "$F/docs/old.md"; printf '# new\n' > "$F/docs/new.md"
+printf '## Entries\n\nk/tag\n  2026-09-02 | s | reached the default branch.\n    Caught: a gate — doc.md §x\nk/moved\n  2026-09-02 | s | first.\n    In-work: the work\nk/moved\n  LANDED abc1234 — docs/old.md §x\nk/moved\n  2026-09-04 | s | came back.\n    In-work: the work\nk/closed\n  LANDED abc1234 — docs/old.md §z\n' > "$F/.claude/log.md"
+f_ add -A; fat "2026-09-02T09:00:00+00:00" capture; f_ tag mark
+printf 'y\n' >> "$F/docs/old.md"; f_ add -A; fat "2026-09-03T09:00:00+00:00" "docs(process/old): on the old file"
+printf 'y\n' >> "$F/docs/new.md"; f_ add -A; fat "2026-09-03T10:00:00+00:00" "docs(process/new): on the new file"
+python3 "$rl" view --keys --reached --root "$F" 2>/dev/null | grep -q '^k/tag ' && fail "a Caught: occurrence ranked before its correction"
+capture() { python3 "$rl" view --chain --key k/tag --root "$F" 2>/dev/null | grep '^  [0-9].* occurrence ' | sed 's/  caught: .*//'; }
+chain_before=$(capture)
+sed -i.bak -e 's#Caught: a gate — doc.md §x#Escaped: the default branch — a revert#' -e 's#docs/old.md §x#docs/new.md §x (was docs/old.md §x)#' -e 's#docs/old.md §z#docs/new.md §z (was docs/old.md §z)#' "$F/.claude/log.md" && rm -f "$F/.claude/log.md.bak"
+python3 "$rl" view --keys --reached --root "$F" 2>/dev/null | grep -q '^k/tag ' || fail "a corrected class line did not reach --reached"
+f_ add -A; git -C "$F" commit -q -m "bookkeeping: corrections" --trailer "Process-Review: 2026-09-05"; f_ tag -f mark >/dev/null
+[ "$(capture)" = "$chain_before" ] || fail "a corrected class line moved the occurrence's capture: $chain_before"
+python3 "$rl" view --chain --key k/moved --root "$F" 2>/dev/null > "$F/ch" || fail "--chain after a re-point failed"
+grep -q 'on the old file' "$F/ch" && grep -q 'on the new file' "$F/ch" || fail "a re-pointed status line lost a marker from the chain: $(cat "$F/ch")"
+python3 "$rl" view --keys --ripe --since HEAD~1 --root "$F" 2>/dev/null | grep -q '^k/tag ' && fail "a corrected class line read as a new escaped occurrence"
+python3 "$rl" view --keys --since HEAD~1 --root "$F" 2>/dev/null | grep -q '^k/tag ' || fail "--since REV did not read a corrected line as written since"
+python3 "$rl" view --keys --since mark --root "$F" 2>/dev/null | grep -q '^k/tag ' && fail "a correction behind the mark still read as new"
+python3 "$rl" view --chain --outside --since HEAD~1 --root "$F" 2>/dev/null | grep -q '^k/closed .*closed outside' && fail "a review's correction read as closed outside a review"
+sed -i.bak 's#docs/new.md §z (was docs/old.md §z)#docs/new.md §z2 (was docs/old.md §z)#' "$F/.claude/log.md" && rm -f "$F/.claude/log.md.bak"; f_ add -A; git -C "$F" commit -q -m "no trailer"
+python3 "$rl" view --chain --outside --since HEAD~1 --root "$F" 2>/dev/null | grep -q '^k/closed .*closed outside' || fail "a closing line edited with no Process-Review trailer did not read as outside"
+python3 "$rl" view --occurrences --key k/tag --root "$F" 2>/dev/null | grep -q 'Escaped: the default branch' || fail "--occurrences did not print the corrected class"
+python3 "$rl" compact --root "$F" 2>/dev/null; grep -q 'Escaped: the default branch' "$F/.claude/log.md" && grep -q 'was docs/old.md' "$F/.claude/log.md" || fail "compact dropped a correction"
+f_ add -A; git -C "$F" commit -q -m "bookkeeping: compact" --trailer "Process-Review: 2026-09-05"
+# a branch forked before a correction of the file's last line: the union merge keeps both lines
+printf 'k/last\n  2026-09-06 | s | text.\n    Caught: a gate — doc.md §x\n' >> "$F/.claude/log.md"; f_ add -A; fat "2026-09-06T09:00:00+00:00" "capture last"
+f_ checkout -q -b session; printf 'k/peer\n  2026-09-07 | s | a peer.\n    In-work: the work\n' >> "$F/.claude/log.md"; f_ add -A; fat "2026-09-07T09:00:00+00:00" "capture peer"
+f_ checkout -q main; sed -i.bak '$s#.*#    Escaped: main — a revert#' "$F/.claude/log.md" && rm -f "$F/.claude/log.md.bak"; f_ add -A; fat "2026-09-07T10:00:00+00:00" "correct last"
+f_ merge -q --no-edit session || fail "the union merge did not complete"
+python3 "$rl" view --keys --root "$F" 2>&1 >/dev/null | grep -q 'second class line on one occurrence (k/last)' || fail "the view did not name a corrected line the merge kept twice: $(python3 "$rl" view --keys --root "$F" 2>&1 >/dev/null)"
+python3 "$rl" compact --root "$F" >/dev/null 2>&1; [ $? -eq 2 ] || fail "compact did not refuse two class lines on one occurrence"
+# the same under a rebase; and a corrected line above the last merges clean
+G="$tmp/correct-merge"; git init -q -b main "$G"; g_() { git -C "$G" "$@"; }
+g_ config user.email t@t; g_ config user.name t
+printf 'log.md merge=union\n' > "$G/.gitattributes"
+printf '## Entries\n\nk/a\n  2026-09-06 | s | text.\n    Caught: a gate — doc.md §x\n' > "$G/log.md"; g_ add -A; g_ commit -qm base
+g_ checkout -q -b s1; printf 'k/peer\n  2026-09-07 | s | a peer.\n    In-work: the work\n' >> "$G/log.md"; g_ commit -qam peer
+g_ checkout -q main; sed -i.bak '$s#.*#    Escaped: main — a revert#' "$G/log.md" && rm -f "$G/log.md.bak"; g_ commit -qam correct
+g_ checkout -q s1; g_ rebase -q main || fail "the rebase over a corrected last line stopped"
+[ "$(grep -cE '^    (Caught|Escaped):' "$G/log.md")" = 2 ] || fail "a rebase did not keep both sides of a corrected last line: $(cat "$G/log.md")"
+g_ checkout -q main; g_ reset -q --hard HEAD~1; printf '    Placement: doc.md §x\n' >> "$G/log.md"; g_ commit -qam placed
+g_ checkout -q -b s2; printf 'k/peer\n  2026-09-07 | s | a peer.\n    In-work: the work\n' >> "$G/log.md"; g_ commit -qam peer
+g_ checkout -q main; sed -i.bak 's#Caught: a gate — doc.md §x#Escaped: main — a revert#' "$G/log.md" && rm -f "$G/log.md.bak"; g_ commit -qam correct
+g_ merge -q --no-edit s2 || fail "the merge over a corrected line above the last stopped"
+grep -q 'Caught:' "$G/log.md" && fail "a corrected line above the last came back: $(cat "$G/log.md")"
+ok "a correction: --reached follows the tag; capture, --ripe --since, and --outside do not read it as new; --since REV does until the mark passes; a moved file's old path keeps its markers; two class lines from a union merge are a violation"
+
 # ---- retro-log.py view --outside --since REV: a key a retro, slice, or release closed or filed
 # in the window, written by no review commit — the self-landed patch the review must judge
 O="$tmp/outside"; mkdir -p "$O/.claude" "$O/docs"

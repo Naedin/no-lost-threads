@@ -262,8 +262,8 @@ Read `retroLogPath` from `.claude/threads.json` (default `.claude/threads-retro-
 
 **Append only. Never edit or remove an existing line.** The log is a stream that
 concurrent sessions merge by union (the adopter sets `merge=union` on it in
-`.gitattributes`), and union merge is only correct when nobody edits a line already
-there. Every change of state is therefore itself an append, and the current state of a
+`.gitattributes`), and a session's edit of a line already there is one no other session's
+copy agrees with. Every change of state is therefore itself an append, and the current state of a
 key is derived from the stream — `scripts/retro-log.py view` derives it; the grammar is
 that script's docstring (`--help` prints it), the log's header only points at it, and this
 block is the copy that ships with the script:
@@ -303,7 +303,7 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   `retro-log-size` check holds the cap where a repo enables it.
 - **A pointer names its section or item, never its number alone** — `Placement:`,
   `Caught:`, a status line's where. A numbered list renumbers when an item is inserted or
-  removed, and an append-only line cannot be re-pointed afterwards.
+  removed, and a session never re-points a line afterwards.
 - **A finding a gate caught with its rule already present** → the ordinary key +
   occurrence, with one continuation line `Caught: <gate> — <where the rule is>` (the
   gate that stopped it: `/slices:check`, the guards, a review round; the rule's file and
@@ -362,8 +362,8 @@ whatever block another session appended on the default branch, silently. A union
 also runs no pre-commit hook, so the adopter's landing step runs its commit gate, where it has one, on
 the merged tree before the push; that is where a merged stream is judged.
 
-Compaction, re-keying, and retirement belong to `/threads:process-review`, which is
-single-session by requirement. Carry any `key (uncold)` flag from §3 into the key line.
+Compaction, re-keying, correcting a line, and retirement belong to
+`/threads:process-review`, which is single-session by requirement. Carry any `key (uncold)` flag from §3 into the key line.
 
 ### The escape hatch — landing straight from retro
 

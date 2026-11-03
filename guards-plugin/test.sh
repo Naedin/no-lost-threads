@@ -128,6 +128,16 @@ done
 git -C "$rc" add log.md; git -C "$rc" commit -qm classed --no-verify
 printf '## Entries\n\nd/new\n  2026-10-01 | s | text.\n    In-work: the work itself\nd/old\n  2026-09-01 | s | predates the class line.\n' > "$rc/log.md"
 expect 0 "retro-log: an occurrence a compaction moves is not new" rcheck
+# A review's correction edits a class line or a status line's where and passes; what a union
+# merge leaves of a corrected last line, two class lines on one occurrence, does not.
+printf '## Entries\n\nd/new\n  2026-10-01 | s | text.\n    Escaped: main — a revert\nd/old\n  2026-09-01 | s | predates the class line.\nd/done\n  LANDED abc1234 — new.md §X (was old.md §Y)\n' > "$rc/log.md"
+expect 0 "retro-log: a corrected class line and a re-pointed status line pass" rcheck
+printf '## Entries\n\nd/new\n  2026-10-01 | s | one.\n    Caught: the guards — doc.md §X\n  2026-10-02 | s | two.\n    Escaped: main — a revert\n' > "$rc/log.md"
+expect 0 "retro-log: one class line on each of two occurrences is no finding" rcheck
+printf '## Entries\n\nd/new\n  2026-10-01 | s | text.\n    Escaped: main — a revert\n    Caught: the guards — doc.md §X\n' > "$rc/log.md"
+expect 1 "retro-log: two class lines on one occurrence are a finding" rcheck
+rcheck 2>/dev/null | grep -q '^log.md:6: second class line on one occurrence (d/new)' \
+  || { echo "FAIL  retro-log: the two-class finding did not name the line and key"; fails=$((fails + 1)); }
 # Through the real hook: a commit finishing a conflicted merge, cherry-pick, or rebase
 # carries the other side's occurrences, classless ones included, and answers for its own.
 # A hand repair of an old dated line is not a new occurrence.

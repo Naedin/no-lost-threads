@@ -9,6 +9,30 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.29.0] — 2026-11-02
+
+### Changed
+
+- **`/threads:process-review` may correct a retro-log line in place, in two cases:** a class line the log's own text contradicts, so `--reached` reads what the text says, and a status line's where whose target moved or was removed, keeping a moved file's old path so `--chain` still finds its markers. Sessions stay append-only, and a ruling stays an appended `ADJUDICATED` line.
+
+### Fixed
+
+- **`view` and `compact` read two class lines on one occurrence as a violation,** which is what a union merge leaves when a branch forked before a correction meets a corrected last line of the file.
+
+### Contract
+
+- **The log's grammar is unchanged; what may edit it widened.** Adopter-side edit: a repo whose log header or `.gitattributes` comment says `compact` is the only change to existing lines adds the review's corrections. The bootstrap's seed text carries no such sentence.
+
+## guards [0.20.0] — 2026-11-02
+
+### Fixed
+
+- **`retro-log` finds two class lines on one occurrence.** A log already holding one blocks at the next commit, whatever that commit touches.
+
+### Contract
+
+- **A new finding on existing logs.** Adopter-side edit: a log holding two class lines on one occurrence keeps the correct one before updating.
+
 ## guards [0.19.1] — 2026-11-02
 
 ### Fixed
