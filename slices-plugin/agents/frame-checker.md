@@ -76,7 +76,14 @@ Work in this order:
    A `risk:` field's `suggested <class>` decisions are read the same way: a confirm whose
    shape does nothing the class's check is for, or a dismissal whose shape does, is
    corrected, its reason rewritten from the walk.
-5. **Weigh.** A shape that delivers as much value at less cost beats the others. When value
+5. **Test every shape against the rules it must keep** — the direction docs of step 1 and,
+   when `.claude/threads.json` names them, its `invariantDocs`. Walk each shape's mechanism
+   against each rule it bears on: a capability it takes off some records, a second path for
+   what one path does, a stored shape a rule constrains. A breach goes on the cost line,
+   `breaks: <the rule, by doc and section>`, and `none` after the walk; with no such doc, the
+   field is omitted. Naming a breach as a trade-off does not discharge it: a shape that breaks
+   a rule carries that rule's amendment in its own line, and whether to amend is a product call.
+6. **Weigh.** A shape that delivers as much value at less cost beats the others. When value
    and cost point to different shapes — one buys more, another keeps most of it with fewer
    new mechanisms, fewer states, or no regression — say so: that trade is a product call,
    and you do not make it.
@@ -87,13 +94,15 @@ pick line resting on a row you refuted is left for the drafter, named in your re
 you writes it from your verdict. Touch nothing outside the `## Frame` section.
 
 Report: each shape you added and why it is a candidate; each cost line or row you changed,
-with the evidence (file, line, command output); the regressions you found, by state. Then
+with the evidence (file, line, command output); the regressions you found, by state; each
+rule a shape breaks. Then
 one verdict line:
 
 - **STANDS `<shape>`** — value and cost agree on one shape: no other shape delivers as much
-  for less, and the one that stands carries no regression a cheaper shape avoids.
-- **CONTESTED** — more than one shape stands, or value and cost point apart. Name the
-  shapes and the trade in one line each.
+  for less, and the one that stands carries no regression a cheaper shape avoids and breaks no
+  rule.
+- **CONTESTED** — more than one shape stands, value and cost point apart, or the shape the
+  value favours needs a rule amended. Name the shapes and the trade in one line each.
 
 A record whose pick holds is a real finding; say so plainly. Do not invent shapes to have
 something to add, and do not restate the record back.

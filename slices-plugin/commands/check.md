@@ -130,9 +130,11 @@ read the report against the stops. **Reasons**, which fire at any round:
   `lands: outside`: their fixes need code outside the plan's changed files to change, or to
   behave differently than the plan assumes. A fix that only corrects the plan's text about
   code it reads lands in the plan;
-- **(c) reopen** — most of the round's defects are marked `reopens`: they land on what the
-  previous round's fixes touched. The first round after a frame baseline has no previous
-  round, so (c) cannot fire on it.
+- **(c) reopen** — most of the round's defects are marked `reopens`: their fixes rewrite or
+  reverse text the previous round's fixes wrote, so the fixes are churning. An omission in a
+  section that round touched is not one. The previous round is read as (d) reads it, so (c)
+  cannot fire on the first round after a frame baseline, on a class's first round, or on a
+  change round, whose defects land on the fold it checks by construction.
 
 **Backstops**, which fire whatever the reasons say:
 
@@ -140,7 +142,9 @@ read the report against the stops. **Reasons**, which fire at any round:
   record's `<N>` since the frame baseline. The first round after one has nothing to decay
   from, so (d) cannot fire on it. Under a profile the previous record is the newest one of
   the same `class:` (round 1 and a go's rounds are one class, the base): a class round
-  measures a different check than the one before it. Within one frame nothing resets it: a `go at` line, a
+  measures a different check than the one before it. A `change:` record is no round here:
+  (d) does not fire on a change round or read one as the previous record, since it measures
+  one fold. Within one frame nothing resets it: a `go at` line, a
   folded question, or a round of applied fixes leaves the baseline where it is;
 - **(e) cap** — §1's: no round past the budget, or with no profile no third round,
   without the frame owner's go.
@@ -239,8 +243,8 @@ trailer on its fix, `Escaped-class: <id | none> — found by <stage>: <the defec
 
 `<N>` counts every defect, dependency findings included, so the next round's no-decay
 backstop reads it from this line; `<D>` is written when any dependency finding came back.
-`touched:` carries the report's `touched` sections when its fixes stand, and is what the
-next round's checker marks `reopens` against. A stopped round writes `addressed: 0` and
+`touched:` carries the report's `touched` sections when its fixes stand, and says where the
+next round's checker finds the text it marks `reopens` against. A stopped round writes `addressed: 0` and
 no `touched:`, since §2 restored the plan, and `stopped:` names the reasons fired as
 §2 lists them — `dependency`, `cluster`, `reopen`, `no-decay`. The `check held` line is the
 cap's stop, written when no checker ran; a `go at` line lets one further round start.

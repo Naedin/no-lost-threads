@@ -9,6 +9,39 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.21.0] — 2026-11-04
+
+### Changed
+
+- **A missing plugin refuses the commit in a repo that opted in,** with exit 2, naming what was searched, the install and `git commit -n`, rather than printing a skip and passing. A repo whose index carries no `.claude/guards.json` still passes. `--on-missing skip` keeps the named skip, for a repo whose contributors commit without the plugin.
+
+### Fixed
+
+- **`install.py`'s printed lookup finds guards on every plugin layout:** it searches `cache/` and `synced/` and picks the highest `plugin.json` version, since a `synced/` path carries no version to sort. A machine with only `synced/` found nothing and passed every commit unjudged.
+
+### Contract
+
+- **The printed lines changed.** Adopter-side edit: a hook or landing step holding the old lines regenerates them with `--print` and `--runner`; the old lines keep working on `cache/` and keep skipping elsewhere.
+
+## slices [0.14.0] — 2026-11-04
+
+### Changed
+
+- **`/slices:check`'s reopen stop reads churn, not overlap.** `reopens` marks a defect whose fix rewrites or reverses text the previous round's fixes wrote, found by the diff from that round's record; an addition to a touched section is no reopening. Reason (c) reads the previous round as the no-decay backstop does, so a class's first round and a change round cannot fire it, and a change round is no round to the no-decay backstop.
+- **`profile.py match` enters a class on the paths a plan changes:** its changed-files section, else Scope's In, else the whole text for a file with neither. Ledger rows read as neither paths nor symbols, and a command span reads as no path. A path cited elsewhere suggests its class, for the drafter to confirm or dismiss.
+- **`profile.py match` prints the `plan` checks the work bears on,** below the record and never into it, and `/slices:draft` writes what they owe into the plan's body.
+- **`/slices:draft` and the frame-checker test every shape against the rules it must keep,** the direction docs and `invariantDocs`, with a `breaks:` field on the cost line. A stated trade-off does not discharge a rule, and the gap-checker reads a tension the same way.
+- **`/slices:draft` re-runs its rows before the first cold round,** after the last edit it makes to the tree.
+
+### Fixed
+
+- **`ledger-row.py add` refuses a row `rerun` could not read back, before running anything:** a line break, an empty command, or a claim or `unverified` row whose ` — ` and code span the reader would run as a different command.
+
+### Contract
+
+- **No grammar changed but `breaks:`, an optional cost field; a plan's classes can.** Adopter-side edit: a plan's `Changed Files` must list what it changes, and a re-profile may move a class from entered to `suggested`, which the drafter decides. A local rule that reads a class's `check.text` while drafting can retire.
+- **Not yet run:** the `reopens` text-diff mark on a base round, the frame-checker's rules step, and the `draft.md` changes. A replay of a class's first round exercised only the new scope of reason (c), so the first plan to reach a base round after a wide one is the mark's test.
+
 ## threads [0.29.0] — 2026-11-02
 
 ### Changed

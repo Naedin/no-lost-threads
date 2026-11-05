@@ -13,7 +13,11 @@ PLAN may also be an inbox stub carrying a frame record (`- framed at …`, slice
 `  - CLAIM — `COMMAND` — OUTPUT` under the plan's newest `drafted at` or `gap-checked at`
 record, else under a stub's newest `framed at` record; a row under that record with the same command is replaced, not duplicated. Under
 a `drafted at` record the record's `<N> sites opened (unverified: <n>)` is recounted from
-its rows. No such record is a refusal: the record line is written first.
+its rows. No such record is a refusal: the record line is written first. A row `rerun` could
+not read back as the same command, or as the same `unverified` row, is a refusal before
+anything runs: a line break anywhere in it, an empty command, or a claim whose own ` — ` and
+code span the reader would take for the command. A command needing line breaks is written on
+one line with `$'…\\n…'`.
 
 Every command runs with the plan file itself emptied and restored afterward, so a sweep
 over a tree holding the plan never matches the plan's own text — its ledger row quotes
@@ -117,7 +121,26 @@ def read(plan):
         fail("cannot read %s: %s" % (plan, e))
 
 
+def refusal(claim, cmd, unverified):
+    """Why rerun could not read this row back, or None."""
+    if any("\n" in t or "\r" in t for t in (claim, cmd or "", unverified or "")):
+        return "a row is one line; write a multi-line command with $'…\\n…', or as two rows"
+    if unverified is not None:
+        row = "  - %s — unverified: %s" % (claim, unverified)
+        u = UNVERIFIED.match(row)
+        if ROW.match(row) or not u or u.group("claim") != claim:
+            return "rerun would read this row as a command; reword the claim without ` — ` before a code span"
+        return None
+    m = ROW.match("  - %s — %s — x" % (claim, span(cmd)))
+    if not m or m.group("cmd") != cmd or m.group("claim") != claim:
+        return "rerun would not read this command back; a command is non-empty with no edge spaces, and a claim has no ` — ` before a code span"
+    return None
+
+
 def add(plan, claim, cmd, unverified):
+    why = refusal(claim, cmd, unverified)
+    if why:
+        fail("%s: %s" % (plan, why))
     lines = read(plan)
     at, end = block(lines, TARGET)
     if at is None:

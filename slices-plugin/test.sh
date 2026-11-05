@@ -95,6 +95,27 @@ python3 "$lr" rerun "$st" >"$tmp/out" || fail "frame rerun did not hold: $(cat "
 grep -q '^rows: 1 held, 0 differ, 0 unverified, 0 unparsed$' "$tmp/out" || fail "frame rerun read lines past the record"
 ok "a stub's framed record takes rows and reruns them alone"
 
+# 10. the writer refuses a row its reader could not read back, before anything runs
+rt="$tmp/Plans/rt.md"
+printf -- '- drafted at 0000000, 2026-11-04, slices 0.13.0 — 0 sites opened (unverified: 0)\n' > "$rt"
+cp "$rt" "$tmp/rt.before"
+heredoc=$'touch ran; cat <<EOF\none\nEOF'
+python3 "$lr" add "$rt" 'heredoc' "$heredoc" >/dev/null 2>"$tmp/err" && fail "add took a multi-line command"
+grep -q 'a row is one line' "$tmp/err" || fail "multi-line refusal not named: $(cat "$tmp/err")"
+python3 "$lr" add "$rt" $'two\nlines' 'true' >/dev/null 2>&1 && fail "add took a multi-line claim"
+python3 "$lr" add "$rt" 'empty' '' >/dev/null 2>&1 && fail "add took an empty command"
+python3 "$lr" add "$rt" 'edge' ' true' >/dev/null 2>&1 && fail "add took a command the reader would trim"
+python3 "$lr" add "$rt" 'see — `a` b' "touch $tmp/ran" >/dev/null 2>&1 && fail "add took a claim the reader would split as a command"
+python3 "$lr" add "$rt" 'see — `touch x` — note' --unverified 'open it' >/dev/null 2>&1 && fail "add took an unverified row the reader would run"
+[ -e "$tmp/ran" ] || [ -e "$tmp/Plans/ran" ] && fail "a refused row's command ran"
+cmp -s "$rt" "$tmp/rt.before" || fail "a refused row changed the plan: $(cat "$rt")"
+python3 "$lr" add "$rt" 'the plain dash — is fine, as is `code` in a claim' 'printf "%s\n" one' >/dev/null || fail "add refused a readable claim"
+python3 "$lr" add "$rt" 'an escaped newline is one line' $'printf \'%s\\n\' "$(printf $\'a\\nb\')"' >/dev/null || fail "add refused a one-line escaped command"
+python3 "$lr" add "$rt" 'a code span — a claim may hold it after' --unverified 'open `it`' >/dev/null || fail "add refused a readable unverified row"
+python3 "$lr" rerun "$rt" >"$tmp/out" || fail "rows the writer took did not read back: $(cat "$tmp/out")"
+grep -q '^rows: 2 held, 0 differ, 1 unverified, 0 unparsed$' "$tmp/out" || fail "round trip wrong: $(cat "$tmp/out")"
+ok "the writer refuses what its reader cannot read back, before running it; what it takes reads back"
+
 # ---- scripts/profile.py: the risk registry, matched against what a plan touches
 pf="$here/scripts/profile.py"
 R="$tmp/risk"; mkdir -p "$R/.claude" "$R/src/policy" "$R/src/math" "$R/src/old" "$R/src/ui" "$R/Plans"
@@ -192,3 +213,51 @@ grep -q '"enters": true' "$R/.claude/enters.json" || fail "fixture: the enters r
 printf 'A snooze toggle.\n' > "$R/Plans/e.md"
 python3 "$pf" match "$R/Plans/e.md" --registry .claude/enters.json --kinds '' | head -1 | grep -q ' — classes: state-machine$' || fail "a symbol marked enters did not enter: $(python3 "$pf" match "$R/Plans/e.md" --registry .claude/enters.json --kinds '')"
 ok "profile suggest: a symbol alone suggests and buys no round; --confirm enters, --dismiss records why, both survive a re-profile; enters:true enters"
+
+# 6. only the paths a plan changes enter; a path it cites suggests; rows and commands are neither
+cat > "$R/Plans/c.md" <<'EOF'
+# C
+
+Reads src/policy/PauseRule.txt and calls src/math/Dose.txt to report on them.
+
+## Changed Files
+
+Generating sweep: `rg -n 'x' src/policy/ src/math/`.
+
+- `src/ui/HomeCopy.txt`
+
+## Claim ledger <!-- slices: ledger -->
+
+- drafted at abc1234, 2026-11-04, slices 0.13.0 — 1 sites opened (unverified: 0)
+  - snoozed sits in Dose — `rg -n snoozed src/math/Dose.txt` — no output (exit 1)
+
+## After
+EOF
+python3 "$pf" match "$R/Plans/c.md" --kinds '' > "$R/m" || fail "match failed: $(cat "$R/m")"
+head -1 "$R/m" | grep -q ' — classes: unclassified; predicted: copy; suggested: state-machine, numeric$' || fail "a cited path entered its class, or a row counted: $(cat "$R/m")"
+grep -q '^  - state-machine — cited: src/policy/PauseRule.txt$' "$R/m" || fail "a cited path was not named: $(cat "$R/m")"
+grep -q 'symbol: snoozed' "$R/m" && fail "a symbol in a ledger row suggested a class"
+python3 "$pf" match "$R/Plans/c.md" --kinds '' --dismiss 'state-machine:reads it only' | head -1 | grep -q 'dismissed: state-machine' || fail "a cited-path suggestion could not be dismissed"
+printf '# B\n\nSee src/policy/PauseRule.txt.\n\n## Scope\n\n- In: `src/math/Dose.txt`\n- Out: src/fresh/Thing.txt — without it: none\n  and src/old/Legacy.txt too\n\n## After\n\nsrc/ui/HomeCopy.txt\n' > "$R/Plans/b.md"
+python3 "$pf" match "$R/Plans/b.md" --kinds '' > "$R/m"
+head -1 "$R/m" | grep -q ' — classes: numeric; suggested: state-machine, copy$' || fail "built-in Scope's In not read: $(cat "$R/m")"
+grep -q 'src/fresh\|src/old' "$R/m" && fail "an Out item entered or read novel: $(cat "$R/m")"
+printf '# H\n\n## Scope\n### In scope\n1. `src/math/Dose.txt`\n### Out of scope\n- Out: src/policy/PauseRule.txt — without it: none\n## Next\n' > "$R/Plans/h.md"
+python3 "$pf" match "$R/Plans/h.md" --kinds '' | head -1 | grep -q ' — classes: numeric; suggested: state-machine$' || fail "an Out sub-heading entered: $(python3 "$pf" match "$R/Plans/h.md" --kinds '')"
+printf '# M\n\n## Scope\n\n- changed at src/math/Dose.txt, the entry\n\n## Files changed\n\n`src/ui/x.md` `rg -n x src/policy/ y`\n\n```\n# not a heading\n```\n\n- `src/math/Dose.txt`\n' > "$R/Plans/m.md"
+python3 "$pf" match "$R/Plans/m.md" --kinds '' | head -1 | grep -q ' — classes: numeric' || fail "a path past a fenced comment did not enter: $(python3 "$pf" match "$R/Plans/m.md" --kinds '')"
+python3 "$pf" match "$R/Plans/m.md" --kinds '' | grep -q 'path: src/policy' && fail "a command after another span entered its class"
+printf '# E\n\n## Changed Files\n\n## Scope\n\n- In: `src/math/Dose.txt`\n- changed at src/policy/PauseRule.txt, the entry\n' > "$R/Plans/e2.md"
+python3 "$pf" match "$R/Plans/e2.md" --kinds '' | head -1 | grep -q ' — classes: state-machine, numeric' || fail "an empty Changed Files blocked Scope, or a prose bullet read as a record: $(python3 "$pf" match "$R/Plans/e2.md" --kinds '')"
+ok "profile paths: Changed Files, else Scope's In; Out, ledger rows and commands never enter; a cited path suggests; a file with neither reads whole"
+
+# 7. match prints the plan checks the work bears on, never into the record
+python3 "$pf" match --paths src/policy/PauseRule.txt,src/math/Dose.txt --kinds new-surface --root "$R" > "$R/m"
+grep -q '^plan check — state-machine: Tabulate axes x states\.$' "$R/m" || fail "an entered class's plan check not printed: $(cat "$R/m")"
+grep -q '^plan check — copy: Read the copy\.$' "$R/m" || fail "a predicted class's plan check not printed: $(cat "$R/m")"
+grep -q 'Boundary tests' "$R/m" && fail "a build check printed as a plan check"
+python3 "$pf" match "$R/Plans/c.md" --kinds '' | grep -q '^plan check (suggested) — state-machine: ' || fail "a suggestion's check not marked suggested"
+python3 "$pf" match "$R/Plans/c.md" --kinds '' --write >/dev/null
+grep -q '^plan check' "$R/Plans/c.md" && fail "a plan check reached the record"
+python3 "$pf" match "$R/Plans/c.md" --kinds '' --dismiss 'state-machine:reads it only' | grep -q '^plan check.*state-machine' && fail "a dismissed class's check was printed"
+ok "profile match: prints plan checks for what the work bears on, suggestions marked, never into the record"

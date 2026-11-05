@@ -95,7 +95,9 @@ Work in this order:
    slice is the same change argument, a split that can name none of the three is not one to ask
    for, and a doc amendment the change itself requires is part of its argument whatever
    commit carries it; a ruling or tension in the plan that changes a recorded decision
-   without naming that decision's own amendment in scope.
+   without naming that decision's own amendment in scope — the decisions include the rules in
+`invariantDocs` (`.claude/threads.json`) and in a direction doc the plan links or your local
+classes name, read for this, and a tension that states the conflict has not discharged it.
 4. **Then every Out item, against the slice's own surfaces.** For each item Scope puts
    Out, find an in-scope surface — copy or output, behavior, timing — that is wrong, or
    hands whoever meets it a chore, without it; an item's recorded `without it:` answer is a claim like any
@@ -134,10 +136,20 @@ lands in the plan, whatever file it cites. A fix lands outside only when it need
 outside the changed files to change, or to behave differently than the plan assumes. A
 plan that reads `store.py:40` where the symbol now sits at `:52` is `lands: plan`; a plan
 whose new caller needs `Store.load()` to stop throwing on an empty file it is not changing
-is `lands: outside — Store.load()`, and a dependency finding as well. When the ledger holds a `gap-checked at` record
-carrying `touched: <sections>` below its newest `drafted at` or `reframed at` record — the
-frame baseline; records above it measured a different document — a defect whose fix lands in
-one of the newest such record's sections is marked `reopens`. **When you report a dependency finding, or more than half your defects land
+is `lands: outside — Store.load()`, and a dependency finding as well.
+
+**Mark `reopens` by the text, never the section.** Take the newest `gap-checked at` record
+carrying `touched: <sections>` below the ledger's newest `drafted at` or `reframed at` record —
+the frame baseline; records above it measured a different document — and of this round's
+kind: no `change:`, and the same `class:` for a class round or none otherwise. A change
+round marks nothing, and no such record means nothing to mark. A defect is marked `reopens`
+only when its fix rewrites or reverses text that round's fixes wrote: `git diff <its sha> --
+<plan>` shows that text, ledger lines aside, and `touched:` says where it sits. Adding what a
+touched section omits — a row, an arm, an entry — is no reopening. When the plan was not
+tracked at that sha, or the sha no longer resolves, the diff proves nothing: mark nothing and
+say so.
+
+**When you report a dependency finding, or more than half your defects land
 outside the changed files, apply nothing** — the round stops at the command that spawned
 you, and an edit it would undo is spent twice; say which held.
 

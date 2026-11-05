@@ -233,8 +233,11 @@ work touches, never to time: one no plan entered is dormant, not stale.
 - `/slices:draft` declares each shape's kinds and prices the classes it enters as cost, then
   writes a `profiled at` record into the plan's ledger: the classes, predicted classes, and
   novel areas it touches. Every later stage reads that record, an adopter's pre-pr included.
-  A class matched only by a symbol is `suggested`: the drafter confirms or dismisses it with a
-  reason, and until confirmed it buys no round.
+  Paths enter a class only when the plan changes them, by its changed-files section or else
+  Scope's In. A class matched only by a symbol, or by a path the plan cites without changing,
+  is `suggested`: the drafter confirms or dismisses it with a reason, and until confirmed it
+  buys no round. `profile.py match` prints each `plan` check the work bears on, so the plan is
+  written knowing what its class rounds will run.
 - `/slices:check` runs round 1 as the full check, then one round per `plan`-class check the
   profile buys. A round past that budget needs the frame owner's go. An unclassified plan
   gets round 1, and a `changed at` line buys one round of just that change.

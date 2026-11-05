@@ -144,8 +144,11 @@ Install, once per clone, from wherever the plugin lives:
 python3 <plugin>/adapters/git/install.py
 ```
 
-It writes the clone's `pre-commit`, shared by its worktrees, calling the newest installed
-copy, so a plugin update reaches the gate on its own. A repo that already has a hook, or sets
+It writes the clone's `pre-commit`, shared by its worktrees, calling the installed copy with
+the highest `plugin.json` version across `cache/` and `synced/`, so a plugin update reaches the
+gate on its own. With no copy found, the hook exits 2 in a repo whose index carries
+`.claude/guards.json`, naming what it searched, the install and `git commit -n`; `--on-missing skip` prints a named
+skip instead, for a repo whose contributors commit without the plugin. A repo that already has a hook, or sets
 `core.hooksPath`, keeps it: the installer changes nothing and prints the lines to add to it
 (`--print` prints them any time, and `--runner` a line finding `run.py` for a landing step).
 

@@ -138,7 +138,8 @@ claim like any other, settled here by measurement:
   `draftBrief`'s sizing rules (§0) saying where that lives and how it is counted. The
   measurement is a claim row like any other, so its command stays runnable: a probe
   written for it never lands in the product tree, and **the command is its source** — a
-  self-contained `python3 -I -c '…'` or `bash -c '…'`, never a reference to a probe kept
+  self-contained `python3 -I -c '…'` or `bash -c '…'`, on one line (`$'…\n…'` when it needs
+  line breaks), never a reference to a probe kept
   in the stub or the plan, since the writer empties that file while the command runs. A harm that cannot be sized is an `unverified:` row
   naming what would size it, never a premise. A count over a grid the repo built — a
   golden matrix, a fixture sweep — sizes **reach** (which states the change touches), not
@@ -176,7 +177,9 @@ claim like any other, settled here by measurement:
   touches; each mechanism it needs that does not exist yet, by name; the user states it
   must specify, counted from the walk; and each regression against shipped behaviour in a
   state the user can be in, from the walk of today's behaviour — `none` when the walk found
-  none. **A shape is never chosen on value alone.** A shape that delivers as much value at
+  none; and each rule it breaks in the repo's direction docs or `invariantDocs`
+  (`.claude/threads.json`), by doc and section — `none` after the walk, the field omitted with
+  no such doc. A shape that breaks a rule names the rule's amendment in its own line. **A shape is never chosen on value alone.** A shape that delivers as much value at
   less cost overturns the stub's; when value and cost point to different shapes — the stub's
   buys more, a cheaper one keeps most of it with fewer new mechanisms, states, or
   regressions — the trade is a product call, not the drafter's.
@@ -192,7 +195,7 @@ command makes to a stub it does not promote:
   - <claim> — `<generating command>` — <its output line>
 - value: <the sentence>
 - states walked: <each state the walk reached, `; `-separated, today's behaviour in each>
-- shape A: <the shape> — mechanism: <how it works: what it derives or decides, from what, through which existing machinery>[ — kinds: <the registry's kind ids it is, or none>] — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>[; risk: <classes it enters, or unclassified>[; suggested <class>: confirmed | dismissed — <why>]…]; states: <n, of those walked>; regresses: <each, by state, or none>
+- shape A: <the shape> — mechanism: <how it works: what it derives or decides, from what, through which existing machinery>[ — kinds: <the registry's kind ids it is, or none>] — value: <its user outcome; what it gives up> — cost: <seams>; new: <mechanisms, or none>[; risk: <classes it enters, or unclassified>[; suggested <class>: confirmed | dismissed — <why>]…]; states: <n, of those walked>; regresses: <each, by state, or none>[; breaks: <each rule, by doc and section, or none>]
 - shape B: …
 - drafter's pick: <shape> — <one line: why, on value and cost>
 ```
@@ -201,10 +204,12 @@ With `riskRegistry` set, each shape line carries `kinds:` — the change kinds f
 registry's vocabulary the shape is, a judgment the cold review checks like the cost line —
 and its cost carries `risk:`, the classes it enters:
 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile.py match --paths <its seams> --kinds <its
-kinds>`, the record line's `classes:` and `predicted:`. A class a shape enters is scrutiny it
+kinds>`, the record line's `classes:` and `predicted:`; the `plan check` lines it prints below
+the record are what each class's round will run. A class a shape enters is scrutiny it
 buys, so a shape entering fewer can win on cost; a kind the vocabulary lacks reads novel.
 A class the stub's words only name — `profile.py match <stub>`'s `suggested:`, matched by a
-symbol and nothing else — is not entered: a word names the topic, not the risk. Decide each
+symbol, or in a plan by a path it cites and does not change — is not entered: a word names the
+topic, not the risk. Decide each
 on every shape it bears on, `suggested <class>: confirmed — <why>` when the shape does what
 the class's check exists for (declaring the class's kind confirms it by itself), or
 `dismissed — <why>` when the word is ordinary prose; the cold review checks the decision as
@@ -226,7 +231,8 @@ When the agent type is not loaded but the `Agent` tool is, spawn a general-purpo
 whose prompt is the body of `${CLAUDE_PLUGIN_ROOT}/agents/frame-checker.md` followed by
 the same brief: still cold. A spawn the harness runs in the background is waited on: nothing
 below runs until its report is in, and a turn may end in between. The checker re-runs the rows, runs its own since-capture and neighbour
-sweep, walks today's behaviour for regressions, and **edits the record in place** — a
+sweep, walks today's behaviour for regressions, tests each shape against the rules it must
+keep, and **edits the record in place** — a
 missed shape added, a cost line corrected — then ends in **STANDS** `<shape>` (value and
 cost agree on one shape) or **CONTESTED** (more than one stands, or value and cost point
 apart). Then re-read the corrected record and rewrite your pick line when a correction
@@ -242,7 +248,11 @@ Then one of two outcomes:
   the ones it leaves out, the harm cited by its row, who picked it, and the review's
   verdict. The `draftBrief`'s standing-shape rules (§0) run on it now, before the
   site-opening pass, so what they decide is decided once on the frame and not on the stub,
-  and whatever they name is opened with the rest. A shape stands only when:
+  and whatever they name is opened with the rest. With `riskRegistry` set, read its `plan
+  check` lines (`profile.py match --paths <its seams> --kinds <its kinds>`) now too: what each
+  owes — a table, a walk — is written into the plan's body before the sections that rest on
+  it, since that round reads the plan cold for it and a body written without it is rewritten
+  there. A shape stands only when:
   - **this draft has a frame owner** (an orchestrating session — `frame owner:` in the
     invocation, or the session whose message asked for this draft; §2) and the frame owner
     picked it against this record: the invocation's `frame:` names it and the stub carries
@@ -305,8 +315,9 @@ writer — the output line comes from the run, never from memory of an earlier o
 row off the writer's form is the visible exception `/slices:check` names first. Every
 command runs with the plan file itself emptied, so a sweep over a tree that holds the
 plan never matches the pattern its own row quotes. A row's command
-is one whole command: a run piped through `head` or `tail` is not a row, and two probes
-are two rows. A characterization
+is one whole command on one line, which the writer enforces with any other row its reader
+could not read back: a run piped through `head` or `tail` is not a row, and two probes are two
+rows. A characterization
 of the hits — `doc comments only`, `all 12 sites`, `none outside Tests` — belongs in the
 claim, written after reading every hit the command returns, never a sample; a read that
 contradicts it rewrites the claim, never narrows the command to fit it. **A count is a row
@@ -434,7 +445,8 @@ profile follows once the rows are in: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/pro
 or dismissed, and novel areas, each with the signal or decision that put it there — at the
 end of the ledger. A suggestion the plan's own text raises that the frame did not decide is
 decided now the same way; and every later stage reads the newest one: the check's
-round budget, an adopter's pre-pr tier. The digest (§4) names its `classes:`.
+round budget, an adopter's pre-pr tier. Only the paths the plan changes enter a class — a
+changed-files section, else Scope's In — so a file the plan changes must be listed there; a path cited elsewhere is a suggestion. The digest (§4) names its `classes:`.
 
 `<version>` is the `version` field of `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`,
 read at write time, as `/slices:check` reads it for its own line; `slices ?` when the file
@@ -517,7 +529,8 @@ a negative criterion ("output contains no X") pairs with a liveness condition �
 code or a positive line proving the command ran — or an aborted command satisfies it by
 printing nothing. A tension entry states the call taken, the pull each way, and the
 lever: what overriding it costs. Tensions are decided, never open; anything unresolved
-is a question for the check, not a tension. The Tensions section opens with the frame (§1). The `Verification ledger` section holds the
+is a question for the check, not a tension. A tension does not discharge a rule: a call that
+breaks one in the repo's direction docs names the rule's amendment in Scope. The Tensions section opens with the frame (§1). The `Verification ledger` section holds the
 site-opening pass's rows under a `drafted at` record when the plan is written: the gap
 check *appends* to it — its own record line and rows — so the plan format never
 migrates, and a draft-time row is re-run rather than re-hunted.
@@ -536,8 +549,13 @@ End in-thread with the review digest — the Shape paragraph verbatim from the p
 at most five tension points, ranked by how much the maintainer's judgment could move
 them; the rest ride the plan's section only. The cap is the digest's: a later session
 cold-reading the plan needs every tension, and a human with limited time needs the five
-that matter. Then run `/slices:check` on the plan in this same session
-without being asked; a plan is not done drafting until a fresh context has tried to break
+that matter. **Re-run the rows first.** The draft went on changing the tree after it measured
+it — spin-off stubs, the promoted stub's delete, the commit when this run makes one — so after
+the last of those, `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py rerun <plan>`. A row the
+draft itself moved is recorded again through the writer (the same command replaces its row),
+its claim rewritten when no longer true, and an `unparsed` row is rewritten through the writer;
+a row anything else moved is a premise to re-read before the check. Then run `/slices:check` on
+the plan in this same session without being asked; a plan is not done drafting until a fresh context has tried to break
 it. Invoke it as a skill; if the harness cannot load it that way, follow
 `${CLAUDE_PLUGIN_ROOT}/commands/check.md` directly — the same plugin root this command
 runs from, never an installed copy elsewhere on disk, so the check that runs is the one

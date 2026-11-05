@@ -23,21 +23,31 @@ and still matches the moment work touches it. `check.at` is `plan` (gap-check ro
 of them, default 1), `build`, or `pre-pr`; `rounds` is read only for `plan`, and a non-zero
 `rounds` elsewhere is a registry error.
 
-`match` reads the work three ways. **Paths**: every path-like token in the file, and every
-CamelCase identifier, resolved to tracked files — the file itself, the one tracked file
+`match` reads the work three ways, from the file's text less its ledger records and their
+rows, which measure what the draft read. **Paths**: the paths the work changes, from a
+`Changed Files` section, else Scope's In (Out items and an `Out…` sub-heading left out), else
+the whole text when the file has neither, as a stub does. Each path-like token, and each
+CamelCase identifier, is resolved to tracked files — the file itself, the one tracked file
 ending in it, a directory (matched as itself, `<dir>/`, never as every file under it), or a
-file whose stem is the identifier; a path that resolves to nothing is new. A class's `paths` regexes are `re.search`ed over the resolved
-paths and the new ones. **Symbols**: a class's `symbols` regexes over the file's text.
+file whose stem is the identifier; a path that resolves to nothing is new. A code span holding
+a space is a command, not a path. A class's `paths` regexes are `re.search`ed over the resolved
+paths and the new ones. **A path cited anywhere else in the text** matches those regexes as a
+`cited:` signal: reading a file is not changing it. **Symbols**: a class's `symbols` regexes
+over the text.
 **Kinds**: `--kinds`, else the kinds the newest `profiled at` record carries, else the
 `kinds:` field of the shape the frame record's `drafter's pick` names. A path or a kind
-enters the class. **A symbol only suggests it**: a symbol names the topic, not the risk, and
-an adopter's vocabulary drifts, so a class matched by symbols alone is `suggested:` and buys
-no round until the drafter decides — `--confirm ID:WHY` enters it, `--dismiss ID:WHY` records
+enters the class. **A symbol or a cited path only suggests it**: each names the topic, not the
+risk, and an adopter's vocabulary drifts, so a class matched by those alone is `suggested:` and
+buys no round until the drafter decides — `--confirm ID:WHY` enters it, `--dismiss ID:WHY` records
 why not. A decision the newest record carries is kept on a re-profile unless overridden. A
 symbol written `{"re": …, "enters": true}` enters on its own, for vocabulary precise enough.
 `--paths` matches a shape's seams with no file, for its cost line.
 
-Novelty: a path under `novelty.roots` (every path when unset) whose directory, or anything
+After the record, `match` prints one line per `plan` check the work bears on — `plan check —
+<id>: <text>`, `plan check (suggested) — …` for an undecided suggestion — so the drafter reads
+what the class round will run. `--write` does not carry these into the record.
+
+Novelty, over the changed paths: a path under `novelty.roots` (every path when unset) whose directory, or anything
 below it, no commit
 among the last `novelty.commits` touching those roots touched (all commits when roots are
 unset; merges skipped) is novel, as is a declared kind the vocabulary lacks.
@@ -46,7 +56,7 @@ The record, which `--write` appends at the end of the plan's ledger section (`##
 ledger`, or the heading carrying `<!-- slices: ledger -->`):
 
     - profiled at <sha>, <date>, slices <version> — classes: <id>, … | unclassified[; predicted: <id>, …][; suggested: <id>, …][; dismissed: <id>, …][; novel: <path|kind>, …]
-      - <id> — path: <file> | symbol: <match> | kind: <kind>[ (+<n> more)]
+      - <id> — path: <file> | cited: <file> | symbol: <match> | kind: <kind>[ (+<n> more)]
       - <id> — confirmed: <why> | dismissed: <why>
       - novel — path: <dir> | kind: <kind>
 
@@ -65,6 +75,15 @@ PATHLIKE = re.compile(r"(?<![\w./-])((?:[\w.-]+/)+[\w.-]*|[\w-]+\.(?:swift|py|sh
 IDENT = re.compile(r"\b([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+)\b")
 RECORD = re.compile(r"^- profiled at ")
 LEDGER = re.compile(r"^#+ .*(Verification ledger|<!-- slices: ledger -->)")
+ANY_RECORD = re.compile(r"^- (drafted|gap-checked|framed|profiled|check held|go|reframed|changed|escaped) at \S+, \d{4}-")
+HEADING = re.compile(r"^(#+)\s+(.*)$")
+CHANGED_FILES = re.compile(r"(changed[ -]files|files[ -]changed)\b", re.I)
+SCOPE = re.compile(r"scope\b", re.I)
+OUT_HEADING = re.compile(r"out\b", re.I)
+OUT_ITEM = re.compile(r"^\s*[-*]\s+(\*\*)?Out\b")
+LIST_ITEM = re.compile(r"^\s*(?:[-*]|\d+\.)\s")
+SPAN = re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)")
+FENCE = re.compile(r"^\s*(```|~~~)")
 KIND_ROW = re.compile(r"^  - \S+ — kind: ([\w-]+)")
 DECISION_ROW = re.compile(r"^  - (\S+) — (confirmed|dismissed): (.*)$")
 SLUG = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
@@ -265,11 +284,90 @@ def recorded_decisions(lines):
     return {m.group(1): (m.group(2), m.group(3)) for m in map(DECISION_ROW.match, newest_rows(lines) or []) if m}
 
 
-def match(reg, root, text, paths, kinds, decisions):
+def without_records(lines):
+    """The file's lines less its ledger records and the rows under them."""
+    out, skipping = [], False
+    for l in lines:
+        if ANY_RECORD.match(l):
+            skipping = True
+        elif not (skipping and l.startswith("  - ")):
+            skipping = False
+            out.append(l)
+    return out
+
+
+def no_commands(text):
+    """The text with each code span holding a space blanked: a command, not a path."""
+    return SPAN.sub(lambda m: " " if re.search(r"\s", m.group(2)) else m.group(0), text)
+
+
+def headings(lines):
+    """(index, level, text) of each heading outside a code fence."""
+    out, fenced = [], False
+    for i, l in enumerate(lines):
+        if FENCE.match(l):
+            fenced = not fenced
+        m = None if fenced else HEADING.match(l)
+        if m:
+            out.append((i, len(m.group(1)), m.group(2)))
+    return out
+
+
+def section(lines, name):
+    """The body of the first heading whose text starts with name, to the next heading at its
+    level or above; None when there is no such heading."""
+    heads = headings(lines)
+    for k, (i, level, title) in enumerate(heads):
+        if name.match(title):
+            end = next((j for j, lv, _ in heads[k + 1:] if lv <= level), len(lines))
+            return lines[i + 1:end]
+    return None
+
+
+def scope_in(lines):
+    """Scope's body less its Out items, multi-line ones included, and any `Out…` sub-heading."""
+    out, skipping, level = [], False, None
+    for l in lines:
+        h = HEADING.match(l)
+        if h:
+            if level is not None and len(h.group(1)) > level:
+                continue
+            level = len(h.group(1)) if OUT_HEADING.match(h.group(2)) else None
+            skipping = False
+        elif level is not None:
+            continue
+        elif OUT_ITEM.match(l):
+            skipping = True
+        elif LIST_ITEM.match(l) and not l.startswith((" ", "\t")):
+            skipping = False
+        if not skipping and level is None:
+            out.append(l)
+    return out
+
+
+def changed_part(lines):
+    """What the work says it changes: Changed Files, else Scope's In, else None."""
+    part = section(lines, CHANGED_FILES)
+    if part and any(l.strip() for l in part):
+        return part
+    part = section(lines, SCOPE)
+    return None if part is None else scope_in(part)
+
+
+def match(reg, root, lines, paths, kinds, decisions):
     tracked = [l for l in git(root, "ls-files").splitlines() if l]
-    tokens = PATHLIKE.findall(text) + list(paths)
-    found, new = resolve(tracked, tokens, IDENT.findall(text))
+    body = without_records(lines)
+    text = "\n".join(body)
+    plain = no_commands(text)
+    part = changed_part(body)
+    changed = plain if part is None else no_commands("\n".join(part))
+    found, new = resolve(tracked, PATHLIKE.findall(changed) + list(paths), IDENT.findall(changed))
     every = sorted(found | new)
+    if part is None:
+        cited = []
+    else:
+        c_found, c_new = resolve(tracked, PATHLIKE.findall(plain), IDENT.findall(plain))
+        cited = sorted((c_found | c_new) - set(every))
     hits, predicted, suggested, dismissed = {}, {}, {}, {}
     for c in reg.get("classes") or []:
         if c["status"] == "retired":
@@ -278,6 +376,7 @@ def match(reg, root, text, paths, kinds, decisions):
         entering, merely = [], []
         for rx in sig.get("paths") or []:
             entering += [f"path: {p}" for p in every if re.search(rx, p)]
+            merely += [f"cited: {p}" for p in cited if re.search(rx, p)]
         entering += [f"kind: {k}" for k in kinds if k in (sig.get("kinds") or [])]
         for sym in sig.get("symbols") or []:
             rx, enters = (sym["re"], sym.get("enters", False)) if isinstance(sym, dict) else (sym, False)
@@ -306,6 +405,19 @@ def match(reg, root, text, paths, kinds, decisions):
     vocab = reg.get("kinds") or {}
     novel += [f"kind: {k}" for k in kinds if k not in vocab]
     return hits, predicted, suggested, dismissed, novel
+
+
+def plan_checks(reg, hits, predicted, suggested):
+    lines = []
+    for c in reg.get("classes") or []:
+        chk = c.get("check") or {}
+        if chk.get("at") != "plan":
+            continue
+        if c["id"] in hits or c["id"] in predicted:
+            lines.append(f"plan check — {c['id']}: {chk['text']}")
+        elif c["id"] in suggested:
+            lines.append(f"plan check (suggested) — {c['id']}: {chk['text']}")
+    return lines
 
 
 def version():
@@ -411,13 +523,12 @@ def main():
     if reg is None:
         print("no riskRegistry in .claude/slices.json: no profile; the check runs as it does without one")
         raise SystemExit(3)
-    text = "\n".join(lines)
     if a.kinds is not None:
         kinds = [k.strip() for k in a.kinds.split(",") if k.strip()]
     else:
         kinds = recorded_kinds(lines)
         if kinds is None:
-            kinds = picked_kinds(text)
+            kinds = picked_kinds("\n".join(lines))
     decisions = recorded_decisions(lines)
     known = {c.get("id") for c in reg.get("classes") or []}
     for verdict, flag, given in (("confirmed", "--confirm", a.confirm), ("dismissed", "--dismiss", a.dismiss)):
@@ -429,12 +540,13 @@ def main():
                 fail(f"no class {cid.strip()} in the registry")
             decisions[cid.strip()] = (verdict, why.strip())
     paths = [p.strip() for p in (a.paths or "").split(",") if p.strip()]
-    block = record(root, *match(reg, root, text, paths, kinds, decisions))
+    groups = match(reg, root, lines, paths, kinds, decisions)
+    block = record(root, *groups)
     if a.write:
         if not a.plan:
             fail("--write takes a PLAN")
         write(a.plan, lines, block)
-    print("\n".join(block))
+    print("\n".join(block + plan_checks(reg, *groups[:3])))
 
 
 if __name__ == "__main__":

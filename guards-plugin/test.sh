@@ -750,6 +750,7 @@ for v in 0.9.0 0.10.0; do
   d="$I/cache/m/guards/$v/adapters/git"; mkdir -p "$d"
   cp "$here/adapters/git/install.py" "$d/"
   printf '#!/usr/bin/env bash\necho ran-%s\nexit 0\n' "$v" > "$d/pre-commit"
+  mkdir -p "$I/cache/m/guards/$v/.claude-plugin"; printf '{ "name": "guards", "version": "%s" }\n' "$v" > "$I/cache/m/guards/$v/.claude-plugin/plugin.json"
 done
 python3 "$I/cache/m/guards/0.9.0/adapters/git/install.py" --repo "$R" 2>/dev/null \
   || { echo "FAIL  install: refused a plain repo"; exit 1; }
@@ -758,6 +759,23 @@ h="$(git -C "$R" rev-parse --path-format=absolute --git-common-dir)/hooks/pre-co
 "$h" | grep -q 'ran-0.10.0' || { echo "FAIL  install: the hook does not call the newest copy"; exit 1; }
 python3 "$here/adapters/git/install.py" --repo "$R" 2>/dev/null || { echo "FAIL  install: its own hook blocks a re-install"; exit 1; }
 "$h" >/dev/null 2>&1
+# every layout: the highest manifest version wins, whatever the path says
+syn() {  # syn <generation dir> <version>
+  mkdir -p "$I/synced/acct/$1/adapters/git" "$I/synced/acct/$1/.claude-plugin"
+  printf '#!/usr/bin/env bash\necho ran-%s\nexit 0\n' "$2" > "$I/synced/acct/$1/adapters/git/pre-commit"
+  printf '{ "name": "guards", "version": "%s" }\n' "$2" > "$I/synced/acct/$1/.claude-plugin/plugin.json"
+}
+syn 'guards' 0.8.5; syn 'guards~g2' 0.11.0; syn 'guards~g10' 0.8.0; syn 'guards-other' 9.9.9
+python3 "$I/cache/m/guards/0.9.0/adapters/git/install.py" --print > "$I/layouts"
+bash "$I/layouts" | grep -q '^ran-0.11.0$' || { echo "FAIL  install: a synced copy with the highest manifest version was not picked, from cache: $(bash "$I/layouts")"; exit 1; }
+cp "$here/adapters/git/install.py" "$I/synced/acct/guards~g2/adapters/git/"
+python3 "$I/synced/acct/guards~g2/adapters/git/install.py" --print > "$I/layouts2"
+bash "$I/layouts2" | grep -q '^ran-0.11.0$' || { echo "FAIL  install: a synced copy did not print the same lookup"; exit 1; }
+syn 'guards~g2' 0.9.5
+bash "$I/layouts" | grep -q '^ran-0.10.0$' || { echo "FAIL  install: the cache copy did not win on its manifest version: $(bash "$I/layouts")"; exit 1; }
+mv "$I/cache" "$I/cache.away"
+bash "$I/layouts" | grep -q '^ran-0.9.5$' || { echo "FAIL  install: a synced-only machine found nothing"; exit 1; }
+mv "$I/cache.away" "$I/cache"; rm -rf "$I/synced"
 R2="$I/repo2"; mkdir -p "$R2"; git init -q "$R2"
 h2="$(git -C "$R2" rev-parse --path-format=absolute --git-common-dir)/hooks/pre-commit"
 mkdir -p "$(dirname "$h2")"; printf '#!/bin/sh\necho mine\n' > "$h2"
@@ -767,10 +785,13 @@ R3="$I/repo3"; mkdir -p "$R3"; git init -q "$R3"; git -C "$R3" config core.hooks
 python3 "$here/adapters/git/install.py" --repo "$R3" 2>/dev/null | grep -q 'guards=' || { echo "FAIL  install: ignored core.hooksPath"; exit 1; }
 F="$I/home"; d="$F/.claude/cache/m/guards/1.0.0/adapters/git"; mkdir -p "$d"
 cp "$here/adapters/git/install.py" "$d/"; printf '#!/usr/bin/env bash\necho ran\nexit 0\n' > "$d/pre-commit"; : > "$F/.claude/cache/m/guards/1.0.0/run.py"
+mkdir -p "$F/.claude/cache/m/guards/1.0.0/.claude-plugin"; printf '{ "version": "1.0.0" }\n' > "$F/.claude/cache/m/guards/1.0.0/.claude-plugin/plugin.json"
 HOME="$F" python3 "$d/install.py" --print > "$I/lines"
+HOME="$F" python3 "$d/install.py" --print --on-missing skip > "$I/skip"
 grep -q '"$HOME"/' "$I/lines" && ! grep -qF "$F" "$I/lines" || { echo "FAIL  install: the printed lines name one machine"; exit 1; }
 HOME="$F" python3 "$d/install.py" --runner | grep -q '^runner=.*"$HOME"/.*run.py' || { echo "FAIL  install: --runner printed no line"; exit 1; }
 { echo 'set -euo pipefail'; cat "$I/lines"; } > "$I/strict"
+{ echo 'set -euo pipefail'; cat "$I/skip"; } > "$I/strict-skip"
 HOME="$F" bash "$I/strict" | grep -q '^ran$' || { echo "FAIL  install: the lines do not run the copy under strict mode"; exit 1; }
 if command -v shellcheck >/dev/null; then
   { echo '#!/usr/bin/env bash'; cat "$I/strict"; HOME="$F" python3 "$d/install.py" --runner; echo 'echo "$runner"'; } > "$I/linted"
@@ -778,9 +799,14 @@ if command -v shellcheck >/dev/null; then
   printf 'ok    %s\n' "install: the printed lines pass shellcheck at its default severity"
 fi
 rm -rf "$F/.claude/cache/m/guards/1.0.0"
-out="$(HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: a missing plugin is not a named skip under strict mode"; exit 1; }
+out="$(HOME="$F" bash "$I/strict-skip" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: --on-missing skip is not a named skip under strict mode"; exit 1; }
 rm -rf "$F/.claude"
-out="$(HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: a missing cache is not a named skip under strict mode"; exit 1; }
+out="$(HOME="$F" bash "$I/strict-skip" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards skipped' || { echo "FAIL  install: a missing root is not a named skip under strict mode"; exit 1; }
+O="$I/optedin"; mkdir -p "$O/.claude"; git init -q "$O"; printf '{}\n' > "$O/.claude/guards.json"
+out="$(cd "$O" && HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'nothing judged' || { echo "FAIL  install: a repo not carrying the config in its index was refused, or passed silently: $out"; exit 1; }
+git -C "$O" add .claude/guards.json
+out="$(cd "$O" && HOME="$F" bash "$I/strict" 2>&1)"; [ $? -eq 2 ] && echo "$out" | grep -q 'git commit -n' && echo "$out" | grep -qF "$F/.claude/cache and /synced" || { echo "FAIL  install: a missing plugin did not exit 2 on an opted-in repo, naming the search and the escape: $out"; exit 1; }
+out="$(cd "$O" && HOME="$F" bash "$I/strict-skip" 2>&1)"; [ $? -eq 0 ] || { echo "FAIL  install: --on-missing skip refused an opted-in repo: $out"; exit 1; }
 S="$I/with space/guards"; mkdir -p "$S/adapters/git"; cp "$here/adapters/git/install.py" "$S/adapters/git/"
 printf '#!/usr/bin/env bash\necho spaced\nexit 0\n' > "$S/adapters/git/pre-commit"
 python3 "$S/adapters/git/install.py" --print > "$I/spaced"
