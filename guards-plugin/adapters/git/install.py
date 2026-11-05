@@ -5,11 +5,12 @@
 
 Writes `<git common dir>/hooks/pre-commit`, shared by every worktree of the clone, calling
 the newest installed copy of this adapter, so a plugin update reaches the gate without a
-re-install. Newest is the highest `plugin.json` version across the plugin root's `cache/` and
-`synced/` copies, when this copy sits in one; otherwise the hook calls this copy. It writes nothing when the repo already has a hook of its own, or sets
+re-install. Newest is the highest `plugin.json` version across this marketplace's `cache/` copies
+and the `synced/` ones, when this copy sits in one; otherwise the hook calls this copy. It writes nothing when the repo already has a hook of its own, or sets
 `core.hooksPath`: it prints the lines to add to that hook instead, and displaces nothing.
-`--print` prints those lines and changes nothing. `--runner` prints a line setting `runner`
-to this plugin's `run.py` the same way, for a landing step that runs the gate by hand.
+`--print` prints those lines and changes nothing. `--runner` prints lines setting `runner`
+to this plugin's `run.py` the same way, naming what was searched when none is found, for a
+landing step that runs the gate by hand; bash and zsh both read them.
 
 With no copy found, the lines refuse the commit with exit 2, the adapter's code for a gate that
 could not run, where the index carries `.claude/guards.json`, naming what was searched, the
@@ -24,6 +25,7 @@ import argparse, os, re, shlex, stat, subprocess, sys
 MARK = "# guards — written by adapters/git/install.py"
 HERE = os.path.dirname(os.path.abspath(__file__))
 ADAPTER = "adapters/git/pre-commit"
+MARKETPLACE = "no-lost-threads"
 
 
 def git(repo, *args):
@@ -48,26 +50,50 @@ def in_quotes(path):
     return prefix + re.sub(r'([\\"`$])', r"\\\1", path)
 
 
-def plugin_root(plugin):
-    """The directory holding `cache/` and `synced/` when this copy sits in one, else None."""
-    m = (re.fullmatch(r"(.+)/cache/[^/]+/[^/]+/\d+(?:\.\d+)+[0-9A-Za-z.+-]*", plugin)
-         or re.fullmatch(r"(.+)/synced/[^/]+/[^/]+", plugin))
-    return m.group(1) if m else None
+def installed_at(plugin):
+    """(plugin root, marketplace) when this copy sits under a plugin root's `cache/` or
+    `synced/`, else None. A synced copy names no marketplace, so the lookup takes this repo's."""
+    m = re.fullmatch(r"(.+)/cache/([^/]+)/[^/]+/\d+(?:\.\d+)+[0-9A-Za-z.+-]*", plugin)
+    if m:
+        return m.group(1), m.group(2)
+    m = re.fullmatch(r"(.+)/synced/[^/]+/[^/]+", plugin)
+    return (m.group(1), MARKETPLACE) if m else None
 
 
 def locate(plugin, rel):
-    """Shell yielding `rel` in this plugin: the copy with the highest manifest version across
-    the plugin root's layouts, whose paths need not carry a version, when this copy sits in
-    one; else this copy. Empty when no copy is left, and `|| true` keeps that a value under
-    `set -e` and `pipefail`, not an exit."""
-    root = plugin_root(plugin)
-    if root is None:
+    """Shell yielding `rel` in this plugin: the copy with the highest manifest version, a
+    release above its prereleases, across this marketplace's cache and the synced copies, whose
+    paths need not carry a version; else this copy. A copy with no readable version never wins.
+    Written for bash 3.2 and zsh too: `find` rather than a glob, which zsh aborts on when
+    nothing matches, and a `case` pattern with its leading paren, which bash 3.2 needs inside
+    `$(...)`. Empty when no copy is left, and `|| true` keeps that a value under `set -e` and
+    `pipefail`, not an exit."""
+    at = installed_at(plugin)
+    if at is None:
         return under_home(os.path.join(plugin, rel))
-    return (f'$(r={under_home(root)}; for f in "$r"/cache/*/guards/*/{rel} "$r"/synced/*/guards/{rel} '
-            f'"$r"/synced/*/guards~*/{rel}; do [ -f "$f" ] || continue; '
+    root, market = at
+    depth = rel.count("/") + 1
+    return (f'$(r={under_home(root)}; {{ find "$r"/cache/{shlex.quote(market)}/guards -maxdepth {depth + 1} '
+            f"-type f -path '*/{rel}' || true; "
+            f'find "$r"/synced -maxdepth {depth + 2} -type f '
+            f"\\( -path '*/guards/{rel}' -o -path '*/guards~*/{rel}' \\) || true; }} 2>/dev/null "
+            '| while IFS= read -r f; do '
             f"""v=$(sed -n '/"version"/{{s/.*"version"[^"]*"\\([^"]*\\)".*/\\1/p;q;}}' """
             f'"${{f%/{rel}}}/.claude-plugin/plugin.json" 2>/dev/null || true); '
-            """printf '%s\\t%s\\n' "$v" "$f"; done | sort -V | tail -n 1 | cut -f2- || true)""")
+            'case "$v" in ([0-9]*) ;; (*) continue ;; esac; '
+            'case "$v" in (*-*) p=0 ;; (*) p=1 ;; esac; '
+            """printf '%s\\t%s\\t%s\\n' "${v%%-*}" "$p" "$f"; done """
+            '| sort -V | tail -n 1 | cut -f3- || true)')
+
+
+def searched(plugin):
+    at = installed_at(plugin)
+    return f"{in_quotes(at[0])}/cache and /synced" if at else in_quotes(os.path.join(plugin, ADAPTER))
+
+
+def runner(plugin):
+    return (f'runner={locate(plugin, "run.py")}\n'
+            f'[ -f "$runner" ] || echo "guards: plugin not found in {searched(plugin)}" >&2\n')
 
 
 def lines(plugin, on_missing="block"):
@@ -75,11 +101,9 @@ def lines(plugin, on_missing="block"):
             'if [ -f "$guards" ]; then bash "$guards" || exit $?\n')
     if on_missing == "skip":
         return head + 'else echo "pre-commit: guards skipped, plugin not installed" >&2; fi\n'
-    root = plugin_root(plugin)
-    searched = f"{in_quotes(root)}/cache and /synced" if root else in_quotes(os.path.join(plugin, ADAPTER))
     return head + ('elif git ls-files --cached --error-unmatch -- .claude/guards.json >/dev/null 2>&1; then\n'
-                   f'  echo "pre-commit: guards plugin not found in {searched}, commit refused; install it '
-                   '(/plugin install guards@no-lost-threads), or git commit -n skips this hook once" >&2\n'
+                   f'  echo "pre-commit: guards plugin not found in {searched(plugin)}, commit refused; install it '
+                   '(/plugin install guards@no-lost-threads), or git commit -n skips the pre-commit and commit-msg hooks once" >&2\n'
                    '  exit 2\n'
                    'else echo "pre-commit: guards plugin not found, no .claude/guards.json in the index, nothing judged" >&2; fi\n')
 
@@ -94,7 +118,7 @@ def main():
     a = ap.parse_args()
     plugin = os.path.dirname(os.path.dirname(HERE))
     if a.runner:
-        print(f'runner={locate(plugin, "run.py")}')
+        sys.stdout.write(runner(plugin))
         return
     block = lines(plugin, a.on_missing)
     if a.only_print:

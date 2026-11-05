@@ -776,6 +776,17 @@ bash "$I/layouts" | grep -q '^ran-0.10.0$' || { echo "FAIL  install: the cache c
 mv "$I/cache" "$I/cache.away"
 bash "$I/layouts" | grep -q '^ran-0.9.5$' || { echo "FAIL  install: a synced-only machine found nothing"; exit 1; }
 mv "$I/cache.away" "$I/cache"; rm -rf "$I/synced"
+# a copy with no readable version never wins; a release beats its prerelease; another marketplace is not read
+syn 'guards~g3' 0.1.0; rm "$I/synced/acct/guards~g3/.claude-plugin/plugin.json"
+syn 'guards~g4' 0.1.0; printf '{ "name": "guards" }\n' > "$I/synced/acct/guards~g4/.claude-plugin/plugin.json"
+syn 'guards~g5' 0.10.0-rc1
+mkdir -p "$I/cache/other/guards/9.9.9/adapters/git" "$I/cache/other/guards/9.9.9/.claude-plugin"
+printf '#!/usr/bin/env bash\necho ran-other\nexit 0\n' > "$I/cache/other/guards/9.9.9/adapters/git/pre-commit"; printf '{ "version": "9.9.9" }\n' > "$I/cache/other/guards/9.9.9/.claude-plugin/plugin.json"
+for sh in bash /bin/bash; do
+  command -v "$sh" >/dev/null || continue
+  [ "$("$sh" "$I/layouts")" = "ran-0.10.0" ] || { echo "FAIL  install: under $sh, an unversioned copy, a prerelease or another marketplace won: $("$sh" "$I/layouts" 2>&1)"; exit 1; }
+done
+rm -rf "$I/synced" "$I/cache/other"
 R2="$I/repo2"; mkdir -p "$R2"; git init -q "$R2"
 h2="$(git -C "$R2" rev-parse --path-format=absolute --git-common-dir)/hooks/pre-commit"
 mkdir -p "$(dirname "$h2")"; printf '#!/bin/sh\necho mine\n' > "$h2"
@@ -788,6 +799,7 @@ cp "$here/adapters/git/install.py" "$d/"; printf '#!/usr/bin/env bash\necho ran\
 mkdir -p "$F/.claude/cache/m/guards/1.0.0/.claude-plugin"; printf '{ "version": "1.0.0" }\n' > "$F/.claude/cache/m/guards/1.0.0/.claude-plugin/plugin.json"
 HOME="$F" python3 "$d/install.py" --print > "$I/lines"
 HOME="$F" python3 "$d/install.py" --print --on-missing skip > "$I/skip"
+HOME="$F" python3 "$d/install.py" --runner > "$I/runner" 2>/dev/null
 grep -q '"$HOME"/' "$I/lines" && ! grep -qF "$F" "$I/lines" || { echo "FAIL  install: the printed lines name one machine"; exit 1; }
 HOME="$F" python3 "$d/install.py" --runner | grep -q '^runner=.*"$HOME"/.*run.py' || { echo "FAIL  install: --runner printed no line"; exit 1; }
 { echo 'set -euo pipefail'; cat "$I/lines"; } > "$I/strict"
@@ -811,6 +823,11 @@ S="$I/with space/guards"; mkdir -p "$S/adapters/git"; cp "$here/adapters/git/ins
 printf '#!/usr/bin/env bash\necho spaced\nexit 0\n' > "$S/adapters/git/pre-commit"
 python3 "$S/adapters/git/install.py" --print > "$I/spaced"
 bash "$I/spaced" | grep -q '^spaced$' || { echo "FAIL  install: a path with a space does not run"; exit 1; }
+out="$(HOME="$F" bash "$I/runner" 2>&1)"; [ $? -eq 0 ] && echo "$out" | grep -q 'guards: plugin not found in' || { echo "FAIL  install: --runner did not name a missing plugin: $out"; exit 1; }
+if command -v zsh >/dev/null; then
+  out="$(HOME="$F" zsh -f "$I/runner" 2>&1)"; echo "$out" | grep -q 'no matches found' && { echo "FAIL  install: zsh aborted --runner on an unmatched glob: $out"; exit 1; }
+  echo "$out" | grep -q 'guards: plugin not found in' || { echo "FAIL  install: --runner under zsh did not name a missing plugin: $out"; exit 1; }
+fi
 python3 "$here/adapters/git/install.py" --repo "$I/nope" >/dev/null 2>&1; [ $? -eq 2 ] || { echo "FAIL  install: passed a non-checkout"; exit 1; }
 printf 'ok    %s\n' "install: wires the newest installed copy; a repo's own hook is kept and its lines printed"
 

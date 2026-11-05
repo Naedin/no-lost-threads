@@ -9,6 +9,19 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## guards [0.21.1] — 2026-11-05
+
+### Fixed
+
+- **A copy with no readable version never wins the lookup.** Apple `sort -V` ranked an empty version above every real one, so a half-synced copy could run the gate, or refuse every commit.
+- **The lookup reads only this marketplace's `cache/`, and a release beats its prerelease.** Another marketplace's `guards` could take over the gate.
+- **The `--runner` lines work in zsh and name a missing plugin,** and the refusal says `git commit -n` also skips `commit-msg`.
+
+### Contract
+
+- **The printed lines changed again, and `--runner` prints two.** Adopter-side edit: regenerate them.
+
+
 ## guards [0.21.0] — 2026-11-04
 
 ### Changed
