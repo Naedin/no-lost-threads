@@ -9,6 +9,29 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.15.0] — 2026-11-06
+
+### Added
+
+- **`ledgerDir` takes claim and frame rows out of the doc.** With it set in `.claude/slices.json`, `ledger-row.py` writes a doc's rows to `<ledgerDir>/<doc filename less .md>.rows`, one group per record, and the doc keeps its record lines and one `- claim rows: \`<path>\`` pointer. Without it, rows stay under their records. Readers take both forms.
+- **`ledger-row.py show`, `move`, and `orphans`.** `show` prints the records that bear rows, each with its rows. `move` carries a doc's inline rows into its rows file and names any row it had to leave. `orphans [--done <dir>]` lists a pointer whose rows file is missing, a rows file that no doc owns, and one whose doc sits only under a done directory.
+- **A pointer to a missing rows file is refused.** `rerun`, `show`, and `add` exit 2 instead of reading no rows, so a commit that staged only the plan fails at the next check instead of passing it.
+
+### Changed
+
+- **`rerun` reports `held`, `line-moved`, or `changed`,** where `line-moved` means only `<path>:<N>:` line numbers or the order of output lines shifted, and ends in `rerun: <h> held, <m> line-moved, <c> changed, <u> unverified, <x> unparsed`. `/slices:check` runs it as it writes its record and copies the count line onto the record.
+- **A row belongs to the nearest bearing record above it,** across `changed at`, `go at`, and other record lines. A row the writer placed after such a line is now read, moved, and recounted with its record. A `profiled at` record's own lines stay its.
+- **A delete or promotion removes the doc's rows file with it,** unless the target has the same filename. In that case the deleted doc's groups stay in the file as history and are never rerun.
+
+### Fixed
+
+- **A run killed while it holds the doc empty no longer loses the doc.** The doc and its rows file are copied under the git directory before they are emptied, and the next run on that doc restores them. A second run on a doc that another run holds empty is refused, instead of copying the empty doc as if it were real.
+
+### Contract
+
+- **New optional key `ledgerDir`; the rows' place and the `rerun` count line changed.** Adopter-side edit, for a repo that sets `ledgerDir`: run `ledger-row.py move` on its active plans. Its plan template's ledger section then holds records and the pointer. A tool that reads rows from the plan, or parses the old `rows: … differ` line, reads the rows file and the new line instead. A tool that rewrites references across files, such as a doc mover, must skip `ledgerDir`, since a row's command is history. A repo that leaves `ledgerDir` unset needs no edit: its rows stay inline and only the `rerun` count line changes.
+- **Run in Kraken:** `move`, `show`, `rerun` and `orphans` on its drafted plans, at 4f1010b1b. They moved 140 rows out of the settings page with no line lost, gave unchanged rerun counts, and refused a missing rows file and a concurrent run.
+
 ## guards [0.21.1] — 2026-11-05
 
 ### Fixed

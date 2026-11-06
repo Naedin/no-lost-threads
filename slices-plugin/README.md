@@ -83,6 +83,10 @@ new plans live in a subdirectory of it names that in an optional `draftDir`, and
 { "inboxDir": "Plans/inbox", "plansDir": "Plans", "draftDir": "Plans/active/drafted" }
 ```
 
+A repo that wants claim rows out of its docs names a directory in an optional `ledgerDir`
+(below, *What the ledger holds*); one it keeps out of default search (`.rgignore`) leaves
+plain `rg` reading plans without the rows.
+
 ### Carrying extra stub fields — an optional template
 
 A repo whose stubs need fields beyond the invariant shape — an epic, a priority, a
@@ -263,9 +267,23 @@ record carries the plugin version that wrote it, which is why the line is a reco
 not a single refreshed field. A plan whose ledger has no rows is one whose named sites
 were never measured, which is what the rows exist to make visible.
 
+The records and the rows live apart once `ledgerDir` is set. A record outlives the
+plan's readiness and scripts read it, so it stays in the doc. A row is dead once the plan
+is ready and read only by the re-runner, the checker, and a finalize step, so it goes to
+the doc's rows file, `<ledgerDir>/<doc filename less .md>.rows`, a group per record, and
+the doc carries one `- claim rows: \`<path>\`` pointer the writer adds. `rerun` reports
+each row `held`, `line-moved` (only `<path>:<N>:` line numbers or the order of lines shifted), or `changed`,
+and `/slices:check` copies its count line onto its record. `show <doc>` prints the
+records that bear rows with their rows, the doc's other records staying where they are;
+`move <doc>` carries a doc's inline rows into its file, naming any row no bearing record
+owns; `orphans [--done <dir>]` lists a pointer whose rows file is missing, a rows file no
+doc owns, or one whose doc sits only under a done directory — the check an adopter's lint
+runs, since a ready plan's rows are deleted with its file. A pointer whose file is missing
+refuses `rerun`, `show`, and `add` rather than reading no rows.
+
 ```
 - drafted at <sha>, <date>, slices <version> — <N> sites opened (unverified: <n>)[, frame owner: <session>]
-- gap-checked at <sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
+- gap-checked at <sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, touched: <sections>][, stopped: <reasons>][, rerun: <counts>][, warm-context][, agent-stale]
 - check held at <sha>, <date>, slices <version> — round <r>: no frame-owner go
 - go at <sha>, <date> — <frame owner>: <disposition>
 - reframed at <sha>, <date>, slices <version> — <frame owner>: <what the frame now is>
@@ -304,6 +322,6 @@ slices-plugin/
   commands/check.md               /slices:check — fresh-context gap check
   agents/gap-checker.md           Cold adversary that edits only the plan (its brief)
   agents/frame-checker.md         Cold reviewer that edits only a stub's frame record
-  scripts/ledger-row.py           Write and re-run a plan's claim rows
+  scripts/ledger-row.py           Write, re-run, show, and move a doc's claim rows
   scripts/profile.py              Match work against the risk registry; the check's round budget
 ```

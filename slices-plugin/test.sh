@@ -55,7 +55,7 @@ ok "a re-run row replaces itself; a backtick command is fenced"
 
 # 5. rerun: held exits 0; a moved tree differs and exits 1
 python3 "$lr" rerun "$plan" >"$tmp/out" || fail "rerun of a fresh ledger did not hold: $(cat "$tmp/out")"
-grep -q '^rows: 5 held, 0 differ, 1 unverified, 0 unparsed$' "$tmp/out" || fail "rerun count wrong: $(tail -1 "$tmp/out")"
+grep -q '^rerun: 5 held, 0 line-moved, 0 changed, 1 unverified, 0 unparsed$' "$tmp/out" || fail "rerun count wrong: $(tail -1 "$tmp/out")"
 printf 'load()\n' >> "$tmp/src/store.txt"
 python3 "$lr" rerun "$plan" >"$tmp/out" && fail "rerun held over a moved tree"
 grep -q '^  now:      `3`$' "$tmp/out" || fail "rerun did not show the derived output"
@@ -92,7 +92,7 @@ python3 "$lr" add "$st" 'two load sites' "rg -c 'load' src/store.txt" >/dev/null
 [ "$(sed -n '6p' "$st")" = "  - two load sites — \`rg -c 'load' src/store.txt\` — \`3\`" ] || fail "frame row not under the record: $(cat "$st")"
 grep -q '^- value: a sentence$' "$st" || fail "frame lines after the record lost"
 python3 "$lr" rerun "$st" >"$tmp/out" || fail "frame rerun did not hold: $(cat "$tmp/out")"
-grep -q '^rows: 1 held, 0 differ, 0 unverified, 0 unparsed$' "$tmp/out" || fail "frame rerun read lines past the record"
+grep -q '^rerun: 1 held, 0 line-moved, 0 changed, 0 unverified, 0 unparsed$' "$tmp/out" || fail "frame rerun read lines past the record"
 ok "a stub's framed record takes rows and reruns them alone"
 
 # 10. the writer refuses a row its reader could not read back, before anything runs
@@ -113,8 +113,154 @@ python3 "$lr" add "$rt" 'the plain dash — is fine, as is `code` in a claim' 'p
 python3 "$lr" add "$rt" 'an escaped newline is one line' $'printf \'%s\\n\' "$(printf $\'a\\nb\')"' >/dev/null || fail "add refused a one-line escaped command"
 python3 "$lr" add "$rt" 'a code span — a claim may hold it after' --unverified 'open `it`' >/dev/null || fail "add refused a readable unverified row"
 python3 "$lr" rerun "$rt" >"$tmp/out" || fail "rows the writer took did not read back: $(cat "$tmp/out")"
-grep -q '^rows: 2 held, 0 differ, 1 unverified, 0 unparsed$' "$tmp/out" || fail "round trip wrong: $(cat "$tmp/out")"
+grep -q '^rerun: 2 held, 0 line-moved, 0 changed, 1 unverified, 0 unparsed$' "$tmp/out" || fail "round trip wrong: $(cat "$tmp/out")"
 ok "the writer refuses what its reader cannot read back, before running it; what it takes reads back"
+
+# ---- ledgerDir: rows in the doc's rows file, records and one pointer line in the doc
+L="$tmp/led"; mkdir -p "$L/.claude" "$L/src" "$L/Plans/inbox" "$L/Plans/done"; git -C "$L" init -q
+printf '{ "ledgerDir": "Plans/.ledger" }\n' > "$L/.claude/slices.json"
+printf 'a\nload()\nb\n' > "$L/src/s.txt"
+lp="$L/Plans/p.md"
+printf '# P\n\nThe prose names zqx.\n\n## Verification ledger\n\n- drafted at abc1234, 2026-11-05, slices 0.15.0 — 0 sites opened (unverified: 0)\n' > "$lp"
+
+# 11. add writes the row to the rows file; the doc keeps its record, recounted, and a pointer
+python3 "$lr" add "$lp" 'load sits at line 2' "rg -n 'load' src/s.txt" >/dev/null || fail "add refused under ledgerDir"
+python3 "$lr" add "$lp" 'no plan names zqx' "rg -l zqx Plans" >/dev/null
+python3 "$lr" add "$lp" 'the caller' --unverified 'open it' >/dev/null
+lf="$L/Plans/.ledger/p.rows"
+[ -f "$lf" ] || fail "no rows file at $lf"
+grep -q '^  - ' "$lp" && fail "a row was written into the doc: $(cat "$lp")"
+grep -qF -- '- drafted at abc1234, 2026-11-05, slices 0.15.0 — 3 sites opened (unverified: 1)' "$lp" || fail "record not recounted from the file: $(cat "$lp")"
+[ "$(tail -1 "$lp")" = '- claim rows: `Plans/.ledger/p.rows`' ] || fail "pointer not after the record: $(cat "$lp")"
+[ "$(grep -c '^- claim rows:' "$lp")" -eq 1 ] || fail "pointer written twice"
+grep -qF -- "- drafted at abc1234, 2026-11-05, slices 0.15.0" "$lf" || fail "group header missing: $(cat "$lf")"
+grep -qF "\`rg -l zqx Plans\` — no output (exit 1)" "$lf" || fail "a sweep matched its doc's prose or its rows file: $(cat "$lf")"
+ok "under ledgerDir the rows go to the rows file; the doc keeps the recounted record and one pointer"
+
+# 12. a check-side row takes its own group; rerun reads the drafted group; show interleaves
+printf -- '- gap-checked at def5678, 2026-11-05, slices 0.15.0 — 0 defects (addressed: 0), 0 questions (open: 0)\n' >> "$lp"
+python3 "$lr" add "$lp" 'one load' "rg -c load src/s.txt" >/dev/null
+grep -qF -- "- gap-checked at def5678, 2026-11-05, slices 0.15.0" "$lf" || fail "no gap-checked group"
+python3 "$lr" rerun "$lp" >"$tmp/out" || fail "file rows did not hold: $(cat "$tmp/out")"
+grep -q '^rerun: 2 held, 0 line-moved, 0 changed, 1 unverified, 0 unparsed$' "$tmp/out" || fail "rerun read the wrong group: $(cat "$tmp/out")"
+python3 "$lr" show "$lp" > "$tmp/out"
+[ "$(sed -n '1p;5p' "$tmp/out" | cut -c1-14 | tr '\n' '|')" = "- drafted at a|- gap-checked |" ] || fail "show not interleaved: $(cat "$tmp/out")"
+ok "a check-side row gets its record's group; rerun reads the drafted group; show puts rows under records"
+
+# 13. rerun tells a shifted line number from a broken claim
+printf 'top\na\nload()\nb\n' > "$L/src/s.txt"
+python3 "$lr" rerun "$lp" >"$tmp/out" && fail "a line-moved row exited 0"
+grep -q '^line-moved' "$tmp/out" || fail "a shifted line read as changed: $(cat "$tmp/out")"
+printf 'a\nload()\nb\n' > "$L/src/s.txt"; printf 'load()\n' > "$L/src/t.txt"
+python3 "$lr" add "$lp" 'two files load' "rg -n --sort path load src/s.txt src/t.txt" >/dev/null
+python3 - "$lf" <<'PY'
+import re, sys
+p = sys.argv[1]; lines = open(p).read().split("\n")
+row = next(l for l in lines if "two files load" in l); lines.remove(row)
+a, b = re.findall(r"`src/[st]\.txt:\d+:load\(\)`", row)
+lines.insert(lines.index(next(l for l in lines if l.startswith("- drafted at"))) + 1, row.replace(a + "; " + b, b + "; " + a))
+open(p, "w").write("\n".join(lines))
+PY
+python3 "$lr" rerun "$lp" >"$tmp/out"
+grep -q '^line-moved rg -n --sort path load src/s.txt src/t.txt' "$tmp/out" || fail "hits in another order read as changed: $(cat "$tmp/out")"
+grep -v 'two files load' "$lf" > "$tmp/lf" && mv "$tmp/lf" "$lf"
+printf 'a\nb\n' > "$L/src/s.txt"
+python3 "$lr" rerun "$lp" >"$tmp/out"
+grep -q '^changed' "$tmp/out" || fail "a vanished site read as line-moved: $(cat "$tmp/out")"
+grep -q '^rerun: 1 held, 0 line-moved, 1 changed, 1 unverified, 0 unparsed$' "$tmp/out" || fail "counts wrong: $(tail -1 "$tmp/out")"
+printf 'a\nload()\nb\n' > "$L/src/s.txt"
+ok "rerun classifies held, line-moved, and changed, and counts each"
+
+# 14. a run killed while holding the files empty is undone by the next run
+cp "$lp" "$tmp/lp.before"; cp "$lf" "$tmp/lf.before"
+python3 "$lr" add "$lp" 'slow' 'sleep 5' >/dev/null 2>&1 & k=$!
+sleep 1; [ -s "$lp" ] && fail "doc not held empty while its command ran"
+python3 "$lr" rerun "$lp" >/dev/null 2>"$tmp/err"; [ $? -eq 2 ] || fail "a second run went ahead while the first held the doc"
+grep -q 'another ledger-row run' "$tmp/err" || fail "concurrent refusal not named: $(cat "$tmp/err")"
+python3 "$lr" show "$lp" >/dev/null 2>&1 && fail "show read a doc another run holds empty"
+kill -9 "$k"; wait "$k" 2>/dev/null
+[ -s "$lp" ] && fail "a SIGKILL left the doc whole, so the case proves nothing"
+python3 "$lr" rerun "$lp" >/dev/null
+cmp -s "$lp" "$tmp/lp.before" || fail "the killed run's doc not restored: $(cat "$lp")"
+cmp -s "$lf" "$tmp/lf.before" || fail "the killed run's rows file not restored"
+python3 -I -c 'import importlib.util as u,sys;s=u.spec_from_file_location("lr",sys.argv[1]);m=u.module_from_spec(s);s.loader.exec_module(m);sys.exit(m.moved_only("12 lines, first: `a:1:x`","12 lines, first: `a:2:x`"))' "$lr" || fail "a summarized listing read as line-moved"
+ok "a killed run's emptied doc and rows file come back on the next run; a concurrent run refuses"
+
+# 15. a renamed doc follows its pointer; a promoted stub's group of the same name is history
+git -C "$L" mv -f Plans/p.md Plans/renamed.md 2>/dev/null || mv "$lp" "$L/Plans/renamed.md"
+python3 "$lr" rerun "$L/Plans/renamed.md" >"$tmp/out" || fail "renamed doc lost its rows: $(cat "$tmp/out")"
+sp="$L/Plans/inbox/feat.md"
+printf '# S\n\n## Frame\n\n- framed at 0000000, 2026-11-05, slices 0.15.0\n- value: v\n' > "$sp"
+python3 "$lr" add "$sp" 'one load' "rg -c load src/s.txt" >/dev/null
+[ "$(sed -n '6p' "$sp")" = '- claim rows: `Plans/.ledger/feat.rows`' ] || fail "stub pointer not under its record: $(cat "$sp")"
+rm "$sp"; fp="$L/Plans/feat.md"
+printf '# F\n\n- drafted at 1111111, 2026-11-05, slices 0.15.0 — 0 sites opened (unverified: 0)\n' > "$fp"
+python3 "$lr" add "$fp" 'one load' "rg -c load src/s.txt" >/dev/null
+python3 "$lr" rerun "$fp" >"$tmp/out" || fail "plan beside a history group did not hold: $(cat "$tmp/out")"
+grep -q '^rerun: 1 held' "$tmp/out" || fail "rerun read the stub's frame group"
+python3 "$lr" show "$fp" | grep -q '^history' || fail "the stub's frame group not shown as history"
+ok "a renamed doc follows its pointer; a promoted stub's frame rows stay as history, never rerun"
+
+# 16. move carries an inline ledger into the file; orphans lists rows no doc owns or that are spent
+mp="$L/Plans/old.md"
+printf -- '- drafted at 2222222, 2026-11-01, slices 0.14.0 — 2 sites opened (unverified: 1)\n  - one load — `rg -c load src/s.txt` — `1`\n  - x — unverified: y\n- gap-checked at 3333333, 2026-11-02, slices 0.14.0 — 0 defects (addressed: 0), 0 questions (open: 0)\n  - one load again — `rg -c load src/s.txt` — `1`\n' > "$mp"
+python3 "$lr" rerun "$mp" >/dev/null || fail "inline rows unread under ledgerDir"
+python3 "$lr" move "$mp" | grep -q '^3 rows moved' || fail "move miscounted"
+grep -q '^  - ' "$mp" && fail "rows left in the doc after move"
+[ "$(sed -n '2p' "$mp")" = '- claim rows: `Plans/.ledger/old.rows`' ] || fail "move's pointer misplaced: $(cat "$mp")"
+python3 "$lr" rerun "$mp" | grep -q '^rerun: 1 held, 0 line-moved, 0 changed, 1 unverified' || fail "moved rows did not rerun"
+printf '# stray\n- drafted at 0, 2026-01-01\n' > "$L/Plans/.ledger/gone.rows"
+mv "$mp" "$L/Plans/done/old.md"
+(cd "$L" && python3 "$lr" orphans --done Plans/done) >"$tmp/out" && fail "orphans exited 0 with orphans"
+grep -q '^orphan     Plans/.ledger/gone.rows' "$tmp/out" || fail "an ownerless rows file not listed: $(cat "$tmp/out")"
+grep -q '^spent      Plans/.ledger/old.rows' "$tmp/out" || fail "a done doc's rows not listed"
+grep -q 'renamed.rows\|p.rows\|feat.rows' "$tmp/out" && fail "an owned rows file listed: $(cat "$tmp/out")"
+ok "move empties an inline ledger into the file; orphans lists ownerless and spent rows files"
+
+# 17. a pointer naming a missing rows file is a refusal, never an empty pass; orphans lists it
+np="$L/Plans/nofile.md"
+printf -- '- drafted at 4444444, 2026-11-05, slices 0.15.0 — 1 sites opened (unverified: 0)\n- claim rows: `Plans/.ledger/nofile.rows`\n' > "$np"
+for c in rerun show; do
+  python3 "$lr" $c "$np" >/dev/null 2>"$tmp/err"; [ $? -eq 2 ] || fail "$c passed a pointer to a missing file"
+  grep -q 'which is missing' "$tmp/err" || fail "$c refusal not named: $(cat "$tmp/err")"
+done
+python3 "$lr" add "$np" 'one load' "rg -c load src/s.txt" >/dev/null 2>&1 && fail "add restarted a missing rows file"
+[ -e "$L/Plans/.ledger/nofile.rows" ] && fail "add created the missing rows file"
+(cd "$L" && python3 "$lr" orphans) >"$tmp/out" && fail "orphans exited 0 over a missing rows file"
+grep -q '^missing    Plans/.ledger/nofile.rows — Plans/nofile.md points at it' "$tmp/out" || fail "missing rows file not listed: $(cat "$tmp/out")"
+rm "$np"
+ok "a pointer to a missing rows file refuses rerun, show, and add; orphans lists it"
+
+# 18. a row past a non-bearing record still belongs to the bearing record above; profile lines stay
+ap="$L/Plans/across.md"
+cat > "$ap" <<'EOF'
+## Verification ledger
+
+```
+  - example — `rg x` — `1`
+```
+
+- drafted at 5555555, 2026-11-01, slices 0.14.0 — 1 sites opened (unverified: 0)
+  - one load — `rg -c load src/s.txt` — `1`
+- gap-checked at 6666666, 2026-11-02, slices 0.14.0 — 0 defects (addressed: 0), 0 questions (open: 0)
+- changed at 7777777, 2026-11-02 — drafter: a fold
+  - s holds a — `rg -c a src/s.txt` — `1`
+- profiled at 7777777, 2026-11-02, slices 0.14.0 — classes: copy
+  - copy — path: src/s.txt
+
+  - stray — `rg -c b src/s.txt` — `1`
+EOF
+python3 "$lr" show "$ap" > "$tmp/out"
+sed -n '/^- gap-checked/,$p' "$tmp/out" | grep -q 's holds a' || fail "a row past changed at not shown under its record: $(cat "$tmp/out")"
+python3 "$lr" move "$ap" > "$tmp/out"
+grep -q '^2 rows moved' "$tmp/out" || fail "move miscounted across a non-bearing record: $(cat "$tmp/out")"
+grep -q '^left       line .*stray' "$tmp/out" || fail "a row under no bearing record not reported: $(cat "$tmp/out")"
+grep -q 'example' "$tmp/out" && fail "a fenced example reported as a row"
+grep -qF '  - s holds a' "$ap" && fail "the row past changed at stayed inline"
+grep -qF '  - copy — path: src/s.txt' "$ap" || fail "a profiled record's line was moved"
+grep -qF '  - example — `rg x` — `1`' "$ap" || fail "a fenced example was moved"
+grep -A1 '^- gap-checked at 6666666' "$L/Plans/.ledger/across.rows" | grep -q 's holds a' || fail "the row not in its record's group: $(cat "$L/Plans/.ledger/across.rows")"
+ok "a row past a non-bearing record belongs to the bearing record above; profile lines, fences, and strays stay, strays named"
 
 # ---- scripts/profile.py: the risk registry, matched against what a plan touches
 pf="$here/scripts/profile.py"

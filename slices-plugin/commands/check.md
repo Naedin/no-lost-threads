@@ -61,7 +61,7 @@ does not list is past the cap. An unclassified plan's budget is round 1. **Cap:*
 profile, never start a round past the budget without the frame owner's go; with none, never
 start a third round, or any after it, without one — a `go at` line (§3) appended after the
 newest `gap-checked at` record. A go's round runs the full check. With none, spawn nothing: append the held record (§3), commit the
-plan file as WIP, send the hand-up report (§2) built from the rounds already recorded, and
+plan file and its rows file (`ledgerDir`) as WIP, send the hand-up report (§2) built from the rounds already recorded, and
 stop. Otherwise copy the
 plan file to a scratch path outside the repo before the spawn — the round's baseline, which
 §2 restores on a stop.
@@ -223,7 +223,7 @@ carries a `- (none yet)` placeholder, and the first append replaces it. That, an
 creation above, are the only writes into the ledger that are not appends:
 
 ```
-- gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, class: <id> | change: <sha>][, touched: <sections>][, stopped: <reasons>][, warm-context][, agent-stale]
+- gap-checked at <short commit sha>, <date>, slices <version> — <N> defects (addressed: <n>), <M> questions (open: <m>)[, <D> dependency][, class: <id> | change: <sha>][, touched: <sections>][, stopped: <reasons>][, <rerun>][, warm-context][, agent-stale]
 - check held at <short commit sha>, <date>, slices <version> — round <r>: no frame-owner go
 - go at <short commit sha>, <date> — <frame owner>: <the disposition, one line>
 - reframed at <short commit sha>, <date>, slices <version> — <frame owner>: <what the frame now is, one line>
@@ -258,6 +258,13 @@ A re-draft — a carve re-drafted from its stub, or a MIS-CARVED plan drafted ag
 no `reframed at`, since `/slices:draft` writes the plan's fresh `drafted at` record, which
 is the baseline.
 
+`<rerun>` is the count line of `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py rerun
+<plan>`, run by this command as it writes the record and copied as printed — `rerun: <h>
+held, <m> line-moved, <c> changed, <u> unverified, <x> unparsed` — never taken from the
+report; a plan with no `drafted at` record omits it. It measures the draft's rows against
+this round's tree, so the records say over time how many rows held, how many only moved a
+line, and how many caught a change.
+
 `warm-context` when the checklist ran in this context (§1); `agent-stale` when the
 report's vocabulary showed an agent definition older than this text (§2). Each names a
 check that paid less than the record's version promises, for the next reader.
@@ -278,7 +285,9 @@ the writer once the record line is in, never pasted from the report — it re-ru
 command and derives the output line, so a report row recalled rather than run is
 corrected on the way in:
 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py add <plan> '<claim>' '<command>'`,
-or `… add <plan> '<claim>' --unverified '<what would settle it>'`.
+or `… add <plan> '<claim>' --unverified '<what would settle it>'`. Under `ledgerDir` the
+rows go to the plan's rows file, in the group for this record, and the section holds the
+record alone.
 
 ```
   - <claim> — `<generating command>` — <one line of its output>

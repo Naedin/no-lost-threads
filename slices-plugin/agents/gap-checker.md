@@ -47,11 +47,14 @@ written from your walk.
 Work in this order:
 
 0. **Re-run the drafter's rows first.** When the plan's ledger carries a `drafted at`
-   record with claim rows under it, run every row's command verbatim against the current
-   tree and compare its output line — with the row re-runner when your brief names one
-   (`python3 <its path> rerun <plan>`, one call printing `held`, `differs` with both
-   outputs, `unverified`, or `unparsed` per row). A row that moved is a defect, cited
-   with both outputs; an `unparsed` row is off the writer's form — not
+   record with claim rows — under it, or in the rows file a `- claim rows: \`<path>\``
+   line names (`python3 <re-runner> show <plan>` prints the records with their rows) — run
+   every row's command verbatim against the current tree and compare its output line —
+   with the row re-runner when your brief names one (`python3 <its path> rerun <plan>`,
+   one call printing `held`, `line-moved` or `changed` with both outputs, `unverified`, or
+   `unparsed` per row). A row that moved is a defect, cited with both outputs: a
+   `line-moved` row only shifted its `<path>:<N>:` line numbers or the order of its hits,
+   so its fix is the plan's cited lines, `lands: plan`; an `unparsed` row is off the writer's form — not
    written by running it — and is mis-recorded: a defect, re-run and reported as a row; a row whose claim or output line characterizes the whole set of hits — a
    summary (`only`, `all`, `none`), a count, a list given as the hits — is confirmed by
    reading every hit the command returns, never a sample, and a hit it does not cover

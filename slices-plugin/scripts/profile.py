@@ -23,9 +23,9 @@ and still matches the moment work touches it. `check.at` is `plan` (gap-check ro
 of them, default 1), `build`, or `pre-pr`; `rounds` is read only for `plan`, and a non-zero
 `rounds` elsewhere is a registry error.
 
-`match` reads the work three ways, from the file's text less its ledger records and their
-rows, which measure what the draft read. **Paths**: the paths the work changes, from a
-`Changed Files` section, else Scope's In (Out items and an `Out…` sub-heading left out), else
+`match` reads the work three ways, from the file's text less its ledger records, their
+rows, and the rows-file pointer, which measure what the draft read. **Paths**: the paths
+the work changes, from a `Changed Files` section, else Scope's In (Out items and an `Out…` sub-heading left out), else
 the whole text when the file has neither, as a stub does. Each path-like token, and each
 CamelCase identifier, is resolved to tracked files — the file itself, the one tracked file
 ending in it, a directory (matched as itself, `<dir>/`, never as every file under it), or a
@@ -76,6 +76,7 @@ IDENT = re.compile(r"\b([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+)\b")
 RECORD = re.compile(r"^- profiled at ")
 LEDGER = re.compile(r"^#+ .*(Verification ledger|<!-- slices: ledger -->)")
 ANY_RECORD = re.compile(r"^- (drafted|gap-checked|framed|profiled|check held|go|reframed|changed|escaped) at \S+, \d{4}-")
+ROWS_POINTER = re.compile(r"^- claim rows: `[^`]+`\s*$")
 HEADING = re.compile(r"^(#+)\s+(.*)$")
 CHANGED_FILES = re.compile(r"(changed[ -]files|files[ -]changed)\b", re.I)
 SCOPE = re.compile(r"scope\b", re.I)
@@ -285,9 +286,11 @@ def recorded_decisions(lines):
 
 
 def without_records(lines):
-    """The file's lines less its ledger records and the rows under them."""
+    """The file's lines less its ledger records, the rows under them, and the rows pointer."""
     out, skipping = [], False
     for l in lines:
+        if ROWS_POINTER.match(l):
+            continue
         if ANY_RECORD.match(l):
             skipping = True
         elif not (skipping and l.startswith("  - ")):

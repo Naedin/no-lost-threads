@@ -28,8 +28,10 @@ records go wrong.
 
 Work in this order:
 
-0. **Re-run the record's rows** — the rows under `- framed at`, with the row re-runner your
-   brief names (`python3 <its path> rerun <stub>`). A row that moved, or one off the
+0. **Re-run the record's rows** — the rows under `- framed at`, or in the rows file the
+   record's `- claim rows: \`<path>\`` line names (`python3 <its path> show <stub>` prints
+   them under the record), with the row re-runner your brief names (`python3 <its path>
+   rerun <stub>`). A row that moved, or one off the
    writer's form, is rewritten through the writer (`python3 <its path> add <stub> '<claim>'
    '<command>'`). A row whose labels misread its hits — read the hits behind each bucket —
    is rewritten with the corrected claim and command. A corrected row **replaces** the row
@@ -91,7 +93,8 @@ Work in this order:
 Edit the record in place: add the missing shapes, rewrite the rows and cost lines you
 correct (the corrected text replaces the old), keep the drafter's own lines otherwise; a
 pick line resting on a row you refuted is left for the drafter, named in your report. Never write the `- reviewed:` line; the command that spawned
-you writes it from your verdict. Touch nothing outside the `## Frame` section.
+you writes it from your verdict. Touch nothing outside the `## Frame` section and the
+stub's rows file.
 
 Report: each shape you added and why it is a candidate; each cost line or row you changed,
 with the evidence (file, line, command output); the regressions you found, by state; each

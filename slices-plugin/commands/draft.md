@@ -24,7 +24,7 @@ command carves before it promotes.
 ## 0. Config
 
 Read `.claude/slices.json` for `inboxDir` and `plansDir` (bootstrap as in
-`/slices:capture` if absent — same file, same one question), and for four optional
+`/slices:capture` if absent — same file, same one question), and for its optional
 fields. `draftDir` is where §2 writes the new plan — a repo whose drafted plans live in
 a subdirectory (`Plans/active/drafted`) sets it, and `plansDir` stays the root the §1
 sweep covers; absent, the plan is written in `plansDir`. `planTemplate` is a path to an
@@ -49,7 +49,11 @@ adopter-owned tool (below). The fifth, `riskRegistry`, is the adopter's registry
 classes (`${CLAUDE_PLUGIN_ROOT}/scripts/profile.py --help` holds its schema): with it set,
 each shape declares its change kinds and prices the classes it enters (§1), and the plan
 carries a profile (§2) that sets `/slices:check`'s round budget. Absent, neither runs, and
-the digest (§4) says so in one line.
+the digest (§4) says so in one line. The sixth, `ledgerDir`, moves claim and frame rows out
+of the doc: with it set the writer keeps a doc's rows in `<ledgerDir>/<doc filename less
+.md>.rows`, and the doc keeps its record lines and one `- claim rows: \`<path>\`` pointer the
+writer adds. A rows file is the doc's second file — staged, committed, and deleted with it.
+Absent, rows sit under their records in the doc.
 
 ### Every delete
 
@@ -73,6 +77,9 @@ each is a plain `git rm` (or removing the file, when it was never tracked). With
   substituted as repo-root-relative paths, run from the repo root. A site whose key is
   absent stops there and names the missing key; a delete with a target never runs
   `noTarget`.
+- **The rows file goes with its doc.** With `ledgerDir` set, each delete also removes the
+  doc's rows file (its pointer's path), except when the target bears the same filename, whose
+  rows file it then is: the deleted doc's groups stay in it as history, never rerun.
 - **Stage first.** The doc and the target are `git add`ed whole before the command runs —
   the plan once written, a survivor once the loser's content is folded in, a restored stub
   once its reframing is folded — since a tool that repoints references reads the index.
@@ -217,7 +224,8 @@ it checks the cost line.
 Write the `- framed at` line first, then every row — premise corrections, the harm, the
 since-capture logs, the declared block — through the writer, as the ledger's are (§1's
 site-opening pass): `ledger-row.py add <stub> '<claim>' '<command>'` writes under a stub's
-`framed at` record, and `rerun <stub>` re-runs them.
+`framed at` record (in its rows file under `ledgerDir`, leaving the record and the pointer
+in the stub), and `rerun <stub>` re-runs them.
 Then the record goes to a context that has not read the drafting rationale: use the
 `Agent` tool with this plugin's `frame-checker` agent (`subagent_type:
 slices:frame-checker`), passing **only the stub's path** — *"Review the frame record in
@@ -309,12 +317,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py add <plan> '<claim>' --unver
 It runs the command in the plan's repo root, derives the output line (up to ten output
 lines, each a code span, joined by `; `; more as `<n> lines, first: <line>`; none as
 `no output`; a non-zero exit appended), and writes the row under the plan's newest `drafted at`
-record, recounting that record's sites; the same command again replaces its row. So §2
+record — in the plan's rows file when `ledgerDir` is set (§0) — recounting that record's
+sites; the same command again replaces its row. So §2
 writes the plan with its `drafted at` record and no rows, and the rows follow through the
 writer — the output line comes from the run, never from memory of an earlier one, and a
 row off the writer's form is the visible exception `/slices:check` names first. Every
-command runs with the plan file itself emptied, so a sweep over a tree that holds the
-plan never matches the pattern its own row quotes. A row's command
+command runs with the plan and its rows file emptied, so a sweep over a tree that holds
+them never matches the pattern its own row quotes or the plan's prose names. A row's command
 is one whole command on one line, which the writer enforces with any other row its reader
 could not read back: a run piped through `head` or `tail` is not a row, and two probes are two
 rows. A characterization
@@ -437,7 +446,9 @@ that most need the reviewer>
 ```
 
 The record is written with `0 sites opened (unverified: 0)`, and the rows under it come
-from `ledger-row.py add`, which keeps the counts (§1). With `riskRegistry` set, the
+from `ledger-row.py add`, which keeps the counts (§1); under `ledgerDir` they land in the
+rows file and the writer puts the pointer line under the record, so the section holds
+records only (`ledger-row.py show <plan>` reads them together). With `riskRegistry` set, the
 profile follows once the rows are in: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/profile.py match
 <plan> --kinds <the standing shape's kinds> [--confirm <class>:<why>]… [--dismiss
 <class>:<why>]… --write`, passing the standing shape's suggestion decisions, appends its
@@ -531,14 +542,18 @@ printing nothing. A tension entry states the call taken, the pull each way, and 
 lever: what overriding it costs. Tensions are decided, never open; anything unresolved
 is a question for the check, not a tension. A tension does not discharge a rule: a call that
 breaks one in the repo's direction docs names the rule's amendment in Scope. The Tensions section opens with the frame (§1). The `Verification ledger` section holds the
-site-opening pass's rows under a `drafted at` record when the plan is written: the gap
+site-opening pass's rows under a `drafted at` record when the plan is written — or the
+record and its pointer, the rows in the plan's rows file, under `ledgerDir`: the gap
 check *appends* to it — its own record line and rows — so the plan format never
 migrates, and a draft-time row is re-run rather than re-hunted.
 
 ## 3. Promote — delete the stub
 
 The stub is deleted in the same change that creates the plan, once the plan is written
-— with `deleteCommand` set, onto the plan as its target (§0). Provenance rides in
+— with `deleteCommand` set, onto the plan as its target (§0) — and its rows file with it
+(§0, *Every delete*), after the plan's own rows are in: the frame record's rows reached
+the plan through the writer (§1), so nothing is carried by hand. The change stages the
+plan and its rows file together. Provenance rides in
 the plan (one line naming the stub it came from); the low-trust artifact doesn't.
 Amend the stub instead only when drafting revealed the premise needs reframing —
 that's a capture update, not a promotion.
