@@ -1,2 +1,0 @@
-# The retro log is an append-only stream; concurrent sessions merge by union.
-.claude/threads-retro-log.md merge=union

@@ -9,6 +9,62 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## slices [0.16.0] — 2026-11-06
+
+### Changed
+
+- **`/slices:draft`'s digest carries every tension point, ranked,** not the top five. The plan's Tensions section was already uncapped; the digest no longer drops any of it.
+
+### Contract
+
+- **Run in Kraken:** `/slices:draft` read-only on an inbox stub, from the working tree. It stopped at the frame as the command requires and ranked all five tensions in its digest. No adopter-side edit.
+
+## guards [0.22.0] — 2026-11-06
+
+### Removed
+
+- **The `retro-log-size` check,** and `review-ledger`'s 12-line Live and 3-line Resolved entry limits. `review-ledger` still finds a section other than Live, Falsifications, or Resolved, and a dated window line in a Live entry.
+
+### Contract
+
+- **A config naming `retro-log-size` names a check that no longer exists.** Adopter-side edit: delete its entry from `.claude/guards.json`. Kraken does not enable it.
+- **Run in Kraken:** `guards-plugin/run.py` from the working tree on Kraken's own config: every check passed, `review-ledger` included, with four existing `referents` warnings.
+
+## threads [0.30.0] — 2026-11-06
+
+### Changed
+
+- **`/threads:process-review` works at direction altitude.** A new `evidence-reader` sub-agent reads the window's incidents: the retro log through its view, each key's chain and class, the process-commit stream, the risk registry, the capability store, and docs nothing routes to or that point at nothing. It returns where residual concentrates, what changed near it, and how much upcoming work runs through it. The reviewer reads `invariantDocs` as the direction it weighs that picture against, and decides for each concentration: act now, let more work narrow the cause, or leave. The command dropped from 13,453 to about 3,600 words.
+- **The maintainer's framing is the run's question.** Text after the command (`/threads:process-review the copy guidelines are broken`) opens the depth gate, puts the whole named artifact in question, and makes the log evidence for or against it.
+- **Residual, not rule churn, is the telemetry.** Residual is every occurrence classed escaped, gate-run, or caught, read as a rate over the window's work commits. Process commits are read as what changed near it. An occurrence saying the rule was present and followed while the output was still wrong counts against the artifact and is never ruled count-only. `/threads:retro`'s ripeness nudge no longer reads the marker bars.
+- **The output flexes.** The decision block is a table for several decisions, or a paragraph for one call about a whole artifact, and nothing that could change the maintainer's answer sits only in the record. A new `replace` class covers "this artifact's approach is wrong", and a replacement reaches the maintainer whole. Every artifact the review acts on names its largest option and that option's cost.
+- **Deletion costs no more than addition.** A new `delete` class covers a named removal. Under `apply-mechanical` it lands unanswered, as an addition does, and the cold old-vs-new read applies only to rewording. A retirable workaround's deletion is mechanical. `finding-placer` answers a wrong rule by removing it, not by adding its opposite.
+- **Outside practice is checked before a design settles.** Any candidate that adds a rule, replaces, carves, or builds tooling first looks at how others solve the problem and what changed in the tools and models, reading the pages themselves rather than search snippets. The marker body carries an `Outside:` line.
+- **Delegate briefs carry the goal.** `structure-explorer` and `evidence-reader` are told the objective the run serves and its constraint, maintainer attention included. Both start without CLAUDE.md (`omitClaudeMd: true`, Claude Code 2.1.271 or later). `structure-explorer` also proposes a pure deletion and the largest option.
+- **The reviewer sees the cases only after it commits to a hypothesis.** `evidence-reader` holds back two or three verbatim occurrences per concentration and its own cause guess. The reviewer records its hypothesis of cause and fix, and what would change its mind, then resumes the reader for the cases. The marker body carries a `Blind:` line saying whether the cases changed the ruling, and the step is kept or dropped on those lines.
+- **No hidden caps on what the reviewer sees.** The picture lists every concentration with its total. Each territory's `excluded` line counts the keys left out because a gate caught them with the rule present. `structure-explorer` runs for every artifact the review acts on, not the top three.
+- **A review with no framing opens with its question answered:** a short direction-level reading of what the window's residual says against the repo's objectives, before any decision.
+- **The largest option is weighed beside a pure deletion,** each with its cost, and a largest option that adds machinery is weighed against the deletion first.
+- **A read-only review has a supported workaround read:** it drops `record` from the pipeline, so the probes run and print and nothing is written. A read-only run also goes on past a peer review in flight, naming it in the record.
+- **The recommendation is the smallest sufficient option.** Waiting, the deletion, and the largest option weigh the same; a wait argues it is enough, with the count, the rule's state, and the trigger that would make it act. A part that answers nothing the window measured is left out and named as not taken.
+- **`evidence-reader` takes an occurrence's class from its own `Escaped:`/`Gate-run:`/`Caught:` line** where it has one, and judges from the text only where it has none.
+- **Held cases that never arrive mean the blind step did not run.** The `Blind:` line says so and why; the reviewer never reads the occurrences itself in their place.
+- **`evidence-reader` reports `marker-stream.py`'s marker counts as printed,** never its own tally.
+
+### Fixed
+
+- **The retro's transcript record no longer drops state-changing commands past the sixth** in one Bash call. A DID's `[ran: …]` lists them all.
+
+### Removed
+
+- **Length and cost limits aimed at verbose model output.** `finding-placer` no longer works to a time budget; the review drops its economics line and `Economics:` marker line, the one-word recommendation, and the ledger's 12- and 3-line entry limits; `/threads:retro` drops the eight-line occurrence limit, the capture bar's read-cost reasoning, and the one-sentence form of its ripeness nudge.
+- **The process-review anti-patterns list, the memory-store intersection, and the staleness ranking by growth-since-touch and sibling variance.** The anti-patterns restated rules stated above them. The staleness sweep keeps reachability and dead referents.
+
+### Contract
+
+- **Run in Kraken:** `/threads:process-review` read-only from the working tree at 1678c09 (framed: the copy guidelines) and 9a55b2d (unframed). The second resumed `evidence-reader` for its held cases after the blind hypotheses, and the cases changed two of three rulings. Kraken's reconcile landed at 8d5538c6e. Then two read-only unframed runs at b41cdae and 3c608fd: the unframed opening, the largest option beside a pure deletion, the workaround read without `record`, and a run past a busy peer each held; the second recommended a wait on one occurrence, naming its trigger, its largest option, and its deletion.
+- **`trigger.n` and `trigger.concentration` are ignored.** Adopter-side edit: delete both from `.claude/threads.json`, and list the repo's process-direction doc in `invariantDocs` if it is not there. `trigger.cluster` is unchanged.
+
 ## slices [0.15.0] — 2026-11-06
 
 ### Added

@@ -7,20 +7,18 @@ The review reads the ledger in full every run, so it carries only what a future
 review acts on: three sections, each entry a top-level bullet.
 
   ## Live …            what was deferred, why, its promoting signal, and one
-                       `last checked: <date> — <state>` line; each entry at most
-                       12 lines. An entry may carry one `wake: <condition>` line —
+                       `last checked: <date> — <state>` line. An entry may carry
+                       one `wake: <condition>` line —
                        a key occurrence, a path touched, a date — and is then
                        dormant: the review reads the wake line each run and
                        re-measures the entry, rewriting `last checked`, only on a
                        run where the condition holds
-  ## Falsifications …  kept whole; no cap
-  ## Resolved …        a pointer at the landing commit; at most 3 lines
+  ## Falsifications …  kept whole
+  ## Resolved …        a pointer at the landing commit
 
 Findings: any other section (a per-window review log belongs in the review's own
 marker commit); a dated window line inside a Live entry (`09-04: no fire`,
-`Re-deferred 2026-09-02:`) — the state is rewritten in place, not accreted; a Live
-entry over 12 lines; a Resolved entry over 3 lines. Both caps are per entry; the
-sections have no cap of their own.
+`Re-deferred 2026-09-02:`) — the state is rewritten in place, not accreted.
 
 Scope: `--paths` names the ledger(s) — each entry a root-relative file, or an fnmatch
 glob where `*` crosses `/` as in a git pathspec; a literal is tried first, so a name
@@ -51,7 +49,6 @@ H2 = re.compile(r"^## (.*)$")
 BULLET = re.compile(r"^- ")
 WINDOW = re.compile(r"(?<![\w-])(?:20\d\d-)?\d\d-\d\d[a-z]?:")
 SECTIONS = ("live", "falsifications", "resolved")
-LIVE_CAP, RESOLVED_CAP = 12, 3
 
 
 def refuse(msg):
@@ -186,7 +183,7 @@ def section_of(title):
 def check(text):
     out = []
     section = None
-    entry_start, entry_lines, entry_windows = None, 0, []
+    entry_start, entry_windows = None, []
 
     def close():
         if entry_start is None:
@@ -195,18 +192,12 @@ def check(text):
             for n in entry_windows:
                 out.append((n, "per-window line; rewrite the state in place and keep one "
                                "`last checked: <date> — <state>` line"))
-            if entry_lines > LIVE_CAP:
-                out.append((entry_start, f"live entry is {entry_lines} lines (cap {LIVE_CAP}): "
-                                         "what, why, promoting signal, last checked"))
-        elif section == "resolved" and entry_lines > RESOLVED_CAP:
-            out.append((entry_start, f"resolved entry is {entry_lines} lines (cap {RESOLVED_CAP}); "
-                                     "a pointer at the landing commit, the narrative lives there"))
 
     for n, line in enumerate(text.splitlines(), 1):
         m = H2.match(line)
         if m:
             close()
-            entry_start, entry_lines, entry_windows = None, 0, []
+            entry_start, entry_windows = None, []
             section = section_of(m.group(1))
             if section is None:
                 out.append((n, f'section "{m.group(1).strip()}" is not Live, Falsifications, or '
@@ -216,10 +207,9 @@ def check(text):
             continue
         if BULLET.match(line):
             close()
-            entry_start, entry_lines, entry_windows = n, 0, []
+            entry_start, entry_windows = n, []
         if entry_start is None or not line.strip():
             continue
-        entry_lines += 1
         if section == "live" and WINDOW.search(line):
             entry_windows.append(n)
     close()

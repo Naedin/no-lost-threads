@@ -239,10 +239,7 @@ context that work requires.
 
 A nil-cost, unmatched finding — a friction noticed and measured before it cost anything, a
 near miss a doc already covers — goes in the punch list under *below the bar* with the
-reason, and is not appended; the user can say *append it*. Every single-occurrence key is
-carried at read cost by every review until it recurs or is retired, so the bar is what
-keeps the substrate readable: the dedup design is right, the volume feeding it is what the
-bar limits. **A positive is never appended.** It stays in the report — a prevented error
+reason, and is not appended; the user can say *append it*. **A positive is never appended.** It stays in the report — a prevented error
 shown as an observed correction is worth the reader's line — and nothing downstream reads
 it: the review ranks by recurrence, and a `NOTED` key closes at write and counts nothing.
 The grammar keeps `NOTED` for the entries already in adopters' logs; retro writes none.
@@ -297,10 +294,8 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   LANDED 9f60e91e — docs/release.md §Rollback: the sibling carrier is amended in the same commit as the primary, and the commit names both; the second carrier was the one the rule kept missing.
 ```
 
-- **A new finding** → key line + one occurrence line, continuations to **eight lines at
-  most**: the cited moment, the cost, the placement (`Placement: file §section — amend
-  "…"`, or key-only the bare `Placement: file §section`). What does not fit goes where the placement points; the `guards`
-  `retro-log-size` check holds the cap where a repo enables it.
+- **A new finding** → key line + one occurrence line, continuation lines: the cited moment, the cost, the placement (`Placement: file §section —
+  amend "…"`, or key-only the bare `Placement: file §section`).
 - **A pointer names its section or item, never its number alone** — `Placement:`,
   `Caught:`, a status line's where. A numbered list renumbers when an item is inserted or
   removed, and a session never re-points a line afterwards.
@@ -315,7 +310,7 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   `Caught:`, so it ranks. Key-only, a rule you did not read counts as present, and the review
   verifies it. The view counts the occurrence and `--reached` does not rank it, so the
   review reads the count without re-ruling the doctrine each window; the next occurrence
-  no gate catches ranks the key regardless of count. It counts against the eight.
+  no gate catches ranks the key regardless of count.
 - **Every occurrence carries exactly one class line, and it says where the occurrence was
   stopped**: `Caught:`, `Gate-run:`, or `Escaped:` below, else `In-work: <what stopped it>`
   (the work itself, this session's own read, a cost spent inside the work). The first stop
@@ -333,15 +328,14 @@ scope-leak/edit-landed-without-exercising-the-sibling-path
   a finding it dropped or misjudged, rounds after its first catch → the ordinary key +
   occurrence, with one continuation line `Gate-run: <gate> — <what went wrong>`. It ranks
   at one occurrence, as an escape does; a gate that caught the slip at its first round and
-  cost nothing past it is `Caught:`, not this. It counts against the eight.
+  cost nothing past it is `Caught:`, not this.
 - **A finding that got past the last gate** — onto the default branch, into a release, or
   to the user → the ordinary key + occurrence, with one continuation line `Escaped: <where
   it reached> — <what it cost>`. It ranks at one occurrence, so write it only for what
   measurably got there (a commit on the default branch, a report from the user), never
-  for a slip a gate caught late. It counts against the eight.
+  for a slip a gate caught late.
 - **A finding whose artifact was fixed under §4b** → the ordinary key + occurrence, with
-  one continuation line `Fixed: <artifact> — <sha>`. It counts against the eight, so
-  compress the moment or the cost to make room — never the placement. No status line:
+  one continuation line `Fixed: <artifact> — <sha>`. No status line:
   the artifact is corrected, the lesson is still open, and a status line would close it.
   §4b runs before this append, so the sha exists when the line is written.
 - **After appending, read your own lines**: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py
@@ -439,13 +433,13 @@ path alone still greps.
 When any of the three fails, the defect still **leads the punch list**, as a defect with
 the edit specified — it outranks a process finding because it is live.
 
-## 5. Ripeness nudge — one line, at the end
+## 5. Ripeness nudge — at the end
 
 The log has just grown, and at closeout *opening a new thread* is an available next move.
 Read `.claude/threads.json`; skip this step entirely if there's no config, no `markTag`
 tag, or nothing accrued.
 
-Measure — four commands, after `git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`
+Measure — three reads, after `git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`
 (a review advances the mark by force-push, which a plain fetch never takes; no remote →
 skip the fetch):
 
@@ -462,27 +456,21 @@ skip the fetch):
   of the mark's own day, the ones the review just ruled on included, as new. Those are the
   classes a ruling turns on; a caught or in-work occurrence is telemetry, so a key that
   recurred only at a gate or inside the work is counted and never makes the review ripe.
-- **Volume and concentration** — `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py
-  files`: the **organic** markers since the mark and how many files `trigger.concentration`
-  or more of them touched. The review's own landings (the `Process-Review:` trailer) and
-  commits that touched only the log and the ledger are classified out — counting them is
-  how a review comes out ripe on its own output the next run.
 - **Clusters** — `retro-log.py view --placements --ripe --since <markTag>`: a file placed
   at by `trigger.cluster` or more live keys with an escaped or gate-run occurrence, one of
   them new since the mark, fires — single findings that together say one doc is not being
   followed past its gates.
 
-**Ripe** means one of: a key escaped or gate-run since the mark; a placement cluster fires; organic
-markers at or above `trigger.n`; a file at or above `trigger.concentration`. Pending captures alone are not
-ripe — they are the substrate waiting to recur, and a review run on volume pays for the
-funnel to learn that nothing recurred. Say something only when pending is non-zero or a
+**Ripe** means one of: a key escaped or gate-run since the mark; a placement cluster fires.
+Process commits are rule changes, not residual, and never make a review ripe; nor do
+pending captures alone, which are the substrate waiting to recur. Say something only when pending is non-zero or a
 bar is met; when neither holds, say nothing — the review is current, and a nudge with
-nothing behind it is the same failure as one nobody heard. Then **one sentence, naming
-ripe or not ripe and teasing the finding rather than the count**, and telling this
+nothing behind it is the same failure as one nobody heard. Then **name ripe or not ripe,
+teasing the finding rather than the count**, and tell this
 session's appends apart from older unreviewed ones — *"six findings are pending, all from
 this session, none recurred: not ripe"* is a different report from *"nine findings are
-pending, one key recurred since the last review, and one doc has churned across four
-organic process commits,"* and only the second is a backlog.
+pending, one escaped since the last review, and three more sit on the same doc,"* and only
+the second is a backlog.
 
 **Point at a fresh thread, and never offer to run it here.** `/threads:process-review`
 requires a context that did not do the work under review, and this one just did. Say they

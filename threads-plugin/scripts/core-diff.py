@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""core-diff — each core doc's window, so step 0a reads the core as churn and not only
-as authority.
+"""core-diff — each direction doc's window, so the review reads its direction as churn and
+not only as authority.
 
   core-diff.py [summary|diff DOC|self] [--since REV] [--head REV] [--days N] [--root DIR]
 
-Step 0a reads `invariantDocs` whole every run and reports which bore on a ruling. A doc
+The review reads `invariantDocs` whole every run and reports which bore on a ruling. A doc
 read whole can still grow unread: a slice PR's squash lands a paragraph in it, no marker
-names the change, and eleven weeks later the doc is twice its size and bears on nothing —
-which the economics block then reports as grounds to stop reading it, when the question
-was why. This script reads each core doc's own window, the range the marker stream reads.
+names the change, and eleven weeks later the doc is twice its size and bears on nothing.
+This script reads each core doc's own window, the range the marker stream reads.
 
 `windowOnlyDocs` is the second list: docs the review watches as churn but never opens
-whole at 0a — a direction or principles doc that bears on no ruling until a finding names
-it, when step 6 reads it as a keyed read. Both lists feed the summary; a path in both is a
-malformed config.
+whole — a doc that bears on no ruling until a finding names it, when the review opens
+it. Both lists feed the summary; a path in both is a malformed config.
 
 Modes:
   summary  (default) one header line, then one line per doc, `invariantDocs` in order

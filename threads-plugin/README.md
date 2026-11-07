@@ -44,9 +44,8 @@ premature lock-in, mode confusion, and stale workflow habits.
 - **Capture has a bar.** A finding is appended when it cost the session something, when
   it matches a key already in the log, or when it is severe on its face. A nil-cost
   friction that matches nothing is reported and not appended (say *append it* to
-  override), and what worked is reported and never appended: every key the log carries
-  is read by every later review until it recurs, and the review ranks by recurrence, so
-  a key that can never rank is pure read cost.
+  override), and what worked is reported and never appended: the review ranks by
+  recurrence, and a positive never recurs.
 - **"If it recurs" becomes measurable.** The placer gives each finding a short,
   domain-free key and checks it against the log, so *adopt if it recurs* is settled by
   looking rather than by hoping — the second time a friction shows up, retro says so and
@@ -88,108 +87,49 @@ still only skips the audit.
 
 ## `/threads:process-review` — the cross-session review
 
-One altitude up from retro. Six sessions can each add a slightly-different local rule
-that *together* should have been one structural change — and no single session can see
-it. `/threads:process-review` reads the accumulated stream of **process-shaped
-commits** (changes to *how you work*: rules, traps, templates, workflows) and surfaces
-reconciliation and structural candidates, ranked, with the commits that feed each one.
+One altitude up from retro. Six sessions can each add a slightly different local rule
+that together should have been one structural change, or one deletion, and no single
+session can see it. `/threads:process-review` reads what accumulated across sessions and
+proposes what to change, replace, or delete.
 
-- **First run bootstraps by inspection, read-only.** It reads your repo's existing
-  conventions and *negotiates* a marker convention that fits (default
-  `docs(process/<scope>):`, adapted to your commit style), proves the pattern fires,
-  and asks before writing anything. The negotiated convention lives in
-  `.claude/threads.json` — one visible source both commands read.
-- **No telemetry yet?** It falls back to clustering churn on your process docs across
-  existing history, so the first run has material on day one — and tells you what the
-  marker convention would sharpen.
-- **A staleness sweep covers the negative space.** Churn only surfaces what changed;
-  stable workflow docs (a command pipeline in `.claude/commands/`, a long-standing
-  rule) can quietly fall behind a growing repo without generating any telemetry. The
-  review ranks process and workflow docs by growth-since-last-touch and by whether
-  siblings that should co-evolve did, then git-blames the survivors to point at their
-  stalest sections. Staleness alone earns a scrutiny note, never a rewrite proposal.
-- **It reads what's pending first.** Findings captured by `/threads:retro` are the only
-  already-adjudicated material in a window — you ran the retro that captured each one — so the review leads
-  with them, ranks any key that shows up more than once, and is free to re-rank what a
-  single session called urgent now that it can see across sessions. Findings that each
-  stayed at one occurrence but pile up on one doc are a cluster, read together as one
-  candidate to cut, command docs first.
-- **`/threads:retro` tells you when a review looks ripe.** One sentence at the end of a
-  retro — what's pending, whether anything recurred since the last review, and what's
-  churned — delivered at closeout, when the backlog has just grown and opening a new
-  thread is the natural next move. No hooks ship: a nudge at session start would compete
-  with the task you just asked for. It always points you at a *fresh* session, since the
-  review can't run in the one it reviews. Never urgent, never acted on unprompted. *Ripe*
-  means a finding escaped past the last gate or a gate itself misran since the last
-  review, a doc's cluster of those grew, or the organic process commits crossed a bar;
-  pending captures, and a shape a gate keeps catching with its rule present, never make a
-  review ripe alone.
-- **The review does not count itself.** Every commit the review lands carries a
-  `Process-Review: <date>` trailer, and a commit that touched only the log or the ledger
-  is bookkeeping; `scripts/marker-stream.py` classifies the stream into organic, review,
-  and bookkeeping, and only the organic commits feed the trigger and the ranking. Without
-  that, a review that lands twenty commits makes the next review look ripe on
-  its own output.
-- **It reads a small core, then only what its findings name.** `invariantDocs` is the
-  handful of docs stating your repo's authority order and the review's own conventions,
-  read every run; `windowOnlyDocs` are the docs it watches as churn and opens only when a
-  finding names them. Every other doc is opened whole only when a recurred key or a fired
-  ledger signal points at it (`retro-log.py view --recurred --docs` derives the list from
-  the log), at the moment it bears; a doc the window's churn points at is read as its
-  diff, and the placer is the only whole read of an edit's target. The core's own window
-  is read too (`scripts/core-diff.py`): a core doc grows through squashes no marker
-  names, and one that doubled while bearing on nothing is a trim finding, never a reason
-  to stop reading it. So is the review's own weight (`core-diff.py self`): its landings
-  fall before the mark moves, so no window counts them, and a file it grows run after run
-  is a growth finding against the review.
-- **It samples whether a prose rule holds.** A lint proves itself at its gate; a rule an
-  agent is supposed to apply — *a comment states only what the code makes true* — has no
-  gate. A rule declared under `adherenceRules` (a whole-tree population command, your judge
-  prompt, a draw size, `window` or `uniform` weighting, an optional `floor` of change) is
-  sampled at each review whose range reaches the floor — the range starting at the rule's
-  last sample, so a review that skips it loses nothing: a seeded
-  draw of distinct blocks, one fresh-context judge ruling each TRUE / DRIFTED / HISTORY
-  against the tree, one refuter re-checking every flag (the script checks each agent's
-  output; nothing is hand-assembled), and an `Adherence:` line in the marker commit — a
-  trend one `git log` reads, a lower bound since only flags are re-checked. A drift shape seen in two windows becomes a review candidate.
-  **`/threads:adherence`** runs the same sample standalone, landing nothing: a baseline
-  over one window, or a calibration over a fixed block list in a tree pinned to a commit.
-- **It reads a key's chain before counting it.** Sessions patch what they hit before a
-  review comes round, and parallel sessions hit one condition at once, so a count is not
-  a recurrence by itself. `retro-log.py view --chain` orders each key's occurrences, at
-  their capture time, with the process commits that touched its placement, and `--outside`
-  adds every key a session closed itself in the window; the review rules each key a burst
-  (one incident), patched (its status line cites the patch; one that only bounds the cost
-  is partial and names the cost driver as the open half), or unpatched, and names any
-  process commit that answers no key, since nothing else counts its recurrence.
-- **It tests the risk registry** a slices adopter keeps. `risk-review.py` joins the
-  window's plan profiles with what escaped them, per class and, for unclassified work, by
-  area. The review then proposes adding a class, revising a check, promoting a predicted
-  class, or retiring one on evidence it is wrong. A dormant class is left alone.
-- **It retires workarounds when their tool moves.** A rule that exists because a tool
-  behaves as it does today sits in a register (`workaroundsPath`) with the version it was
-  seen on and a probe that reproduces it, or a re-test where no command can. The review
-  runs only the probes whose tool moved, in its own shell, and proposes deleting what no
-  longer reproduces. An optional changelog read, filtered to the surfaces you name, catches
-  what a version number and a probe cannot, such as a new capability that replaces a workaround. A finding whose
-  cause a tool owns, or a hook already enforces, is placed `out of doc`: fixed in its owner,
-  or counted, never restated as a rule.
-- **It closes with its own economics**, as questions to you, each carrying the review's
-  own answer and the default it acts on, or why only you can answer it: what it read
-  against what bore on a ruling, how much of the marker stream was its own weight, how
-  many keys it carried against how many recurred, and its own landing errors — and the
-  standing question, *what should the next run stop reading?* A question whose answer
-  could change a decision row is worked before the table is written. Its own misses go
-  there, never into the log it is trying to keep small.
-- **Nothing silent.** Applying anything requires recorded consent (`applyMode`,
-  starting `read-only`, ratcheting by an answer to `apply-on-approval` and then to
-  `apply-mechanical`, where a run nobody is answering lands wording amendments and trims
-  itself and holds everything else); every run states which inputs it used and what the
-  next tier up would buy.
+- **It starts from your diagnosis when you have one.** `/threads:process-review the copy
+  guidelines are broken` makes that the run's question, and the retro log is evidence for
+  or against it. Without one, the question is what the window's residual says.
+- **It reads residual, not rule churn.** Residual is what gets caught after the work is
+  done: your corrections, review and gate findings, escapes. It is read as a rate per
+  stretch of work, to diagnose, never as a target. Residual piling up in one doc's
+  territory while its rules are followed makes the doc the suspect. Process commits are
+  read beside it as what changed near it.
+- **It works at direction altitude.** A delegate (`evidence-reader`) reads the raw
+  incidents: the log through its view, each key's chain, the process-commit stream, the
+  risk registry, and docs nothing routes to or that point at nothing. It returns a
+  compressed picture of where residual concentrates, what changed near it (a rule change,
+  a tool version, a new area of work), and how much upcoming work runs through it. The
+  reviewer weighs that against the docs you name as your direction (`invariantDocs`) and
+  decides: act now, let more work narrow the cause, or leave.
+- **It asks whether the approach is wrong before patching.** For each doc it acts on,
+  `structure-explorer` proposes different shapes for the doc's job, after checking how
+  others solve the same problem. The review names the largest option and its cost beside
+  the one it recommends, and a replacement reaches you whole, never cut back into patches.
+- **Deletion costs no more than addition.** A wrong rule is answered by deleting it. Under
+  `apply-mechanical`, a named deletion lands unanswered just as an addition does.
+- **You read one block.** The output opens with the decisions that need you: a table when
+  there are several, a short paragraph when there is one call about a whole doc. The record
+  below it is for the commit body and the next run, and nothing that could change your
+  answer is only there.
+- **It samples whether a prose rule holds** (`adherenceRules`; `/threads:adherence` runs the
+  sample standalone), and **retires workarounds when their tool moves** (`workaroundsPath`,
+  each workaround carrying a probe or a re-test).
+- **First run bootstraps by inspection, read-only**, negotiating a commit marker that fits
+  your style and proving it fires. Every commit the review lands carries a
+  `Process-Review: <date>` trailer, so it never reads its own output as change.
+- **Nothing silent.** Applying anything requires recorded consent (`applyMode`, starting
+  `read-only`, ratcheting by an answer to `apply-on-approval` and then `apply-mechanical`).
 
-`/threads:retro` feeds this loop from both ends: findings it captures are the pending
-stream, and anything you do land straight from a retro becomes a marker commit — the
-landed stream. Retro captures; process-review lands.
+`/threads:retro` feeds the loop: what it captures is the review's evidence, and it closes
+with a one-line nudge when a review looks ripe (a finding escaped or a gate misran since
+the last review, or a doc's cluster of such findings grew). Retro captures;
+process-review lands.
 
 ## Install
 
@@ -215,10 +155,11 @@ drops the audit. The self-pass needs nothing beyond Claude Code itself.
 threads-plugin/
   .claude-plugin/plugin.json      Plugin manifest
   commands/retro.md               The /threads:retro command — flow, args, and output
-  commands/process-review.md      The /threads:process-review command — bootstrap, funnel, output
+  commands/process-review.md      The /threads:process-review command — bootstrap, the review, output
   agents/retro-auditor.md         Read-only sub-agent for the fresh-context audit (its brief)
   agents/finding-placer.md        Read-only sub-agent that sites findings in your process docs (both commands)
-  agents/structure-explorer.md    Read-only sub-agent that asks whether a doc's whole approach is the problem (review step 6)
+  agents/evidence-reader.md       Read-only sub-agent that reads the window's incidents and returns where residual concentrates
+  agents/structure-explorer.md    Read-only sub-agent that asks whether a doc's whole approach is the problem
   commands/adherence.md           The /threads:adherence command — a declared rule's sample (a review phase, or standalone)
   agents/adherence-judge.md       Read-only sub-agent that rules each drawn block against the tree
   agents/adherence-refuter.md     Read-only sub-agent that tries to show each flagged block true

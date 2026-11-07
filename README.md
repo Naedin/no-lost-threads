@@ -71,8 +71,8 @@ See [`threads-plugin/README.md`](threads-plugin/README.md) for the full loop.
 Three explicit-only commands carrying the smallest slice-pipeline habits that pay
 immediately: **`/slices:capture`** files a one-concern, low-trust stub the moment
 work is discovered; **`/slices:draft`** promotes a stub into a plan that
-re-verifies the capture's claims and ends in a review digest (shape + at most
-five tension points); **`/slices:check`** hands the plan to a fresh-context
+re-verifies the capture's claims and ends in a review digest (shape + every
+tension point, ranked); **`/slices:check`** hands the plan to a fresh-context
 adversary told only its path — no plan is implement-ready until it survives. The
 artifacts are the contract, so later hardening (lint, ledgers, gates) only
 appends to them. Full spec: [`slices-plugin/README.md`](slices-plugin/README.md).

@@ -1,5 +1,5 @@
 ---
-description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code and size its frame first (every shape weighed on value and cost, the record reviewed cold), carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus at most five tension points). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
+description: Promote an inbox stub into a slice plan — re-verify the capture's claims against current code and size its frame first (every shape weighed on value and cost, the record reviewed cold), carve out anything bundled, then write a plan that ends in a review digest (a cold-readable Shape paragraph plus every tension point, ranked). The stub is deleted in the promotion; the plan is not implement-ready until gap-checked.
 argument-hint: "<stub path, or the concern to promote> [frame: <the shape picked at a frame stop>] [frame owner: <orchestrating session>]"
 allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent
 ---
@@ -8,12 +8,10 @@ allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent
 
 **The contracts this command serves:** a capture's claims are **re-verified before
 anything is built on them** — a stub is a low-trust artifact and says so on its
-face. And a plan is **built for review by a human with limited time**: it ends in
-a review digest — one cold-readable **Shape** paragraph, then at most five
-**tension points**, each a genuinely contestable decision with the pull in both
-directions. The cap is the digest's, never the plan's: the plan's Tensions section
-holds every contestable call, compressed, and the digest carries the five that most
-need the reviewer. The maintainer reviews the tensions, not the whole plan.
+face. And a plan ends in a review digest — one cold-readable **Shape** paragraph,
+then the **tension points**, each a genuinely contestable decision with the pull in
+both directions, ranked by how much the maintainer's judgment could move them. The
+maintainer reviews the tensions, not the whole plan.
 
 A **slice** is one coherent change argument, independently verifiable, completable
 in a single fresh session — carved as large as its coherence requires and bounded only
@@ -434,8 +432,7 @@ Write exactly this shape. Nothing here changes when a repo has no template:
 <every decision made in this plan that is genuinely contestable, one compressed entry
 each, stated as the call taken, with the pull in both directions and the lever — what
 overriding it costs: a cheap re-carve, or a reshaped slice. No cap: compress entries,
-never omit one. This section is what gets reviewed; the digest (§4) carries the five
-that most need the reviewer>
+never omit one. This section is what gets reviewed; the digest (§4) carries it, ranked>
 
 ## Verification ledger
 
@@ -561,10 +558,8 @@ that's a capture update, not a promotion.
 ## 4. Close with the digest
 
 End in-thread with the review digest — the Shape paragraph verbatim from the plan, then
-at most five tension points, ranked by how much the maintainer's judgment could move
-them; the rest ride the plan's section only. The cap is the digest's: a later session
-cold-reading the plan needs every tension, and a human with limited time needs the five
-that matter. **Re-run the rows first.** The draft went on changing the tree after it measured
+every tension point from the plan's section, ranked by how much the maintainer's
+judgment could move them. **Re-run the rows first.** The draft went on changing the tree after it measured
 it — spin-off stubs, the promoted stub's delete, the commit when this run makes one — so after
 the last of those, `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger-row.py rerun <plan>`. A row the
 draft itself moved is recorded again through the writer (the same command replaces its row),
@@ -597,10 +592,6 @@ check exists precisely because this context just wrote the plan.
   shape avoids, and the trade is the frame owner's.
 - **A plan with no tensions.** Zero contestable decisions means either the slice
   is trivial or the contestable calls were made silently. Say which.
-- **More than five tensions in the digest** — that's the whole plan re-litigated in
-  chat, the reading cost the digest exists to remove. The plan's section is uncapped;
-  the digest is the filter, and omitting a tension from the section to fit the digest is
-  the inverse failure.
 - **Promoting a bundle.** One slice per plan; carve first.
 - **An Out item the slice leans on.** An item without which an in-scope surface is wrong
   or hands the user a chore is a dependency (§1), pulled in or stopped on, never deferred —

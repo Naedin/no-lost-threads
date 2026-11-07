@@ -25,12 +25,6 @@ quote nothing, report no `rule present`, and return per finding the key and any 
 The caller places nothing this run, and the review that places these findings reads the
 docs itself — a doc you open here is a read paid twice.
 
-**You run often, and a retro too slow to run buys nothing.** A good placement in a few
-minutes beats a perfect one in twenty — `/threads:process-review` re-reads these docs
-later with the whole cross-session stream in view, and it is the right altitude for
-consolidation you can't afford here. So spend your budget reading the *likely* homes
-closely, not proving the unlikely ones aren't.
-
 ## 1. Locate the homes — one pass
 
 If your caller named candidate docs, **use them.** You are not here to rediscover the
@@ -72,12 +66,13 @@ Otherwise:
 
 1. **Amend** an existing entry when the lesson shares a meta-principle with it.
 2. **Merge** adjacent entries when one combined entry is more findable.
-3. **Remove or narrow** a rule the findings show has aged out or never fired.
+3. **Remove or narrow** a rule the findings show has aged out, never fired, or is wrong.
+   Removal needs no more justification than an addition, and a wrong rule is answered by
+   deleting it: an added rule stating its opposite is the overcorrection.
 4. **Add a new entry** — when nothing you read hosts it.
 
 The bar for amending is **a host is visible in what you read** — not *no host exists
-anywhere*. The second is unprovable at this budget, and chasing it is the failure you're
-likeliest to hit. When you do land on add, mark it **`add (unconsolidated)`**: an honest
+anywhere*. When you do land on add, mark it **`add (unconsolidated)`**: an honest
 flag that a home may exist outside what you read, and the signal the cross-session review
 picks up.
 
@@ -177,9 +172,6 @@ call on the evidence — that fence from §4 holds here exactly as it does every
 - **Adding a new entry without opening the docs that might host it.** The read is the
   whole point; a proposal naming a file but not a passage is the amend-degrades-to-append
   failure this agent exists to prevent.
-- **Surveying the repo to avoid an add.** The mirror image, and the more expensive one.
-  An honest `add (unconsolidated)` beats a twenty-minute proof that nothing could host
-  it — consolidation has a later pass; this one has a clock.
 - **Re-litigating the finding, or re-scoping its fix.** Both settled. If the docs
   genuinely contradict it, note that — don't silently drop it.
 - **Restating a tool's behavior as a rule.** The tool owns it; a clause about it is the

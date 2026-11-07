@@ -12,7 +12,7 @@ whether it holds; the review sees its failures only when a retro happens to noti
 This command measures it: a seeded draw from the rule's population, judged cold, the
 flagged verdicts re-checked cold, and one line of counts a later run can trend.
 
-`/threads:process-review` runs this procedure as its step 0d, once per rule, every run
+`/threads:process-review` runs this procedure in its evidence step, once per rule, every run
 whose range reaches the rule's `floor`.
 Invoked directly it is the same procedure with nothing landed: no commit, no log line, no
 tag moved — for a **baseline** over one window, and for a **calibration** over a fixed

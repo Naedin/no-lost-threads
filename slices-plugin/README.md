@@ -35,10 +35,8 @@ a virtue: where the coherent change already fits one context, it ships whole.
   owner rather than being deferred;
   bundled concerns are carved into separate stubs; the stub is deleted in the
   promotion. The plan ends in a **review digest** — a cold-readable Shape
-  paragraph plus at most five tension points — so a human with limited time
-  reviews the contestable decisions, not the whole plan. The cap is the digest's;
-  the plan's own Tensions section carries every contestable call, compressed, never
-  omitted.
+  paragraph plus every tension point, ranked — so the maintainer reviews the
+  contestable decisions, not the whole plan.
 - **`/slices:check <plan>`** — the fresh-context gap check. A sub-agent that did
   not write the plan, handed **only its path** (withholding the drafting context
   is load-bearing), tries to break it: reads the frame first and calls a frame narrower than the

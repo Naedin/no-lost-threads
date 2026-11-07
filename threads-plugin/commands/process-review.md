@@ -1,1054 +1,373 @@
 ---
-description: Cross-session process review — reads accumulated process-change commits (and, as a fallback, process-doc churn) across sessions to surface reconciliation / structural opportunities the per-session retro structurally can't see, and sweeps stable process/workflow docs for negative-space drift the churn signal can't. First run bootstraps read-only; never auto-fires.
-argument-hint: "(no args; bootstraps on first run, else reviews since the process-review-mark tag)"
-allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent, SendMessage
+description: Cross-session process review — weighs where residual (what gets caught after the work) concentrates against the repo's direction, with delegates reading the raw incidents, and proposes what to change, replace, or delete. Takes the maintainer's own diagnosis as the run's question. First run bootstraps read-only; never auto-fires.
+argument-hint: "[the maintainer's framing, e.g. \"the copy guidelines are broken\"] [deep]"
+allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent, SendMessage, WebSearch, WebFetch
 ---
 
 # /threads:process-review — the cross-session process review
 
 "The maintainer" below means whoever decides for this repo, one person or several.
 
-The second altitude of the threads family. `/threads:retro` reviews **one session**;
-this reviews **across sessions** — the accumulated process changes — hunting patterns no
-single session can see: several over-specific local rules that should reconcile into one
-structural change, or a larger move to process / repo layout / tooling that no single
-slice surfaces.
+`/threads:retro` reviews one session and captures what it found to the retro log. This
+command reads across sessions and lands. It runs fresh by requirement: never in a session
+that did the work under review.
 
-It reads two streams produced by the repo's own work. **Process-shaped commits** (a
-change to *how we work* — a rule, trap, template, command behavior, workflow — not status
-flips, feature code, or product edits) are what has **landed**. The **retro log** is what
-is **pending**: every finding `/threads:retro` captured and no review has adjudicated yet.
-Retro captures; this command lands. That split exists because retro fires at maximum
-context — the most expensive moment in a session to apply an edit — while this command
-runs fresh by requirement and is the only one that can tell one friction from three of the
-same shape.
+**It works at direction altitude.** You, the reviewer, weigh what happened against the
+repo's direction and decide what to change. Delegates read the raw incidents and return a
+compressed picture: where residual concentrates, what changed near it, and how much
+upcoming work runs through it. A finding is evidence about a direction, not a request for
+a rule; a context full of incidents answers each one as an incident, one rule apiece.
 
-**Fresh context required.** Like every retro, this can't run anchored to the work it
-reviews. Run it in a session that did not do the work under review.
+**Deletion is a neutral move.** Removing a rule, a passage, or a doc needs no more
+justification than adding one. A wrong rule is often best answered by deleting it; a
+replacement stating its opposite is usually an overcorrection. Several mechanisms each
+pushing the same way add up to one too; prefer the simplest sufficient change.
 
-**Nothing silent.** First run is read-only. Writing is gated on recorded consent
-(`applyMode`), never inferred per-run. Every run states which tier it ran at and what the
-next tier up would buy.
+**Nothing silent.** The first run is read-only; writing is gated on recorded consent
+(`applyMode`); every run names what it read and what it skipped.
+
+## Argument — the run's question
+
+Text after the command is the **maintainer's framing**: their diagnosis ("the copy
+guidelines are broken", "pre-PR catches too late"). It becomes the run's question; the log
+is evidence for or against it, never a vote on whether to look. A framing opens the depth
+gate by itself, and a framing that names an artifact puts the whole artifact in question,
+not its sections one at a time. A framing scopes what the run rules on, not what it
+reports: any other opener that fired (a cluster, an escape, a ledger wake) gets one line at
+the foot of the decision block, left for the next run. Never measure a framing by asking the maintainer to
+produce more of it. With no framing, the question is *what does this window's residual
+say*. A bare `deep` runs the full read with no gate.
 
 ## Config — the single source
 
-The convention lives in `.claude/threads.json` (create on bootstrap; recommend
-committing it — conventions are team-visible). Both commands read it; never re-derive a
-convention in the moment. Fields:
+`.claude/threads.json` (created at bootstrap; commit it). Both commands read it; never
+re-derive a convention in the moment. A missing field takes its default, noted.
 
-- `markerPattern` — anchored (BRE) pattern matching a process commit's **subject**. Default
-  `^docs(process`. Match subjects only, never whole messages — a commit that merely quotes
-  a marker line in its body must not count. Character classes cover real conventions —
-  e.g. `^[a-z(]*process[:/)]` spans `docs(process/…`, `process: …` squash subjects, and
-  `chore(process): …`. Avoid `\|` alternation — it's a GNU extension in BRE and won't
-  travel; character classes are enough. **Editing this field later re-runs the proof**
-  (bootstrap step 3).
-- `processDocs` — paths that count as process docs (the churn fallback + silent-death
-  check read these).
-- `workflowDocs` — optional: files that describe one workflow and are expected to
-  co-evolve (e.g. a command pipeline). Absent → detected command directories
-  (`.claude/commands/` and the like), each directory treated as one set.
-- `trigger` — `{ "n": 10, "concentration": 3, "cluster": 3 }`: the volume backstop and the
-  distinct-commit re-touch bar, both over **organic** markers — the ones no review landed
-  and that changed something beyond the log and the ledger (Telemetry, below) — and the
-  placement-cluster bar: live keys placed at one file (step 0b). Read by
-  `/threads:retro` for its closing ripeness nudge, which calls a review *ripe* on a key
-  with an `Escaped:` or `Gate-run:` occurrence since the mark, on a cluster of such keys
-  with one new since it (`view --ripe`), or on either marker bar, and never on pending
-  captures alone: a caught or in-work recurrence is telemetry and never ripe by itself. `cluster` unset is the adoption state: the next
-  review reads the whole cluster backlog once (0b) and records the value.
-- `applyMode` — `read-only` | `apply-on-approval` | `apply-mechanical`. Starts
-  `read-only`. Once the user has approved candidates in two or more reviews, offer **once**
-  to ratchet to `apply-on-approval`; once they have approved the mechanical line as a batch
-  in two or more reviews, offer **once** to ratchet to `apply-mechanical`, under which a run
-  the maintainer is not answering lands the `trim` and `amend` candidates itself and holds
-  every other class. The offer says what it ratchets into: the candidates that pass the
-  tier's guards (Output) — in a repo whose `invariantDocs` covers most of its process docs,
-  that is the command docs and templates, and the offer names them. Record either answer
-  here and don't re-ask. The consent is the recorded value, never a run's reading of the
-  room; the ladder only goes up by an answer.
-- `retroTelemetry` — `true` | `false`: whether a finding landed **straight from a retro**
-  (its escape hatch, used only when the user asks to apply on the spot) gets a
-  `markerPattern` commit. Unset → retro offers once at its next such moment and records
-  the answer here. It has nothing to say about retro's default capture path, which writes
-  no commits.
-- `ledgerPath` — deferral ledger: what a *review* declined, plus the signal that would
-  promote it. Default `.claude/threads-review-ledger.md`.
-- `retroLogPath` — retro log: what *sessions* captured and no review has adjudicated yet.
-  Default `.claude/threads-retro-log.md`. An append-only stream `/threads:retro` writes;
-  `scripts/retro-log.py view` derives each key's state and count from it, and this command
-  is its only mutator, through `scripts/retro-log.py compact`, re-keying, and the two
-  corrections under *Maintain the retro log*.
-- `invariantDocs` — optional, **ordered** (highest authority first): **the core** — the
-  docs that state the repo's authority order and this review's own contract (its
-  conventions, anything it adds to this command). Read whole at step 0a, every run, before any commit, so
-  it is short by construction: a doc belongs here only if it outranks the commit stream
-  on *every* run. A domain doc — a traps catalogue, a UI guideline, a testing strategy —
-  is not core however true it is: it is read at step 6 when a finding names it (a
-  **keyed read**, derived per run from the findings themselves), and the placer reads it
-  again for the edit; listing it here reads it once for nothing. Absent → the review has
-  no input above the commit stream and says so.
-- `windowOnlyDocs` — optional, ordered: the docs the review watches as **churn and never
-  opens whole** at 0a — a product-direction or design-principles doc that outranks the
-  commit stream on the questions it states, and bears on none of this review's rulings
-  until a finding names it. `core-diff.py` reads both lists; step 0a reads these as their
-  window only, and a finding that names one opens it at step 6 as a keyed read. A path in
-  both lists is a malformed config. The move from `invariantDocs` to here is the answer
-  to a core doc that bore on nothing for two runs and is not the authority order or this
-  review's contract; it is never the answer for a doc that is.
-- `capabilityEvidencePath` — optional: a log of findings about *capabilities* — contracts
-  and rungs rather than doc sections. Only relevant where the repo builds tooling others adopt. It is the one input that can yield a non-doc proposal; without it the funnel is
-  doc-churn-shaped end to end. Written by this command alone — no other step in the system
-  appends here. Absent → narrate and skip, except in a repo that ships tooling to others
-  (a plugin directory, a published package of checks), where the narration is
-  a question the review asks **once**: set the path, or record `null` here to decline, and
-  the question is not asked again. Unset in such a repo, the review's only non-doc input is
-  missing and every upstream-bound finding has no store.
-- `adherenceRules` — optional: prose rules sampled at step 0d, each an `id`, a
-  whole-tree `population` command emitting `path:line:` hits, the adopter's `judgePrompt`
-  path, a draw size `n`, a `weighting` (`window` or `uniform`), and an optional `floor`
-  of change below which the rule is not sampled; the schema is
-  [`commands/adherence.md`](adherence.md). Absent → step 0d narrates and skips.
-- `workaroundsPath` — optional: the **workaround register**, the rules, hooks, and config
-  lines that exist because a tool (the harness, a CLI, an app, a dependency) behaves as it
-  does today, each naming the version it was seen on and a probe that reproduces it, or
-  the re-test a person runs where no command can; the
-  schema is `scripts/workarounds.py --help`. Read at step 0f. Absent → narrate and skip.
-- `placerModel` — optional: the model the `finding-placer` spawn runs under, a harness
-  short name passed through as given. Absent, the agent file's own pin applies.
-- `retroPlacement` — optional: `"full"` (default) or `"keys"`. `/threads:retro` under
-  `"keys"` keys findings without placing them and records a bare `Placement: file
-  §section` pointer (retro §3c); step 7's placer writes the edit. This command's own
-  placement is unchanged.
+- `markerPattern` — anchored BRE over commit **subjects** only. Default `^docs(process`.
+  Use character classes, never `\|` (a GNU extension). Editing it re-runs the bootstrap
+  proof.
+- `processDocs` — the paths that count as process docs.
+- `workflowDocs` — optional sets of files describing one workflow; absent → each detected
+  command directory is one set.
+- `trigger` — `{ "cluster": 3 }`: the number of live keys placed at one file that fires a
+  cluster. Unset → the next review reads the cluster backlog once and records it. (`n` and
+  `concentration`, if present, are ignored: they counted rule changes, not residual.)
+- `applyMode` — `read-only` | `apply-on-approval` | `apply-mechanical`; starts
+  `read-only`. After the maintainer has approved candidates in two reviews, offer once to
+  ratchet to `apply-on-approval`; after they have approved the mechanical line as a batch
+  in two reviews, offer once to ratchet to `apply-mechanical`, naming which docs its guards
+  leave reachable. Record the answer either way; never re-ask, never infer.
+- `retroTelemetry` — whether a finding the retro lands on the spot gets a marker commit.
+- `ledgerPath` — what a review declined, with its promoting signal. Default
+  `.claude/threads-review-ledger.md`.
+- `retroLogPath` — what sessions captured. Default `.claude/threads-retro-log.md`.
+  Append-only; this command is its only mutator.
+- `invariantDocs` — ordered, highest authority first: **the direction** — the docs you
+  weigh findings against: the repo's authority order, its process direction and
+  objectives, and this review's own contract. Read whole every run. A domain doc (a traps catalogue, a style guide) is not direction however
+  true; it is read when a finding names it. Absent → the review has nothing to weigh
+  against but the evidence, and says so.
+- `windowOnlyDocs` — optional: docs watched as churn and opened only when a finding names
+  them, such as a product direction too large to read every run. A path in both lists is
+  a malformed config.
+- `capabilityEvidencePath` — optional: findings about capabilities (contracts, rungs)
+  rather than doc sections, for a repo that ships tooling to others. Unset in such a repo
+  → ask once for a path or `null`, record it.
+- `adherenceRules` — optional: prose rules sampled each run; the schema is
+  [`commands/adherence.md`](adherence.md).
+- `workaroundsPath` — optional: the workaround register (`scripts/workarounds.py --help`).
+- `placerModel` — optional model for the `finding-placer` spawn.
+- `retroPlacement` — `"full"` (default) or `"keys"` (retro keys without placing; this
+  command places).
 - `markTag` — default `process-review-mark`.
 
-**The two files are separate on purpose.** The ledger holds decisions *not* to act and is
-read late, as a suppressor. The retro log holds findings already judged worth acting on
-and not yet landed — the highest-signal material in a window, read first. One file would
-serve two opposite jobs from one read position.
+The ledger and the log are separate on purpose: the ledger holds decisions not to act,
+read as a suppressor; the log holds findings, read first.
 
-If `.claude/threads.json` is absent, you are in **bootstrap** (below). If present but a
-field is missing, use the default above and note it.
+## Telemetry — residual, and the rule changes beside it
 
-## Telemetry — three kinds of marker, one of them counted
+**Residual** is what gets caught after the work is done: maintainer corrections, review and
+gate findings, escapes. In the log it is every occurrence classed escaped, gate-run, or
+caught; in-work occurrences are the work itself. Residual is read **as a rate per stretch
+of work** and **to diagnose, never as a target**. Its causes vary: a new area of work, a
+recent rule change, a model or harness change, the artifact, chance. Untangling them takes
+enough work to have run through the suspect territory.
 
-A marker commit is one whose subject matches `markerPattern`. Three kinds share the
-spelling, and only the first is telemetry:
+**Residual concentrating in one artifact's territory while its rules are followed makes
+that artifact the suspect.** "Rule present and read, output still wrong" is the tell.
 
-- **organic** — a process change no review has adjudicated: the retro's escape hatch, a
-  rule landed by hand, a slice's process commit. The trigger, step 1's ranking, and the
-  tally's headline read these.
-- **review** — a commit this command landed: a candidate, its `LANDED` lines, a
-  compaction, the ledger rewrite, the mark. **Every commit this command makes carries the
-  trailer `Process-Review: <today's date>`** (`git commit --trailer 'Process-Review:
-  <date>'`; `land-process-commit.py` preserves it through the cherry-pick), read on any line
-  of the body, since a hand-written message can split git's trailer block. Already
-  adjudicated: its sha is a `LANDED` ref, never churn. A review that counts its own
-  landings as the next window's churn is ripe on itself the next run, and spends
-  most of its read on what it wrote.
-- **bookkeeping** — a commit touching nothing but `retroLogPath`, `ledgerPath`, or
-  `capabilityEvidencePath`: a retro's capture, a status line. A status flip changed no
-  rule, whatever its subject says.
+**Marker commits are the rule changes**, the "what changed near it" for every
+concentration, never residual. Three kinds share the subject pattern: **organic** (a
+process change no review adjudicated), **review** (a commit this command made; every one
+carries the trailer `Process-Review: <date>`), and **bookkeeping** (touching only the log,
+the ledger, or the capability store). Only organic markers are read as change.
+`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py` (`count`, `list`, `files`,
+`--all`, `--head origin/<default>`) is the only stream read; a hand-rolled `git log |
+grep` counts all three kinds.
 
-`python3 ${CLAUDE_PLUGIN_ROOT}/scripts/marker-stream.py count` prints the four numbers
-for the window; `list` classifies each marker; `files` ranks the organic commits per file
-and counts the files at `trigger.concentration`; `--all` is the tally; `--head
-origin/<default>` reads the remote's branch. Every stream read below goes through it,
-never a hand-rolled `git log | grep` — subject-first order, the trailer, and the path
-test are three ways to get the number wrong by hand. **Until the mark passes the first
-trailered landing**, commits the review landed before the trailer existed still read as
-organic, so `files` ranks the last untrailered run's churn as if nobody had adjudicated
-it; narrate that for the one or two windows it holds, and read those clusters against
-the log's `LANDED` refs before ranking them.
+## Bootstrap — first run, read-only until the seed is confirmed
 
-## Bootstrap — first run (writes nothing until the user confirms the seed)
+No config, or no `markTag` tag → bootstrap. Inspect first, then ask only what inspection
+cannot answer.
 
-No config, **or** the `markTag` tag doesn't exist in the repo → bootstrap. Inspect,
-then negotiate with the answers in hand; do not interview blind.
+1. **Inspect.** Subject style (`git log --format=%s -50`); how changes reach the default
+   branch (a squash rewrites branch subjects, so the marker must match what lands); an
+   existing marker convention, mark tag, or hand-built log to adopt as-is; where process
+   lessons and direction live; command directories; `gh` and a memory store; tooling
+   shipped to others.
+2. **Report** what you found and which inputs and fallbacks apply.
+3. **Negotiate the marker**, default `docs(process/<scope>):` or one fitting the repo's
+   style, covering the squash spelling. **Prove it fires**: `marker-stream.py count --all
+   --pattern '<the pattern as it will be written>'`, and `list` for one sample per lane.
+4. **Confirm `processDocs` and `invariantDocs`.** Ask which docs state the repo's direction;
+   ask for `capabilityEvidencePath` where step 1 found tooling.
+5. **Seed** after confirmation: write the config and re-run the proof from the file; create
+   the retro log with a header that points at the grammar (`retro-log.py --help`), never
+   copies it, then `## Entries`; propose `<retroLogPath> merge=union` in `.gitattributes`
+   with a `guards` run on the merged tree in the landing step; `git tag <markTag> HEAD`;
+   then run one normal pass.
 
-1. **Inspect** (all read-only):
-   - Commit-subject style: `git log --format='%s' -50`. Is there an existing prefix
-     convention (`docs(...)`, `chore(...)`, Conventional Commits, or plain imperative)?
-   - **How changes reach the default branch** — direct commits, or squash-merged PRs
-     (subjects ending `(#NN)`)? A squash rewrites branch-side subjects, so markers on
-     branch commits die in the squash; the negotiated marker must match what actually
-     lands on the default branch, which may be a second spelling.
-   - Existing telemetry: does anything already match a plausible marker? Is there already
-     a `process-review-mark` tag or a prior home-grown flow? (The **migration case** — a
-     repo already running this convention must be *recognized and adopted as-is*, not
-     re-converted.)
-   - Where process lessons live: `CLAUDE.md`, `.claude/`, a patterns/traps doc, a failure
-     catalog, a hooks dir. Glob/read to locate; don't assume a structure.
-   - Workflow surface: command directories (`.claude/commands/` or similar) — these
-     become the default workflow sets for the staleness sweep.
-   - Enhancements present: `gh` on PATH + a GitHub remote? An agent memory store
-     (`MEMORY.md`)?
-   - Tooling the repo ships to others: a plugin directory, a published package of checks.
-     Present → `capabilityEvidencePath` has a job here, and step 4 asks for it.
-2. **Report** what you detected, which inputs you'll use, and which fallback tiers apply.
-3. **Negotiate the marker** — propose the default `docs(process/<scope>):`, *or* an
-   adaptation fitting the repo's existing style (e.g. a `chore(...)` repo → offer
-   `chore(process/...)`). Surface any collision with an existing convention **before**
-   adopting. In a squash-lane repo, negotiate a pattern covering the merge-lane spelling
-   too. Prefer character classes to `\|` alternation — `\|` is a GNU extension in BRE and
-   won't travel. Then **prove it fires**: `marker-stream.py count --all --pattern
-   '<the pattern exactly as it will be written to the config>'` against the history, and
-   `list` to see one sample subject per lane classified. A marker that fails its own test
-   is not adopted.
-4. **Confirm `processDocs`** — the one thing inspection can't reliably answer. Ask. Where
-   step 1 found tooling, ask for `capabilityEvidencePath` in the same breath: a path, or
-   `null` to decline; either is recorded, and the review never asks again.
-5. **Seed** (only after confirmation): write `.claude/threads.json`, then re-run the
-   step-3 proof reading the pattern back out of the real file; create the retro log at
-   `retroLogPath` with a header that **points at** the grammar and never copies it: *the
-   grammar is the threads plugin's `retro-log.py` docstring; `python3
-   <plugin>/scripts/retro-log.py --help` prints it* — then `## Entries` and nothing after
-   them. A copy in the header is a second source nothing refreshes (`compact` keeps the
-   header verbatim), so it reads as current while listing the tokens of a version ago;
-   the appending agent reads the grammar from `/threads:retro`'s own text, released with
-   the script. Propose `<retroLogPath> merge=union` for the repo's
-   `.gitattributes`, which is what lets concurrent sessions append, together with a
-   `guards` run on the merged tree in the repo's landing step, since a union merge runs
-   no pre-commit hook; tag
-   `git tag <markTag> HEAD`. Then run one normal pass so the first run delivers value.
-   **Migration case:** a repo already keeping a hand-built recurrence log should have it
-   adopted as `retroLogPath` if its entries can carry keys, not have a second one started
-   beside it.
+## The review
 
-The all-time tally (below) doubles as the bootstrap demo: *"your repo already shows N
-commits of process-doc churn — here's what this tool does with that."*
+**Pre-flight — one review at a time.** This command is the only mutator of the log and the
+ledger and moves a shared tag. `git fetch`, then
+`git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>` (a peer moves the mark by
+force-push, which a plain fetch never takes), and record `git rev-parse <markTag>` and
+`git rev-parse origin/<default>:<retroLogPath>`. Where the harness lists sessions, a review
+of this repo (same working directory and branch) already running means stop and say so; a
+read-only run, which writes nothing, goes on and names the peer in the record.
+Immediately before the first write, fetch and re-read both; if either moved, rebase onto
+`origin/<default>`, run the repo's commit gate on the rebased tree, re-read, then write.
+Refuse only on a conflict or a red gate.
 
-## The review — cheap → expensive (never read every diff)
+### 1. The direction and the question
 
-**Pre-flight — one review at a time.** This command is the only mutator of the retro log
-and the ledger and it advances a shared tag, and nothing else stops two reviews from running
-at once. Before reading anything, `git fetch` and record the two facts a peer run would
-move, **as the remote holds them, never as this checkout does**: `git rev-parse <markTag>`
-and `git rev-parse origin/<default>:<retroLogPath>` — a peer lands on the default branch
-while this checkout's head sits untouched, so a local read is unchanged in exactly the case
-the check exists for. The mark needs its own fetch,
-`git fetch origin +refs/tags/<markTag>:refs/tags/<markTag>`: a peer advances it with a
-force-push, and a plain `git fetch` never moves a tag this clone already has. The scripts
-that read the mark refuse a local tag the remote holds elsewhere and name that fetch.
-Where the harness exposes a session listing, look: a peer is identified by its **working
-directory and branch**, since a worktree name can repeat across repos — a review on this repo already in flight means stop and say so. Then,
-**immediately before the first write** (a log append, the ledger edit, `compact`, the
-tag), fetch the same two ways and re-read both facts. Either moved → a peer landed while this
-one ran: **re-derive, then write** — rebase onto `origin/<default>` (the log merges by
-union; the ledger is a working file), run the repo's commit gate, where it has one, on the rebased tree since a
-rebase runs no pre-commit hook, re-read the view, then write. Refuse only on a rebase
-conflict or a red gate; a run that has spent its budget is not thrown away for a clean
-rebase.
+Read `invariantDocs` whole, in order. These are what every finding is weighed against.
+State the run's question (the framing, or the default) and the objective it bears on, in
+the repo's own words where the direction names its objectives. Read each direction doc's
+window too: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/core-diff.py` (one line per doc), and for
+a doc with a window `core-diff.py diff <doc>`, each hunk classed **rule** (a predicate, a
+scope, a decision-relevant why) or **prose** (narration, a restated rule or why, a tool's
+behavior restated). Prose outrunning rules is a growth finding; two rules disagreeing at
+one moment, a conflict; a rule stated where its reader never arrives, a reach finding.
+`core-diff.py self` gives this command's own landings over 30 days: a file the review grew
+in two runs and trimmed in none is a growth finding against the review.
 
-0. **Free — the reads that size the run.** 0a–0c, 0e, and 0f are cheap; none is optional where
-   configured. Do them before looking at a single commit; 0d, the one paid step, follows.
+### 2. The evidence — delegated
 
-   **0a — the core** (`invariantDocs`, in order). Read them whole. You are about to
-   propose changes to how this repo works, and its stated invariants outrank anything
-   you will derive from a commit stream. **Name what you read in the output, and which
-   of it bore on a ruling** — the economics block carries both numbers. Then read each
-   one's **window as churn**: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/core-diff.py` (one
-   line per doc — words at the mark and now, words added and removed, commits), and for
-   each doc with a window, `core-diff.py diff <doc>`, each hunk classed **rule** (a
-   predicate, a scope boundary, a named exception, a decision-relevant why) or **prose**
-   (narration, a symbol enumeration, a restated why, a worked case restating a rule
-   already present, a tool's own behavior restated). A slice PR's squash lands a paragraph in a core doc and no marker
-   names it; a doc read whole every run can still double unread. **Word count is one
-   reason a written rule slips, never the target.** Read each window for three, each a
-   **finding** beside step 4's: **growth** — prose-only, or prose outrunning rules (remedy:
-   a trim); **conflict** — a rule that disagrees with or silently narrows another reachable
-   at the same moment (one rule kept, the other deleted or scoped); **reach** — a rule
-   stated where the agent at its firing moment never arrives (moved to where it fires, or
-   out of prose, step 6). A trim of an
-   enforced doc lands only after a fresh-context read comparing old and new, handed both
-   files and the exclusion list (wording, order, examples restating a present rule,
-   symbols, generic rationale) and never the trimmer's account. Each moved predicate it
-   reports is adjudicated like a review finding, not counted to zero: verified against the
-   doc it was routed to and the reader's real path to the moment the rule fires — who
-   reaches that moment, whether their command or doc already carries the rule, what
-   missing it costs. A confirmed loss is restored; a refuted one is overridden, with that
-   measured reason in the trim's commit. **A core doc that bore on nothing is grounds to ask why — growth, conflict,
-   or reach above — never grounds to leave the core**; only a doc that has stopped stating the repo's authority order or this
-   review's contract leaves it — to `windowOnlyDocs` when its churn still needs
-   watching, out of the config when it does not. A `windowOnlyDocs` entry is read here
-   **as its `core-diff.py` row and, when the row shows a window, its diff**, classed
-   the same way; a row at `+0 -0` has no diff to read, and opening the doc whole here is
-   the read the field exists to drop. Every other doc this run opens is a
-   **keyed read** (step 6): named by a finding, read at the moment it bears, never here.
-   **The output names each doc opened whole and each read as its window.** Neither list
-   → narrate and skip.
+Spawn `evidence-reader` (`subagent_type: threads:evidence-reader`), handed the repo root,
+`${CLAUDE_PLUGIN_ROOT}` resolved to its absolute path, the run's question, the objective it
+bears on and its constraint (maintainer attention: you will write them a short block),
+`markTag`, `retroLogPath`, `trigger.cluster`, `capabilityEvidencePath`, and the default
+branch. Never hand it your own leaning. It reads the log, the chains, the marker stream,
+the risk registry, and the capability store, and returns the picture: residual as a rate,
+its concentrations with what changed near each and its exposure, how the evidence bears on
+the question, the held proposals, and the log lines to write. No `Agent` tool → do its
+procedure here (its file is `${CLAUDE_PLUGIN_ROOT}/agents/evidence-reader.md`) and narrate
+that the incidents were read at reviewer altitude.
 
-   **Then the review's own weight**: `core-diff.py self` — per file, the words this
-   command's own landings added and removed over the 30 days back from its newest run,
-   which no window counts, since the mark passes them in the run that lands them. A file
-   the review grew in two or more of those runs and trimmed in none is a **growth** finding against the
-   review itself, ranked like any other, its remedy that file's trim; the record carries
-   the line. Read it whatever the lists hold: the file the review grows need not be core.
+Two reads stay here, each one call:
 
-   **0b — the retro log** (`retroLogPath`). The only already-adjudicated findings in the
-   window: a retro captured each one in front of whoever ran it, and a cold reader named its
-   shape unless the retro was `quick`. Read it through
-   the view's filters, never whole — the reads below are the run's reads, in order, and
-   each is one tool result at any log size. Note the commit they read the log at (`git
-   rev-parse HEAD`); the mark's advance reads what landed after it:
-   - `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py view --keys --held` — the last
-     run's unanswered proposals, each with the date it was held and its age in days. This
-     run reports them before anything new, oldest first.
-   - `view --keys --recurred` — every key at two or more occurrences, the promotion the
-     log exists to make visible. **Rank from `view --keys --reached`**: the same set with
-     the occurrences retro tagged `Caught:` (a gate caught the shape with its rule
-     present) left out of the test, so a shape a check keeps catching is counted and not
-     re-ruled, and any key whose untagged occurrence follows a tagged one ranks
-     regardless of count — the key line says `escaped <gate>`, and that is the shape
-     reaching implementation; a key holding one `Escaped:` or `Gate-run:` occurrence since
-     its last closing status ranks at one. The summary line carries both counts. `--reached` reads only
-     the tags; an untagged occurrence a gate caught is classed below and ruled count-only
-     by one `ADJUDICATED` line.
-   - `view --keys --since <markTag>` — what this window touched, to the commit: a line
-     the log at the mark did not hold. A date would read the mark's whole day, the last
-     run's own rulings included. The re-key sweep reads these plus the `(uncold)` ones.
-   - `view --placements --since <markTag>` — every live key grouped by the file its
-     occurrences are placed at, command docs first (read on every run of the command),
-     resolved the way `--docs` paths are. A file at `trigger.cluster` keys **fires** when one
-     of them is new since the mark, or, once weighed, when `trigger.cluster` of its keys
-     have an occurrence after the newest weighing: findings that each stayed at one occurrence, so no key recurs, and
-     together say the doc is not being followed. Counted like `--reached`:
-     a `Caught:` occurrence, a key ruled count-only after its last occurrence, and an
-     occurrence before a landing are left out, so a gate catching with its rule present is
-     not counted twice. With `trigger.cluster` unset, drop `--since`: every cluster at the
-     bar fires, the backlog read once; record `cluster` (default 3) in the config at the
-     run's close.
-   - `view --key <key>` — one key's detail, for the keys the reads above surfaced.
-   `view --keys` alone is every key on one line each and is the read for a small log; past
-   a hundred keys it outgrows a tool result, and `view` with detail is the read to avoid at
-   any size. The summary line counts the whole log whatever the filter.
-   A warning on the view's stderr names a line the grammar cannot read: repair that line
-   by hand first — you are the mutator — so `compact` does not refuse on it later.
-   - **Re-key first, then count — in that order.** A key written at slice altitude cannot
-     match anything, so counting before re-keying yields a number the re-key invalidates,
-     after every ranking decision has already been made against it. Read every key as a
-     set, rewrite the ones still carrying their session's nouns — a re-key edits the key
-     line wherever it appears; besides the two corrections under *Maintain the retro log*
-     it is the one edit the stream permits, and only this command makes it — then
-     `compact`, *then* count from the view. Keys flagged `(uncold)` come
-     first, but the sweep is over all of them.
-   - **Read each key's chain before counting it.** Occurrences are not independent: a
-     session patches what it hit in the lag before a review, often in part, and parallel
-     sessions hit one condition at once. `retro-log.py view --chain --prs --reached
-     --since <markTag>` (`--key` for any other key this run rules on) orders each
-     key's occurrences with the organic markers that touched its placement since the
-     first, all on author time — what the session knew when it wrote — and names the open
-     PRs touching the placement (without `gh`, the header says it could not, and the run
-     narrates the tier drop). **Then `view --chain --prs --outside --since <markTag>`**:
-     every key a retro, a slice, or a release closed or filed in the window — its LANDED,
-     RETIRED, UPSTREAM, or FILED line new since the mark and written by no review commit,
-     each row naming the commit that wrote it. `--reached` reads live keys only, so a
-     session that hit a finding and landed its own fix hands the review a closed key
-     nothing else shows; each is ruled here exactly like the patched case below, and when
-     its chain shows no marker answering it — no placement, or a fix that landed upstream
-     or in another file — the sha on its closing line is the patch to judge (the chain
-     line says `closed citing <sha>`). Read
-     both **before this run appends a status line or compacts**: `compact` reduces a
-     landed key to its status line, and the chain it was ruled on cannot be re-derived
-     after. A marker wider than 30 files is bracketed as
-     broad — a relink touches every chain — and its placement hunk is read before it is
-     ruled anyone's patch. Every ruling names which of three the chain is:
-     - **burst** — near-simultaneous occurrences, nothing landed between: one incident
-       for ranking, the count kept — `ADJUDICATED <date> — burst: <n> occurrences, <dates>,
-       one incident`.
-     - **patched** — a marker between or after the occurrences answers the key. Judge
-       the patch on two questions: will the occurrences stop recurring, and did it remove
-       what they recorded costing. Recurrence alone cannot tell them apart, since a patch
-       that bounds the cost stops the shape too. **Structural** — yes to both →
-       `LANDED <its sha> — <where, by name>`, so a later occurrence reads recurred after
-       LANDED. **Partial** — no to either, and always a bound on the cost (a cap, a stop
-       rule, a timeout, a rule that the cap is a decision) rather than the end of its
-       driver → `ADJUDICATED <date> — patched in part by <sha>; open: <the half still
-       open>`, the open half naming the cost driver, and the key ranks on the open half.
-       A key `--outside` showed closed keeps its closer's status line when structural;
-       partial reopens it — `REOPENED <date> — patched in part by <sha>; open: <the cost
-       driver>` — since an annotation leaves a closed key closed and `compact` would
-       drop the open half with its occurrences. `--reached` ranks a REOPENED key at any
-       count, so an open half survives a compaction that ran before its ruling. An
-       occurrence after a patch is evidence that patch did not hold, and outranks the same
-       count with nothing between. A marker that touched the file and does not answer the
-       key is not its patch; the ruling says so.
-     - **unpatched** — nothing answered it: the count ranks as it stands. An open PR on
-       the placement that answers it is a fix in flight: `FILED #<n> — <the PR>`, so a
-       row proposes nothing over it.
-     The chain's closing section is the reverse read: an organic marker in the window
-     that answers no key — at zero and zero, or not answering the keys named under it —
-     is named in the record, since its problem never entered the log and nothing counts
-     its recurrence; one that answers a key the ranking read did not show gets that key's
-     status line the same way.
-   - **A key reopened on one occurrence** — recurred after LANDED, its row showing the
-     landed status line — is read against that rule before it ranks: an occurrence the rule
-     would not have fired on is a sibling matched on shape alone, re-keyed, not a failed
-     landing.
-   - **Class each occurrence before ranking on it.** A gate that stopped an agent's slip
-     is the gate working, not a defect to fix. A **gate** is a named step whose job is to
-     stop defects before a boundary — a check, a hook, a review or gap-check command, a
-     suite run as a step; a red test while writing, a tool refusal, or another agent's
-     passing notice is the work itself, unless a gate had already passed the slip, which makes
-     it gate-run on that gate. The **boundary** is the merge, or the hand-on as
-     ready; a step rerunning checks just before it is a gate, not the boundary. Class each occurrence of every key and
-     cluster this run rules on, from its text:
-     - **in-work** — stopped by the work itself before any gate. An `In-work:` line naming a
-       gate and an absent rule is the rule-absent finding under **caught** below: it ranks by
-       count, as an untagged occurrence does, and the split counts it under caught;
-     - **caught** — stopped by a named gate before the boundary, rework before the gate's
-       first catch included. A `Caught:` tag claims this on the gate and the cost, as
-       `Gate-run:` and `Escaped:` claim theirs; verify the rule was
-       present at the placement before counting it, since a gate catching what no rule
-       states is a rule-absent finding and ranks;
-     - **gate-run** — about how a gate itself ran: a misfire, a skipped step, a stop path
-       that failed, a finding it dropped or misjudged, rounds after its first catch. It wins over escaped when the
-       occurrence's subject is the gate, after merge included;
-     - **escaped** — reached past the boundary: the default branch, a release, the user —
-       a report's form or order the user received included.
-     An occurrence whose text does not say where it was stopped is classed from its cost
-     and named unclassed in the record, never guessed.
-     An occurrence holding several slips takes its worst class, in the order escaped,
-     gate-run, caught, in-work. Escaped and gate-run rank; caught and in-work are
-     telemetry, never ruled on alone. The ruling's `ADJUDICATED` line, or a cluster's
-     weighing, carries the split over occurrences and the keys it touches —
-     `<n> occurrences: <a> escaped · <b> gate-run · <c> caught · <d> in-work; <k> of <m>
-     keys with an escape or gate-run` — so the next run reads it.
-   - **Count occurrences per key** from the view, read by the chain and the classes. A key
-     with two or more occurrences, not all caught or in-work, is the promotion the log exists
-     to make visible — rank those first, a burst as one incident, and carry the count and
-     the split as the evidence. A key `--reached` hides needs no `ADJUDICATED` line to say
-     count-only: the `Caught:` tags are the ruling, and the count they build is the
-     evidence a rule is cited past, read when the key escapes.
-   - **A fired cluster is one candidate, not a rule per key.** Read its keys together
-     (`view --key`, repeated) against the sections they name, classed as above: the
-     question is why the doc is not being followed, and step 6's structure read asks it
-     cold. The expected answer cuts or restructures, never appends one clause per key. A key the cut answers gets `LANDED`; one it does not stays
-     live. A cluster the run weighs and does not cut gets one `ADJUDICATED <date> —
-     cluster <path> weighed at <n>: <ruling>` line on its newest key: it fires again only
-     once `trigger.cluster` of its keys have an occurrence dated after that line, so a doc
-     that is the home of a whole class of findings is not re-asked every window it gains
-     one. The weighing is about the file: compaction keeps it when its key closes, the
-     newest per file holds, and keys closing after it never raise the bar, so a shrunken
-     cluster needs no re-weighing. A backlog read fires more
-     clusters than a run can rule; take them in the view's order, name the rest in the
-     record, and they fire on their next new key.
-   - **Retro's disposition tag is an input, not a verdict.** You hold the cross-session
-     view, which is strictly better standing for ranking than the single session that set
-     it — so re-rank freely, in either direction. Record the re-rank and the reason as an
-     `ADJUDICATED <date> — <ruling>` line on the key — its own entry, the key line again
-     above it — never as continuation prose inside an occurrence, which the grammar reads
-     as the occurrence's own text, the size cap counts, and a status-only last block turns
-     into an unknown status. An annotation changes neither the key's state nor its count,
-     which is what lets a count-only ruling, a build trigger, or a withdrawn re-rank sit on
-     the key without moving it. Never silently overwrite the original call.
-   - **Empty log, or no `retroLogPath`** → narrate and skip, like any detected input.
+- **Workarounds** (`workaroundsPath`), in your own Bash tool, since a version depends on
+  the shell: `w=${CLAUDE_PLUGIN_ROOT}/scripts/workarounds.py; eval "$(python3 "$w"
+  versions)" | python3 "$w" due | { eval "$(cat)"; } | python3 "$w" record; python3 "$w"
+  status`, and `eval "$(python3 "$w" changelogs)"` where the register has `changelogs`. A
+  read-only run drops `| python3 "$w" record`: the probes still run and print their
+  answers, and nothing is written.
+  A retirable workaround is a named deletion of its sites' text and its entry; a due
+  re-test is a row quoting its steps; a broken probe is a `tooling` candidate. A tool
+  version that moved is a cause to set beside the residual near what it governs.
+- **Adherence** (`adherenceRules`), two sub-agent passes per rule above its `floor`: the
+  procedure in [`commands/adherence.md`](adherence.md) §Procedure. Its `Adherence:` line
+  goes to the record and the marker body; a shape `recur` routes is a candidate.
 
-   **0c — capability evidence** (`capabilityEvidencePath`), where the repo builds the
-   tooling it uses. Entries here name a contract and a rung rather than a doc section, so
-   they are the only input that can produce a non-doc proposal. Without it, every input in
-   this funnel is doc-churn-shaped and the output can only ever be doc edits. Count keys
-   the same way. Absent → narrate and skip; absent **and unset** (no `null` in the config)
-   in a repo that ships tooling to others → the narration is the once-only question in
-   Config: ask for a path or a `null`, record the answer, and do not ask again. A store
-   that stays unset for the life of an adopter is the funnel silently doc-shaped.
+### 3. The depth gate
 
-   **Then reconcile it against 0b, and carry the number.** A retro-log `Placement:` may
-   name this store, and nothing but this command writes here — so a placement that names
-   it has landed only if an entry for it exists. Grep 0b's placements for this path and
-   check each against the keys you just counted. **The count of unresolved ones is a
-   required field of the capability-candidates output**, including when it is zero. Report
-   it as a fraction (landed / named). This is what makes the store's shortfall visible:
-   0c's key counts look complete whether or not the placements arrived, so a review that
-   reads only 0c reports a healthy log and a short one identically.
+Go on only if one holds: a framing was given; a concentration came back; a key escaped or
+ran a gate wrong since the mark; a cluster fired; a held proposal awaits; a workaround is
+retirable, broken, or due; a ledger signal fired (read the ledger now, `ledgerPath`, and
+adjudicate every signal that fired: promote, retire, or re-defer with the reason); or
+`deep`. Otherwise **stop and say so**: the pending captures, the residual rate, the
+adherence lines. A window with no concentration has bought the complete answer for the
+price of step 2. The marker body carries `Opened: <framing | concentration | escape |
+cluster | held | workaround | ledger | deep> — <what>`, so a later run can test which
+openers led to landings that held.
 
-   **0d — adherence sample** (`adherenceRules`). Not free: two sub-agent passes per rule.
-   It runs before the gate, every run whose range reaches the rule's `floor`. The draw's
-   range starts at the rule's **last sample** — the newest review commit carrying its
-   `Adherence:` line — so a run below the floor, a failed run, or a review that never
-   reached 0d leaves no range unsampled: the next draw covers it. A draw below the floor
-   prints its header at `n 0`; name it in the record and record no line. Per rule, run the
-   procedure in `${CLAUDE_PLUGIN_ROOT}/commands/adherence.md` §Procedure — draw over its
-   default range (`--head` the default branch the checkout now sits at), one judge checked by `flags`,
-   one refuter over its flags, `verdicts`, `tally`, `recur`; an agent whose output is
-   refused twice fails that rule's run and records no line. Carry the `Adherence:` line to the record and
-   the marker commit body; a shape `recur` calls **routed** (two or more windows) is a
-   recurrence for the gate below and a candidate like any other, classed `tooling` for a
-   lint class or `amend` for a review-prompt line. Absent → narrate and skip.
+### 4. Weigh each concentration against the direction
 
-   **0e — the risk registry** (`riskRegistry` in `.claude/slices.json`, the slices
-   plugin's; its schema is that plugin's `scripts/profile.py --help`). Free:
-   `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/risk-review.py --since <markTag>` joins the
-   window's plan profiles with its class rounds and its escapes — `escaped at` lines in
-   plans, `Escaped-class:` trailers on fixes with no plan — per class, with how each plan
-   entered it (path, kind, a confirmed suggestion, an entering symbol) beside the
-   suggestions dismissed, and groups the unclassified escapes by area. An escape is what a
-   check missed; an empty class round — `0 defects` — is what a check cost and found nothing
-   for, and nothing else counts it. The
-   registry is the repo's prediction of where scrutiny pays; this read tests it, and every
-   ruling is about what the work touched, never about time. One proposal per class or area,
-   each a registry edit landed like any candidate:
-   - **add** — unclassified escapes clustering at one area (two or more at one directory, or
-     one whose cost the maintainer named): a class with its signals drawn from the area, its
-     check from what the escapes needed, `status: predicted` until a window shows its check
-     catching, and the escapes as `evidence`.
-   - **revise a check** — a class whose escapes landed on plans profiled into it: its check
-     ran and missed them. The revision names what the escapes needed that the check did not
-     ask for; a `plan` check that keeps missing what a render or a replay finds moves its
-     `at`, since another round of reading cannot buy it.
-   - **narrow the signals, or revise the check** — a class whose rounds in the window were
-     mostly empty, two or more of them, with no escape against it: it is buying rounds on
-     work outside it. The entry split says where — rounds bought by one signal type, a
-     suggestion confirmed on prose — and the proposal narrows that signal; when the entries
-     are right and the rounds still find nothing, the check is revised or moves its `at`.
-     Suggestions dismissed far more often than confirmed are a symbol to tighten.
-   - **leave dormant** — a class no plan entered (`dormant`): no proposal, only a line in the
-     record. Dormancy is never evidence; a class idle for a year still matches the day work
-     returns to it.
-   - **retire** — only on evidence the class is wrong: its signals keep pulling in work its
-     check finds nothing on while the escapes land elsewhere, cited by plan. It stays in the
-     file with `retired: <ref> — <the evidence>`, so the review never proposes it again.
-   - **promote** — a `predicted` class whose check caught what it predicted on a plan in the
-     window: `status: active`.
-   An escape naming a class the registry lacks is a misspelling or a class never written:
-   fix the line at its source, or add the class. Exit 3 (no registry) → narrate and skip.
+**The cases, blind first.** The picture holds no verbatim occurrence and no cause
+guess. Before asking for them, write in the record, per concentration you will rule on,
+your hypothesis of its cause and its fix and one line on what would change your mind. Then
+resume the same reader (`SendMessage` to its agent id) asking for its held cases and its
+cause guess; until then they are not in your context. The marker body carries `Blind: <the
+concentration> — <hypothesis> — cases changed the ruling: yes, what | no`. Rule on what
+the cases show, not on the hypothesis. The cases not arriving (no way to resume the reader,
+a refusal, an answer cut off) means the step did not run: the `Blind:` line says so and
+why, and you rule without the cases. Never read the occurrences yourself to stand in for
+them; that puts the incidents back in your context, which the reader exists to prevent. This step is kept or dropped on its `Blind:` lines over several runs;
+never harden it.
 
-   **0f — the workaround register** (`workaroundsPath`). Free unless a tool moved. The
-   script runs no command: a version and a probe's answer depend on the shell they run in,
-   so run the read in **your own Bash tool**, never a subprocess or a hook, as one call:
-   `w=${CLAUDE_PLUGIN_ROOT}/scripts/workarounds.py; eval "$(python3 "$w" versions)" |
-   python3 "$w" due | { eval "$(cat)"; } | python3 "$w" record; python3 "$w" status`. It
-   reads each tool's version, runs the probe of every workaround whose tool moved past
-   where it was last answered — none when nothing moved — and prints the counts, `live ·
-   retirable · due · broken`, with a line per workaround not live. The counts line goes to
-   the record. A **retirable** one is a candidate: delete its sites' text and its register
-   entry, classed `trim`, and a deletion is a row, never the unanswered line. A **due**
-   re-test (`probe: null`) is a row asking for that re-test, its steps quoted; the answer
-   is recorded with `workarounds.py record <id> <0|1>`, and it never retires unanswered. A
-   **broken** probe is a `tooling` candidate: repair it, or the workaround loses its
-   admission. A workaround is judged by its probe or its re-test, never by re-reading the
-   tool's behavior from the stream. Exit 3 (no register) → narrate and skip.
-   Where the register has `changelogs`, run `eval "$(python3 "$w" changelogs)"` too: each entry
-   it prints is a changed surface this repo named. One that could retire a workaround, or
-   falsify a rule, is a candidate row; the rest are read and dropped.
+For each concentration, in order of residual weighted by exposure, decide among:
 
-**The depth gate — decide the run's size here, before step 1.** Steps 1–7 are the
-expensive path and they are *conditional*, not automatic. **Its direction is expected
-value**: open the funnel, and rank inside it, by what a finding is likely to cost if left —
-how far it got, how often its artifact is read, how likely it is to come back — of which the
-occurrence count is one input, and a floor: a slip that is frequent, cheap, and quietly fixed
-is rarely captured, so where a script can detect the shape, its run over history is the rate. **The mechanism below is the current hypothesis**, not the
-definition: a recurrence, a fired cluster, or one `Escaped:` or `Gate-run:` occurrence opens the gate, and
-ranking puts escapes first, then targets read on every run, then count. Each marker commit
-body carries `Opened: <recurrence | escape | cluster | risk | workaround | ledger | deep> — <the keys, files, or classes>`
-beside `Tally:`, and a later review tests the hypothesis from what is already recorded: of
-the keys landed by runs each opener started, how many came back after `LANDED` (`view
---recurred`), and how many runs it opened landed nothing. An opener whose landings recur, or
-that opens runs with nothing to land, is revised on that evidence.
+- **act now** — residual is concentrated, its likely cause is the artifact, and upcoming
+  work runs through it heavily;
+- **let more work narrow the cause** — the cause could still be a new area, a recent rule
+  change, a model or harness change, or chance, and exposure is low enough to wait; the
+  ledger gets a watch naming what would settle it;
+- **leave** — the residual is a gate working with its rule present.
 
-- **Nothing recurred** in 0b, 0c, 0d, 0e, or 0f (no key `--reached` shows after re-keying — an
-  `Escaped:` or `Gate-run:` key shows at one occurrence — no placement cluster fires, no shape routed,
-  no risk proposal but leave-dormant, no workaround retirable, broken, or due a re-test), and
-  no ledger signal fired → **stop and say so.** Report the pending
-  captures, the tier, the tally, and 0d's lines. A repo with no recurrence has bought
-  the complete answer for the price of step 0; running the full funnel against it burns
-  wall-clock and tokens to rediscover that. This is the expected outcome in a young or healthy repo, not a failed run.
-- **Something recurred, or a ledger signal fired** → run the funnel, scoped to what fired.
-- **A bare `deep` argument** overrides the gate: the maintainer asked for the sweep.
+For an artifact you act on, the first question is **whether its approach is wrong**, not
+which sentence to patch. Spawn `structure-explorer` (`subagent_type:
+threads:structure-explorer`), one per artifact you act on, in parallel. Hand it the
+artifact, its job (who runs it, when, what its failing costs), the objective and the
+constraint the run serves (maintainer attention among them, so no structure it proposes
+puts the maintainer in its own loop), the framing if one names it, and the occurrences as
+`retro-log.py view --occurrences --key <k>` prints them. Never this run's leaning.
 
-1. **Free** — list the stream: `marker-stream.py list`, then `files` (Telemetry). **The
-   organic markers are the stream**; the review's own landings and the bookkeeping
-   commits are two counts in the narration and are never ranked — a cluster made of the
-   last run's candidate landings is the review looking at itself. This stream is what
-   **landed**; step 0 is what is **pending**. Tabulate the organic commits by scope (parse
-   `<scope>` from each subject) and by file, counting **distinct commits** (re-touch
-   across sessions is the signal, not raw line count).
-   - **Fallback tier (no marker commits):** cluster churn on `processDocs` paths instead
-     (`git log <markTag>..HEAD --name-only -- <processDocs>`, or full history on the very
-     first run). Marker commits are the precise signal; path-churn is the coarse one.
-     **Narrate that you're on the fallback and what the marker convention would buy.**
-   - **Silent-death check:** marker hits == 0 while `processDocs` churn > 0 → surface
-     "your telemetry convention may not be firing" (a narrated tier drop, not silent rot).
-     Before concluding it's dead, rule out the measurement itself: `marker-stream.py
-     count --all` is the lifetime count, and zero there against a pattern that once
-     fired is a pattern edit, not a dead convention. Then check the merge lane: if that
-     churn arrived via squash-merged PRs, the markers may be dying in the squash (see
-     bootstrap), not missing — the fix is widening the pattern, not re-negotiating the
-     convention. Zero marker hits is also simply *expected* in a
-     repo whose retros all capture and never use the escape hatch — check step 0 before
-     diagnosing anything.
-2. **Free** — rank; only clusters above a re-touch bar survive.
-3. **Cheap** — read the deferral ledger (`ledgerPath`); don't re-propose what's already
-   deferred. The reverse motion is equally required: each entry names a promoting
-   signal — check every live signal against this window and **adjudicate the ones that
-   fired** (promote, retire, or re-defer with the reason). A deferral whose signal fires
-   and sits is the ledger rotting in exactly the way it exists to prevent. (Detected
-   upgrade: prior tracker issues, if `gh` + label exist.)
-4. **Cheap, detected** — if a memory store is present, read it as a second input:
-   commit-churn ∩ memory = high-confidence candidate. Absent → narrate and skip.
-5. **Cheap — staleness sweep.** Churn is half the signal; the other failure mode
-   generates no telemetry at all: a stable workflow quietly falling behind as the repo
-   grows around it. Over `processDocs` ∪ workflow sets (`workflowDocs`, else the
-   detected command directories):
-   - **Stale-vs-growth** — per file, last substantive touch and commits since
-     (`git log -1 --format=%H -- <path>`; `git rev-list --count <that>..HEAD`). Rank by
-     growth-since-touch, never raw age: untouched-for-40-commits means nothing in a slow
-     repo and a lot in one that just doubled.
-   - **Sibling variance** — files in one workflow set describe one workflow and should
-     co-evolve. One stage amended recently while its neighbors sat untouched through
-     the same growth is drift evidence, with no knowledge of the workflow's semantics.
-   - **Reachability** — is each process doc routed from anywhere (a trigger table, a
-     command, a hook, another doc)? An orphan nothing points at is the silent-death
-     class regardless of freshness.
-   Only high-ratio or high-spread survivors advance — and on each survivor, check
-   **referent existence** first (do the files, commands, and labels it names still
-   exist?): a freshness-only pass on a doc full of dead referents logs "clean" and
-   becomes evidence *against* urgency. No workflow surface detected and no
-   `workflowDocs` → narrate and skip, like any detected input.
-6. **Expensive — hot clusters and staleness survivors only.** **Keyed reads first**: the
-   docs this run must open whole are the ones its own findings name, derived, never
-   configured, and **bounded** — `retro-log.py view --recurred --since <markTag>
-   --docs` (the docs the *recurred* keys' placements, landings, and stubs point at;
-   never the whole since-mark set, which on a busy repo outweighs the core), each path
-   resolved by basename against the `processDocs` trees — a placement writes
-   `conventions.md`, the doc is `docs/process/conventions.md` — and a path that resolves to no
-   process doc dropped (the flag also returns scripts and stubs, which route a read and
-   are not one), plus the docs a **fired** ledger signal names. Read each once, here,
-   where a candidate is about to be reasoned against it; a doc named by nothing this run
-   is not opened, whatever else the repo holds true. **A hot file from step 1 is never
-   opened whole**: it is read as its churn diff (`git show`) or its blamed section; the
-   placer is the only whole read of a target, and it reads it for the edit. The
-   economics block carries the keyed set's size, so the bound is visible per run. Then
-   `git show` the churn diffs; `git blame` the staleness survivors to locate their
-   stalest sections,
-   weighting load-bearing files (referenced by other process docs, or amended by past
-   marker commits). Reason about reconcile-into-one-rule vs a structural process /
-   repo / tooling move vs *leave — not yet ripe*.
-   **Before ruling a patch, check for a local maximum.** For the top three candidates that
-   are a fired cluster, a `carve`, or a `tooling` candidate, spawn `structure-explorer`
-   (`subagent_type: threads:structure-explorer`), one per artifact, in parallel, handed the
-   artifact, its job (who runs it, when, what failing costs them), and its keys as
-   `retro-log.py view --occurrences --key <k>` prints them (repeat `--key`) — the
-   occurrences without a review ruling on them — **never this run's ruling or leaning**. Choose among the structures it returns and name
-   the one chosen and the ones rejected in the record; a candidate whose failure classes no
-   doc edit fixes is not a `trim` or `amend`. The high bar is on **landing** a restructure,
-   never on **considering** one. No `Agent` tool → narrate the skip. Entries a retro appended fast (`add
-   (unconsolidated)`) are expected raw material here — that's the division of labor, not
-   a defect to report.
-7. **Placement** — for candidates that survive as reconcile-into-X or
-   structural-change, the remaining question is *where X lives*, and by this point the
-   session is no longer fresh: it has spent its budget on the funnel. Spawn
-   `finding-placer` (`subagent_type: threads:finding-placer`) **once, with all
-   surviving candidates** — pass each as pattern → evidence → proposal, with your
-   ripeness call attached; it returns the target section, the existing text judged
-   against, and the concrete edit. When `placerModel` is set, pass it as the spawn's
-   `model` and say so; a refused model is narrated and the spawn retried without it.
-   **Name the candidate docs**: `processDocs` plus the
-   specific files this run surfaced as hot or stale. You already paid for that view, and
-   rebuilding it is the placer's largest cost. If the agent or the `Agent` tool is
-   unavailable, place here and narrate that the amend-before-add bar was applied by a
-   depleted context.
+**Outside practice before a design settles.** Before any candidate that adds a rule,
+replaces an artifact, carves a doc, or builds tooling is written, check how others handle
+the same problem and what changed in the tools and models since the artifact was written:
+open the pages (a search snippet is not a source), prefer primary sources, date and name
+each. structure-explorer does this for its artifact; do it yourself for any other such
+candidate. What comes back is adapted, modified, or discarded on this repo's terms, never
+adopted whole, and never counted as an occurrence. The marker body carries
+`Outside: <question> — <pages opened> — <changed a ruling: yes, what | no>`.
 
-## Output (in-thread; `applyMode` governs whether approved edits are applied)
+**Name the largest option before cutting.** For each artifact you act on, state the most
+ambitious answer (rewrite the doc from a positive brief, re-author every string) and the
+pure deletion (what goes, with nothing written in its place), each with its cost, beside
+the one you recommend. A largest option that adds machinery is weighed against the
+deletion first. The maintainer may want the larger
+one; they cannot pick what was never put to them.
 
-**Two audiences, two shapes.** Everything from *Pending captures* down is the **record**:
-pattern → evidence → proposal per candidate, complete enough that the next run and the
-marker commit body can stand on it. The maintainer reads none of it to decide. What they
-read is the **decision block**, which opens the output, and **nothing else sits above it** —
-no evidence, no placements, no tier narration, no tally.
+**Recommend the smallest sufficient option.** Waiting, the deletion, and the largest option
+are weighed at the same weight; none is the default. A wait argues it is sufficient: the
+count, the rule's state, and the named trigger that would make it act. Every mechanism in the
+recommendation answers something this window measured. A part that answers nothing measured
+(a threshold moved, an outcome split three ways, a second check beside the first) is left
+out and named in the record as not taken. A recommendation that bundles an unsupported part
+is the stacking a review exists to stop.
 
-**Before a row is written, re-measure its premise against the default branch, now, and
-against the open PRs** (`--chain --prs`, where `gh` reads them). A candidate can have
-landed since it was held, be building on an unmerged branch, or have gone moot on a
-decision the maintainer took elsewhere; a row whose premise is stale spends the one attention budget the block exists to
-protect. Re-measured and gone → `RETIRED` or `LANDED` in the log, not a row.
+### 5. Place
 
-The block, in this order:
+For candidates that edit existing docs, spawn `finding-placer` (`subagent_type:
+threads:finding-placer`) once with all of them, each as pattern → evidence → proposal,
+naming the candidate docs (`processDocs` plus the files this run surfaced); pass
+`placerModel` as the spawn's `model` when set. A `replace` candidate is not placed: its
+target is the artifact itself. No `Agent` tool → place here and say so.
 
-1. **The table** — one row per candidate that genuinely needs the maintainer: a trade-off, a
-   product or policy call, a change hard to reverse. Four columns:
-   - **Letter.**
-   - **Decision** — one clause naming *the artifact and the motion* ("carve the pin protocol
-     into its own routed doc", "retire the four-carrier landing rule"), never the retro key
-     or the finding's pattern; the maintainer does not carry the key vocabulary between
-     sessions.
-   - **Recommend** — one word: approve, retire, split, or fold.
-   - **Why** — one or two sentences, each resting on something *this run measured* (an
-     occurrence count, a signal that fired, a landed commit, a filed/built ratio), with the
-     reversibility stated when it bears. Never the candidate's rationale restated.
-   A row without a recommendation hands the maintainer the review's own work; a row the
-   maintainer cannot answer from the row alone belongs in the record instead.
-2. **One sentence**: *Mechanical, land on your word:* followed by the letters.
-3. **One line** naming what happens next if every row is answered as recommended.
+## Output
 
-Held candidates are rows or letters like any other, with their age from `view --held` in
-the Why when it bears; the ageing detail goes in the record.
+**Two audiences.** The maintainer reads the **decision block**, which opens the output with
+nothing above it. Everything else is the **record**, for the marker commit body and the
+next run. **Nothing that could change the maintainer's answer is only in the record.**
 
-Every candidate carries a **class** so the block and the log can sort it without re-reading
-it: `trim` (a net removal, or a cross-reference clause into existing text), `amend` (wording
-inside an existing rule, a consolidation), `rule` (a new rule or bullet), `carve` (a new doc,
-a split with its routing), `config` (a field in a config file), `tooling` (a script, a check,
-a capability — a check names the rung it starts at, the evidence for that rung, and its
-scope, measured by running it over the tree and history and counting both what it flags
-that it should not and what it rightly flags — the second is the shape's true rate, which a
-retro-log count undercounts;
-it starts at `monitor` unless that count is near zero, and for a monitor check already
-configured `guards run.py --monitor` is the evidence for the next rung), `motion` (a backlog motion — a stub filed, a field re-formed, a plan moved or
-deleted — which is not a doc edit at all). `trim` and `amend` are the mechanical sentence by
-default; the rest are rows. **A doc admits only this repo's own decisions.** A candidate whose
-cause is a tool's own behavior, or a rule already enforced at the moment it fires by a hook,
-script, check, or config, is never a `rule` or an `amend` restating it: its remedy is in the
-owner — `tooling` or `config`, a register entry with its probe where `workaroundsPath`
-exists — or it is telemetry, `ADJUDICATED` count-only. The placer's `out of doc` is this
-disposition. The class predicts where judgment is likely; it groups, it does
-not gate — a `rule` the maintainer waves through is still a row, answered in a word.
+**Before anything goes in the block, re-measure its premise** against the default branch
+now and the open PRs: a candidate can have landed, be building on a branch, or have gone
+moot. Gone → `LANDED` or `RETIRED` in the log, not in the block.
 
-**The record**, below the block:
+**A run with no framing opens with its question answered**: a short reading, at direction
+level, of what the window's residual says against the objectives in the direction docs,
+before any decision. **The block flexes to what the run found.** Several independent decisions read as a table:
+letter, the decision (the artifact and the motion, never a retro key), a
+recommendation, and a why resting on what this run measured. One whole-artifact call reads
+as a short paragraph: the diagnosis, the approach recommended, the largest option and its
+cost, and what the residual and exposure say. Keep a whole-approach answer whole: never
+cut a replacement back into patches to fit a table. Then one line, *Mechanical, land on
+your word:* with the letters, and one line on what happens next if every recommendation is
+taken. Held proposals from the last run lead, with their age.
 
-- **Pending captures** from step 0, led by any key with more than one occurrence — the
-  finding, its occurrence count with dates, the placement retro already proposed, and your
-  ranking (with the re-rank noted where it differs from retro's). Each already carries an
-  accepted finding and a proposed edit, so these need the least work to land.
-- **Structural candidates**, ranked most-supported first. Each: the **pattern**, the
-  feeding **commit refs** (or churned files, on the fallback), related memories if any,
-  and a concrete proposal — reconcile-into-X / structural-change / *leave* — with the
-  placement from step 7 (the **amend-before-add** bar lives in
-  `agents/finding-placer.md`). **Split-with-routing is a sanctioned outcome**: when a
-  hot doc's growth is a coherent cluster its charter doesn't cover, carving it out is
-  the amendment — but a split without a routing change (whatever sends readers to the
-  new home at the decision moment) is incomplete, and the unrouted half is where it
-  fails. **Narrate the *why*** — the relatable failure each local was patching.
-- **Drift candidates (staleness)** — file or workflow set, plus the evidence: last
-  touch vs repo growth since, sibling spread, and the stalest sections when blame ran.
-  **Staleness alone proposes scrutiny, never a change** — an untouched doc may simply
-  be *done*; the ask is *read this against current repo shape*. It escalates to a
-  concrete proposal only with an intersecting signal (churn in the area the doc
-  governs, a memory, an accepted retro finding that brushed it).
-- **Taxonomy health** — a one-line note *only* when a scope-token signal holds across
-  several cycles (dead / overloaded / co-occurring pair / `misc` pressure). Bias-to-keep.
-- **Capability candidates** (where `capabilityEvidencePath` exists) — findings whose
-  implication is a contract change, a rung promotion, or a new capability, not a doc edit.
-  Rank by rung implication and occurrence. These are the proposals the doc-churn inputs
-  structurally cannot reach, so report them even when the doc-side funnel found more.
-  **Lead with 0c's reconciliation fraction** (placements landed / placements naming the
-  store). Below 100%, the funnel's only non-doc input is short by that many findings and
-  every ranking here was made without them.
-- **The reads that sized the run** — name the `invariantDocs` you actually read and what
-  in them bore on this run, the `windowOnlyDocs` read as their window, each doc's window
-  from `core-diff.py` with its hunks classed rule / prose, plus the depth-gate decision
-  and what triggered it. A run that
-  stopped at the gate says so plainly: that is a complete review, not a truncated one.
-- **Adherence** (where `adherenceRules` exists) — per rule, the `Adherence:` line, every
-  block's judge and final verdict with its citation, and `recur`'s routed and recorded
-  shapes. The line rides the marker commit body beside `Tally:` and `Economics:`, where
-  `git log --format=%b --grep '^Process-Review: ' | grep '^Adherence: <id>'` reads the
-  trend; it is per-window state, so never the ledger. **The rate is a lower bound** —
-  only non-TRUE verdicts are re-checked — and a flat trend reads "no more drift the judge
-  can see", never "no drift".
-- **Tier narration** — which tier this run used; what the next tier up would buy.
-- **Tally** — all-time: `marker-stream.py count --all` (derived, never stored). The
-  organic figure is the headline; the review and bookkeeping figures say how much of
-  the stream is the loop's own weight.
-- **Review economics** — the closing block, and the one place the review's own conduct
-  goes. Numbers first, one line each, every one from a command this run already ran:
-  core docs read / core docs that bore on a ruling (count and words); **core prose
-  growth** — per core doc with a window, words added classed prose / words added, from
-  `core-diff.py` and the hunk read, a signal for 0a's slip read and never a number to
-  drive down; keyed docs opened
-  whole / keyed docs that bore (count and words — a keyed set larger than the core is
-  the bound in step 6 failing); markers read — organic / review / bookkeeping; keys read (the
-  view's summary line) / keys that recurred; keys ruled burst / patched / unpatched, and
-  organic markers answering no key; this run's own landing errors (a wrong
-  anchor, a mistyped literal, a repaired commit — count and shas); the run's size where
-  the harness shows it (tool calls, wall clock). Then **questions to the maintainer**,
-  never findings: *what should the next run stop reading?* — a ledger watch that has
-  not woken in several windows, a class of capture the retro should stop appending (a
-  core doc that bore on nothing is not on this list: 0a asks why) — and any miss of this run's own, phrased as the question
-  it raises. **Each goes out answered**: the review's recommendation and the default it
-  acts on absent a reply — one this run applies, or records where the next run reads it
-  (a `HELD` line, a ledger watch) — or the one clause saying why only the maintainer can
-  answer it. **A question whose answer could move a row is worked before the table is
-  written**: its premise measured against the files it names, its answer drawn from this
-  run's record, landing as that row's evidence or a changed row; one only the maintainer
-  can answer is that row's Why, never a question under the economics. **The review's own misses are lines here and an `Economics:` line beside
-  `Tally:` in the marker commit body, never keys in the log it maintains**: keying the
-  review's conduct into the stream it is trying to shrink feeds the count it measures.
-  The maintainer answers in the thread; an answer that changes a config field or a doc
-  lands as this run's marker commit.
+Each candidate carries a **class** so the block and the log sort it: `delete` (a named
+removal of whole sentences, entries, sections, or files, nothing written in their place),
+`trim` (rewording toward less), `amend` (wording inside a rule, a consolidation), `rule` (a
+new rule), `replace` (the artifact's approach is wrong: rewrite it or swap it for another
+shape), `carve` (a new doc or a split, with its routing), `config`, `tooling` (a script, a
+check at a stated rung, measured by running it over the tree and history), `motion` (a
+backlog move). A doc admits only this repo's own decisions: a cause in a tool's behavior,
+or a rule a hook or check already enforces, is `tooling`, `config`, or a register entry,
+never prose restating it.
 
-Nothing is applied without recorded consent. Under `read-only`, present candidates only.
-An approved `tooling`, `carve`, or `motion` candidate that fits one pass may be **built in
-the run** rather than filed as a stub; the row says which, and the maintainer's answer
-decides.
-Under `apply-on-approval`, land each **approved** edit as its own `<markerPattern>` commit —
-never folded into unrelated work. Under `apply-mechanical`, the same, and a run the
-maintainer is not answering lands the mechanical line — `trim` and `amend` only, each its
-own marker commit, landed first and cited second like any other, **with its `LANDED` line
-written** (a landing with no status line is re-proposed by the next run) — and reports it
-as *landed* with the shas rather than *land on your word*; every row is still `HELD`. The
-class is what the placer assigned against the text it read, and it is necessary, not
-sufficient: a candidate lands unanswered only if **every** guard below passes, and one
-failing guard holds it whatever its class says.
+**The record**, below the block: per concentration, the picture's line and your ruling with
+its reason; the structures structure-explorer returned, the one chosen and the ones
+rejected; outside sources; the direction docs read and which bore on a ruling, with each
+window's rule/prose split; the depth-gate decision; adherence; the tally
+(`marker-stream.py count --all`); and the residual rate. Then any question for the maintainer, each carrying the
+review's recommended answer and the default it acts on absent a reply; a question that
+could move a decision is worked before the block is written, not asked under it. The
+review's own misses go here and in the marker body, never as keys in the log.
 
-- **Docs only.** Every file it touches is a doc in `processDocs`; a required companion edit
-  anywhere else — a script, a config, a budget table a doc's growth forces — holds the
-  whole candidate.
-- **Additive only.** Inserted sentences or a cross-reference clause; a deletion or rewrite
-  of an existing rule sentence, a consolidation included, holds — a net-negative diff
-  removes prose the maintainer never saw go.
-- **Live and never landed.** The key is live and carries no `LANDED`, `REOPENED`, or
-  `FILED` block; a shape recurring with its rule present is an application failure the
-  log counts, and a key filed against a stub is filed so prose stops accreting.
-- **Not a watched section.** The target section is named in no Live ledger entry; step 3
-  already reads the ledger, so the check is free.
-- **Whole or not at all.** A candidate that edits several files lands whole or holds
-  whole; one protected file holds the set, since a pointer landed alone points at text
-  that does not exist.
-- **Not protected.** No file in `invariantDocs`, nothing still referenced deleted, and no
-  placer call of `add (unconsolidated)`.
+## Applying
 
-**A landing is a text match, not a paraphrase — under every tier.** The anchor is the
-placer's on-disk quote with its line numbers, wrapped as the file wraps it; an anchor that
-does not match verbatim is a placement to send back, never a sentence to re-find by
-meaning. A value written into a data literal — a number in a budget table, a field in a
-config — is asserted to be of the literal's type before the write (`[0-9]+` for a count):
-a parsed value is a claim about the emitted form, and a wrong one lands as an exemption
-the literal's own checker cannot see. Both are clean-judgment errors, and both are cheaper
-as a check at the write than as an executor sub-agent between judgment and landing.
+Nothing is applied without recorded consent. Under `read-only`, present only. An approved
+`tooling`, `carve`, `replace`, or `motion` candidate that fits one pass may be built in the
+run; the block says which. Under `apply-on-approval`, land each approved candidate as its
+own marker commit. Under `apply-mechanical`, a run the maintainer is not answering also
+lands the mechanical line, each as its own commit with its `LANDED` line written, and
+reports it as landed with the shas; every other candidate is `HELD`. A candidate is
+mechanical only if every guard passes:
+
+- **Docs only** — every file is in `processDocs`; a companion edit elsewhere holds it.
+- **An addition or a named deletion** — inserted sentences, a cross-reference clause, or the
+  removal of whole sentences, entries, or sections the candidate names, with nothing
+  written in their place. A rewrite or a consolidation holds.
+- **Live and never landed** — the key carries no `LANDED`, `REOPENED`, or `FILED` block.
+- **Not watched** — no Live ledger entry names the section.
+- **Whole** — a multi-file candidate lands whole or holds whole.
+- **Not protected** — nothing in `invariantDocs`; nothing deleted that is still referenced;
+  no placer call of `add (unconsolidated)`.
+
+A rewording of an enforced doc lands only after a fresh-context read compares old and new,
+handed both files and never the trimmer's account; each rule it reports moved is checked
+against where its reader arrives, restored if lost. A named deletion needs no such read:
+its diff is the whole of it.
+
+**A landing is a text match.** The anchor is the placer's on-disk quote, wrapped as the
+file wraps it; one that does not match verbatim goes back to the placer. A value written
+into a data literal is asserted to be of the literal's type first.
 
 ## On completion
 
-- **Every commit this run makes carries the trailer `Process-Review: <today's date>`** —
-  candidate landings, the log and ledger bookkeeping, the mark's own commit — so the next
-  run counts none of it as churn (Telemetry). `git commit --trailer 'Process-Review:
-  <date>'`; `land-process-commit.py` carries it through the cherry-pick unchanged.
-
-- **Land first, cite second.** A sha written before its commit is on the default branch is
-  a sha the landing rebase rewrites. Every `LANDED <sha>` line, and every sha the ledger
-  cites, is written *after* the landing commits are pushed, with each sha read back from
-  the remote by subject (`git log origin/<default> --grep '<the candidate's subject>'`),
-  in a commit of its own. Never cite a branch-side sha. From a slice branch, a marker
-  commit that must not wait for a squash lands by itself through
-  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/land-process-commit.py <sha>`: a throwaway
-  worktree at the remote's default branch, cherry-pick then `git commit -C` so the
-  repo's own pre-commit hook judges it, push, and the only thing on stdout is the sha
-  re-read from the remote — the one to cite; the slice branch is rebased so the
-  duplicate drops.
-- Advance the mark: `git tag -f <markTag> <commit>` — where `<commit>` is an
-  **ancestor of the default branch**, after any approved edits have landed there. **First
-  read what landed behind the window**: `retro-log.py view --keys --since <the commit 0b
-  read the log at>` lists every key with a line appended since, this run's own status
-  lines among them; the list is per key, so a key carrying both is read with `view --key`
-  to tell this run's lines from the rest. A line this run did not write was captured after
-  the window was read — give its key the re-key sweep, and name it in the record. The tag moves it behind the
-  mark, and `--since <markTag>` never shows it again unless it recurs. `HEAD`
-  is only right when that's where you are; a branch tip that a squash or rebase later
-  orphans takes the mark with it, and the next window re-reads everything this one
-  covered as new.
-- **Propagate it — the mark is shared state, not a local bookmark.** A local advance alone
-  leaves every other clone measuring from a stale mark, so every later review re-reads
-  commits this one already covered. If the tag is published on the remote
-  (`git ls-remote --tags origin refs/tags/<markTag>` returns a hit), push the advance:
-  `git push -f origin refs/tags/<markTag>`. If it isn't on the remote it's local-only —
-  leave it that way; don't publish it as a side effect of a review. (`origin` here means
-  whatever the repo's remote is actually called; no remote → nothing to do.)
-- **Land the placements 0c counted as unresolved.** A retro-log `Placement:` naming
-  `capabilityEvidencePath` is a proposal nothing else in the system will act on. Append
-  each in that store's own entry format, or record a decline in the ledger with the
-  reason; then the entries you just landed become collapse candidates below. Under
-  `read-only`, propose the appends rather than making them. Zero unresolved → nothing to
-  do, and 0c already said so.
-- **Maintain the retro log (`retroLogPath`) — you are its only mutator.** Retro appends
-  and never edits, so everything below is yours, and nothing else in the system will do
-  it. Under `read-only`, propose these rather than applying them. The `guards`
-  `retro-log` check, where the repo runs it, is the shape gate; run it after.
-  - **A finding that landed** gets the key + one `LANDED <sha> — <where>` line appended,
-    if the landing session did not append it. **A retirement** is the key + one
-    `RETIRED <date> — <why>` line; **one that must land elsewhere** is `UPSTREAM <ref>`;
-    **one routed to a stub or plan** is `FILED <ref>` — the key stays live, so a further
-    occurrence counts against the stub instead of vanishing into a closed key.
-  - **A status line's where names its section or item, never its number alone** —
-    `release.md §Rollback`, `review.md *Data migrations*`, not `§4` or `class 9`. A
-    numbered list renumbers when an item is inserted or removed, and nothing notices. A
-    line already written stays as it is until its target moves or goes (the correction
-    below).
-  - **A candidate this run proposed and held** (an autonomous run, or one the user did
-    not answer) is `HELD <today's date> — <letter, class, the proposal in one line>` on
-    its key, and the lines ride **this run's marker commit** — the date is the ref because
-    a commit cannot cite its own sha, and that date names the marker commit (`git log
-    --grep '<markerPattern>' --since <date> --until <date+1>`). HELD is its own state:
-    nothing owns the proposal and nothing picks it up until someone approves, which is
-    why the view lists HELD keys first, with their age, and the next run reports them
-    before anything else. A held candidate keyed to nothing goes in the ledger's Live with
-    *promoting signal: approval*. Approved → `LANDED`; declined → `RETIRED` with the
-    reason. A held proposal that lives only in a commit body is lost to the next run.
-  - **A ruling on a key that moves nothing** — a re-rank, a count-only call at a key whose
-    rule is present, a build trigger on a filed stub, a burst, a partial patch, a re-rank
-    withdrawn — is `ADJUDICATED <today's date> — <the ruling in one line>` on the key, its
-    reason measured like a row's premise before it is written: its own entry,
-    never continuation prose inside an occurrence. It changes neither the state nor the
-    count, `compact` keeps it, and `view --key` shows it, so the next run reads the ruling
-    where the key is instead of in a commit body. A count-only ruling on a key whose
-    every occurrence carries `Caught:` is already written: `--reached` does not show it,
-    and an `ADJUDICATED` line restating that is the re-ruling the tag exists to stop.
-  - **A correction edits one line in place**, after this run's chain reads and before
-    `compact`, in one of two cases:
-    - **A class line the log's own text contradicts** — the occurrence's text, or another
-      occurrence naming it. Replace `Caught:`, `Escaped:`, `Gate-run:`, or `In-work:` with
-      the class that text states, its where and cost taken from that text, so `--reached`
-      reads what the text says. A class resting on your reading rather than the text is a
-      ruling, and an occurrence with no class line is classed as above.
-    - **A status line's where whose target moved or was removed.** The token and the ref
-      stay, since state and `closed citing` read them. When the file changes, keep the old
-      path in the line, `new.md §X (was old.md §Y)`: `--chain` finds a key's markers by
-      the paths its status lines name, so a marker on the old file leaves the chain when
-      the line stops naming it. A target gone with no successor reads `old.md §Y (removed)`.
-
-    Nothing else is corrected: not an occurrence's dated line or text, and not an
-    `ADJUDICATED` or `ARC` line, which records what was decided then. The trace is the
-    commit, which names each line's key and its old and new text; a correction adds no
-    `ADJUDICATED` line, since it decides nothing the log did not already say. The
-    `Process-Review:` trailer is load-bearing here: `--outside` reads a corrected closing
-    line by the commit that last wrote it. Sessions never correct; retro captures a wrong
-    line as a finding.
-    **Union merge keeps both sides of a corrected last line of the file** when a branch
-    forked before the correction lands after it, a rebased tree on your side
-    notwithstanding; any line above the last merges clean. The view and the `guards`
-    `retro-log` check name the result, two class lines or two status lines where one
-    belongs, and the repair keeps the correction.
-  - **A judgment about several keys at once** — this stub field, that trailer, and the
-    pinned form are one deferral converging; this deprecation and its reversal are one
-    spelling arc; a layer proposed "to be proved out" and its later instances — is an
-    `ARC <slug> [<date>] — <one line>` line on each key it rides with: its own entry,
-    changing neither state nor count, kept by `compact` on either side of a closing
-    status. The date is when the key entered the arc, and it is written on a key whose
-    own lines carry none — a closed key compacted to its `LANDED` line — since the writer
-    is the only party who knows it. `view --arc <slug>` then prints those keys by the date
-    each entered, with their dated occurrences and status lines, which *is* the
-    trajectory — attempted, landed, recurred, retired, each dated — derived from the log
-    rather than re-narrated in a marker body; `view --arcs` lists the arcs with their key
-    counts, the read that finds where a new key attaches. The arc's own landings are
-    commits, never keys: a commit that moves an arc carries the trailer `Arc: <slug>`
-    beside `Process-Review:`, and `marker-stream.py list --arc <slug>` prints them dated,
-    so the two reads join on the date and an `ARC` line never lists shas by hand. The
-    commit that enters an arc into the log is bookkeeping by construction — it touches the
-    log and the ledger only — so `--arc` on a fresh arc reads zero organic until a rule
-    commit carries the trailer; that zero is the arc's age, not a missing landing. A
-    per-window verdict on the arc ("a fresh build converging: leave") is one
-    `ADJUDICATED` line on a key the arc carries, its text naming the arc rather than that
-    key's own shape — for an arc whose spine is maintainer-directed commits, the key may
-    be a precursor or a tangent, not a shape the arc produced — and a hypothesis about where the arc
-    goes is a Live ledger watch citing both reads as its re-derive; a direction hypothesis
-    or a positive with nothing to land gets its live home that way, on the exposure keys
-    it rides with, never as a revived `NOTED`. An arc older than the log's keys — its
-    shapes re-keyed into pointers, its carrier the marker stream alone — gets no
-    anchor-only key; its watch cites `git log --grep` and, from its next landing on, the
-    trailer. An arc name is a slug the `guards` `retro-log` check holds. Retire an arc —
-    stop writing the token, leave the lines — when two windows of reading it changed no
-    ruling.
-  - **Then compact:** `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact` — one
-    block per key, closed keys reduced to their status line. It is the only rewrite of
-    the whole file and it is deterministic; a violation it refuses on is repaired by hand first.
-  - **Re-key before you retire.** Entries flagged `key (uncold)` were keyed by the
-    session that did the work, which is the context least able to write a domain-free
-    key — re-key those first, and never read their failure to match as evidence of a
-    one-off. Beyond the flagged ones: an entry that never recurred is either genuinely
-    one-off *or keyed too specifically to ever match* — volume can't tell those apart,
-    and retiring blindly deletes the only evidence that keying is broken, leaving a log
-    that looks healthy and dedups nothing. You read every key at once, which makes you
-    the one context that can spot a key still carrying the nouns of the slice that
-    produced it. Rewrite those at the right altitude instead of dropping them.
-  - **Retirement is a judgment, not a threshold.** The question is *would a future review
-    act differently without this entry?* — decided the way staleness is, bias-to-keep. No
-    fixed age is right for both a repo capturing twice a month and one capturing several
-    times a day.
-  - **Note any key-quality drift in one line** when it holds across the corpus (keys too
-    specific to ever match, or so broad they'd match anything). It is the health signal
-    for the whole dedup mechanism.
-- Update the ledger (`ledgerPath`) — a working file the review reads in full every run,
-  so it holds current state and never a window's narrative. Three sections, each entry a
-  top-level bullet; the `guards` `review-ledger` check, where the repo runs it, is the gate:
-  - **Live** — what was deferred, why, its **promoting signal**, and one
-    `last checked: <date> — <state>` line, rewritten in place each run; each entry at most
-    12 lines — the cap is per entry, the section has none.
-    A dated window line (`09-04: no fire`) is the failure — the state replaces the old
-    state, it does not follow it. The gate for any entry: *would a future review act
-    differently without it?* A Live entry may be **dormant**: it carries one `wake:
-    <condition>` line — a key occurrence in the since-mark view, a path in the window's
-    organic stream, a date — and is re-measured, its `last checked` rewritten, only on a
-    run where the wake holds; otherwise the run reads the wake line and nothing else of
-    it. A watch on a trajectory names `retro-log.py view --arc <slug>` and
-    `marker-stream.py list --arc <slug>` as what re-measures it. The promoting signal stays as written; the wake is the one-line proxy the run
-    tests first. An entry whose signal has not fired for several windows and whose
-    measurement costs more than a line is the case for it.
-  - **Falsifications** — kept whole; their job is stopping a repeat.
-  - **Resolved** — a pointer at the landing commit, at most 3 lines; the commit body
-    keeps the story.
-  - **This run's narrative** — what fired, what was held, the counts — goes in the body
-    of this run's own `<markerPattern>` commit, never into the ledger.
-  - A number recorded in the ledger carries its **generating command**, not just its
-    value — a later run re-measures instead of reconciling stale figures under
-    similar labels.
-- If a tracker issue filed this review (detected tier), close it with a completion note.
-
-## Anti-patterns
-
-- **Writing anything on the first run**, or writing at all under `read-only`.
-- **Dictating a convention** the repo didn't agree to — negotiate, prove it fires, record
-  it once.
-- **Re-deriving the marker** in the moment instead of reading the config.
-- **Eager grand restructures** — a meta-review that over-proposes is worse than none.
-- **Treating stale as broken** — staleness alone never earns a rewrite proposal, only a
-  scrutiny note; bias-to-keep applies double on the negative-space side.
-- **Reading every diff** — respect the funnel; only hot clusters get `git show`, only
-  staleness survivors get `git blame`.
-- **Retiring retro-log entries on age alone**, or retiring one that is merely mis-keyed —
-  re-key first; blind retirement hides the failure it should surface.
-- **Writing a window's narrative into the ledger**, or editing a log line other than a key
-  being re-keyed or one of the two corrections. The commit body is the narrative's home;
-  the stream is otherwise append-only.
-- **Treating retro's disposition as settled.** You have better standing to rank than the
-  session that set it; use it, and record the re-rank.
-- **Counting keys before re-keying them** — the count is then invalidated by your own
-  later re-key, after it has already set the ranking.
-- **Judging `capabilityEvidencePath` from its own contents alone.** A store nothing else
-  writes reads as healthy whether or not the placements addressed to it arrived; the
-  reconciliation against 0b is the only thing that can tell those apart.
-- **Running the full funnel against a corpus with no recurrence** — the gate exists
-  because measurement cost rises with repo size while a fixed funnel's yield does not.
-- **Silent fallback** — always narrate the tier and its upgrade path.
-- **Writing while a peer review is in flight**, or without re-reading the mark and the log
-  blob right before the first write — the pre-flight exists because this command is the
-  one mutator and nothing else serializes it.
-- **Landing on class alone under `apply-mechanical`** — the class admits a candidate to
-  the guards, it never lands one; an amend that drags a script edit, deletes a sentence,
-  sits on a landed or filed key, touches a watched section, or lands half of a pair is
-  held however small it looks, and an invariant doc is never edited unanswered.
-- **Handing the maintainer the record.** Pattern → evidence → proposal per candidate is
-  for the commit body and the next run; a person gets the decision block, and a wording
-  amendment listed as a decision is the row that hides the real one.
-- **A row named by its key, missing its recommendation, or resting on a stale premise** —
-  the Decision names the artifact and the motion, the Recommend column is never empty, and
-  every premise is re-measured against the default branch before the row is written.
-- **Citing a sha the commit cannot know, or one a rebase will rewrite** — the date keys
-  `HELD`; a `LANDED` sha is read back from the remote after the push; and a ruling is an
-  `ADJUDICATED` line, never continuation prose.
-- **Checking the local head for a peer's landing**, or refusing on a clean rebase — the
-  pre-flight reads the remote's default branch and re-derives.
-- **Counting the review's own landings, or log-only bookkeeping, as the window's churn**
-  — the trailer and the path test exist so the trigger measures what no review has seen;
-  a hand-rolled `git log | grep` counts all three kinds and the loop feeds itself.
-- **Reading a domain doc at step 0 because a config lists it.** The core is the authority
-  order and this review's contract; everything else is a keyed read at step 6, opened
-  because a finding named it.
-- **Re-finding an anchor by meaning, or writing a parsed value into a literal unchecked**
-  — a mismatch goes back to the placer, a non-number never reaches the file.
-- **Keying the review's own conduct into the log.** It goes in the economics block and
-  the commit body, as a question to the maintainer; the log is the substrate this
-  command is trying to keep small.
-- **A bare question to the maintainer**, or one that could move a row asked after the
-  table — the question carries the review's answer and its default, or why it is the
-  maintainer's alone, and a row is written after the questions that could move it.
-- **Counting a key's occurrences as independent and unpatched** — a burst is one
-  incident, a landed patch gets its status line, and an organic marker that answers no
-  key is named, since nothing else will count its recurrence.
+- **Every commit carries `Process-Review: <today's date>`** (`git commit --trailer`;
+  `land-process-commit.py` keeps it), so the next run reads none of it as change.
+- **Land first, cite second.** `LANDED <sha>` and any sha the ledger cites are written
+  after the push, each sha read back from the remote by subject, in a commit of its own.
+  From a slice branch, a marker commit lands alone through
+  `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/land-process-commit.py <sha>`, which prints the
+  remote's sha to cite.
+- **Write the evidence-reader's log lines**, after the pre-flight re-check: re-keys first
+  (a re-key edits the key line wherever it appears), then status lines, each as its own
+  entry under its key, never prose inside an occurrence:
+  - `LANDED <sha> — <file §section>`, `RETIRED <date> — <why>`, `UPSTREAM <ref>`,
+    `FILED <ref>` (the key stays live), `REOPENED <date> — patched in part by <sha>; open:
+    <the cost driver>`. A where names a section, never a number alone.
+  - `HELD <date> — <letter, class, the proposal>` for a candidate proposed and not
+    answered; the date names this run's marker commit. A held candidate keyed to nothing
+    goes in the ledger with *promoting signal: approval*.
+  - `ADJUDICATED <date> — <ruling>` for a ruling that moves nothing (a re-rank, a burst, a
+    partial patch, a cluster weighed: `cluster <path> weighed at <n>: <ruling>`).
+  - `ARC <slug> [<date>] — <one line>` for one judgment across several keys; `view --arc`
+    reads the trajectory, and a commit moving an arc carries `Arc: <slug>`.
+  - A correction edits one line in place, in two cases only: a class line the log's own
+    text contradicts, and a status line whose target moved (`new.md §X (was old.md §Y)`,
+    or `(removed)`).
+  Then `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/retro-log.py compact`, and the `guards`
+  `retro-log` check where the repo runs it. A union merge can keep both sides of a
+  corrected last line; the check names it and the repair keeps the correction.
+- **Retire a key by judgment, never by age**: would a future review act differently
+  without it? Re-key a mis-keyed one before retiring it.
+- **The capability store**: append each retro-log placement naming it that has no entry,
+  or record the decline in the ledger.
+- **The ledger** holds current state, never a window's narrative; the `review-ledger` check
+  is its gate. **Live** — each entry what was deferred, why, its promoting signal, and one
+  `last checked: <date> — <state>` line rewritten in place; a dormant
+  entry carries one `wake: <condition>` line and is re-measured only when it holds.
+  **Falsifications** — kept whole. **Resolved** — a pointer to the landing commit. A number recorded carries its generating command.
+- **Record `trigger.cluster`** (default 3) in the config when it was unset, so the backlog
+  is read once.
+- **The run's narrative** — what fired, what was held, the counts, `Opened:`, `Outside:`,
+  `Adherence:`, `Blind:`, `Tally:` — goes in this run's marker commit body.
+- **Advance the mark** to an ancestor of the default branch, after the landings: first
+  `retro-log.py view --keys --since <the commit the log was read at>`, and give any line
+  this run did not write the re-key sweep and a line in the record. Then
+  `git tag -f <markTag> <commit>`, and `git push -f origin refs/tags/<markTag>` if the
+  remote already holds the tag; a local-only tag stays local.

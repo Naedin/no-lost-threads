@@ -243,7 +243,7 @@ def did_text(name, inp):
         ran = [short(c, 70) for c in CONSEQUENTIAL.findall(code)] + scripts_run(code)
         ran = [c for c in dict.fromkeys(ran) if c.split()[0] == "git" and c not in seen
                or c.split()[0] != "git" and c.split()[0] not in seen]
-        return f"{name}({seen})" + (" [ran: " + "; ".join(ran[:6]) + "]" if ran else "")
+        return f"{name}({seen})" + (" [ran: " + "; ".join(ran) + "]" if ran else "")
     if name == "Skill":
         key = (str(inp.get("skill") or "") + " " + str(inp.get("args") or "")).strip()
     elif name == "AskUserQuestion":
