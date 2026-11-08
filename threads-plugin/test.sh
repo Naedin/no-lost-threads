@@ -1378,6 +1378,10 @@ for want in 'author kind robot' 'row type note' 'attachment type voice_command';
 done
 env -u CLAUDE_CODE_SESSION_ID python3 "$er" --probe >/dev/null 2>&1; [ $? -eq 2 ] || fail "a probe with no transcript did not say it could not tell"
 python3 "$er" --probe "$E/old.jsonl" 2>"$E/err"; [ $? -eq 2 ] && grep -q 'no turn marked' "$E/err" || fail "the probe passed a transcript with no human turn"
+grep -q 'a session a person drives' "$E/err" || fail "the no-human-turn probe does not say where to run it"
+printf '%s\n' '{"type":"user","origin":{"kind":"robot"},"message":{"content":"renamed human"}}' > "$E/renamed.jsonl"
+python3 "$er" --probe "$E/renamed.jsonl" 2>"$E/err"
+grep -q 'author kind robot' "$E/err" && ! grep -q 'person drives' "$E/err" || fail "the probe blamed the session beside a format surprise"
 ok "extract-record --probe: exit 2 names a new author, row, or route, or no human turn; a transcript it reads passes quietly"
 
 # ---- workarounds.py changelogs: what a version number cannot say
@@ -1436,6 +1440,24 @@ python3 "$wa" status --root "$D" | grep -q $'^due\tr' || fail "a newer version d
 python3 "$wa" record r 0 --root "$D" 2>/dev/null; printf 'fake\t2.0.5\n' | python3 "$wa" due --root "$D" >/dev/null
 python3 "$wa" status --root "$D" | grep -q $'^due\tr' && fail "an older version re-opened an answered re-test"
 ok "workarounds: a version below an answer is that answer; an unverified premise stays due"
+
+# ---- workarounds.py: a probe that could not tell gave no answer
+C="$tmp/cannot"; mkdir -p "$C/.claude"; git init -q "$C"
+echo '{ "workaroundsPath": ".claude/w.json" }' > "$C/.claude/threads.json"
+: > "$C/x.md"; printf 'echo "noise on stdout"; echo "first"; echo "author kind x" >&2; echo "no transcript here" >&2; exit "$(cat c.code)"\n' > "$C/p.sh"
+echo 2 > "$C/c.code"
+cat > "$C/.claude/w.json" <<'EOF'
+{ "tools": { "fake": "echo 1.0" }, "workarounds": [
+  { "id": "c", "tool": "fake", "observed": "1.0", "probe": "sh p.sh", "sites": ["x.md"] } ] }
+EOF
+cread() { printf 'fake\t1.0\n' | python3 "$wa" due --all --root "$C" | { eval "$(cat)"; } | python3 "$wa" record --root "$C" 2>/dev/null; python3 "$wa" status --root "$C"; }
+cread | grep -q $'^broken\tc\tfake 1.0\tprobe at 1.0 on .*: exit 2 (author kind x; no transcript here)' || fail "a probe that could not tell did not keep its reason: $(python3 "$wa" status --root "$C")"
+[ -n "$(printf 'fake\t1.0\n' | python3 "$wa" due --root "$C")" ] || fail "due did not re-run a probe that could not tell, at the same version"
+echo 0 > "$C/c.code"
+printf 'fake\t1.0\n' | python3 "$wa" due --root "$C" | { eval "$(cat)"; } | python3 "$wa" record --root "$C" 2>/dev/null
+python3 "$wa" status --root "$C" | head -1 | grep -q 'live 1 · retirable 0 · due 0 · broken 0' || fail "a re-run answer did not replace could-not-tell: $(python3 "$wa" status --root "$C")"
+grep -q reason "$C/.git/threads/workarounds-state.json" && fail "an answer kept a stale reason"
+ok "workarounds: a probe that could not tell keeps its stderr reason and is re-run at the same version until it answers"
 
 # ---- adherence.py: a rule with no block reads the hit's own comment leader
 python3 - "$here/scripts/adherence.py" <<'EOF' || fail "adherence default block is not per language"

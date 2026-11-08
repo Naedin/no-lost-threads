@@ -339,7 +339,11 @@ def probe_claude_code(src):
                 if kind not in KNOWN_AUTHORS:
                     surprises.add(f"author kind {kind}")
     if not any(kind == "human" for kind, _ in read_claude_code(src)):
-        surprises.add("no turn marked as the human's")
+        # With no other surprise the format reads fine, so the likely cause is the session;
+        # beside one, the missing human turn is that surprise's symptom and gets no hint.
+        surprises.add("no turn marked as the human's" + ("" if surprises else
+                      " — this session has none (`claude -p`, or started by another session);"
+                      " run the probe from a session a person drives"))
     return sorted(surprises)
 
 

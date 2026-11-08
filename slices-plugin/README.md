@@ -1,9 +1,17 @@
 <!-- audience: human -->
-# slices: the day-one pipeline kit
+# slices: change work sized to its situation
 
-A Claude Code plugin carrying the day-one form of a slice pipeline: the smallest
-set of habits that pays immediately in an AI-assisted repo, shipped as three
-commands whose artifacts are designed to stay stable as the repo later hardens.
+A Claude Code plugin for AI-assisted change work. A change takes the posture and the rigor
+its situation warrants: talk it through, investigate, prototype, do it, or draft and check a
+plan. The situation is read from whether the change's shape is clear, whether it is
+reversible, how large it is, and whether its open questions are checkable or are the user's
+to call; a checkable question is checked, and only the user's calls go to the user. Neither
+planning nor executing is the default posture, a change re-reads its situation when the work
+reveals a different one, and whatever verification guards landing is **never** skipped.
+
+Most changes need none of the commands below. They serve the situations where writing the
+change down pays, as the smallest set of habits that pays immediately, with artifacts
+designed to stay stable as the repo later hardens.
 
 The unit of work is a **slice**: one coherent change argument, independently
 verifiable, carved as large as its coherence requires and bounded only by what one
@@ -20,7 +28,9 @@ a virtue: where the coherent change already fits one context, it ships whole.
   expressed by directory, never by status metadata; a blocker is a named,
   checkable condition or nothing; a `source:` line names where an observation
   came from when that is not this repo's own session.
-- **`/slices:draft <stub>`** — promote a stub into a slice plan. The capture's
+- **`/slices:draft <stub>`** — for a change to shipped behavior whose shape the
+  conversation has not settled; a change whose shape is settled is done from it.
+  Promote a stub into a slice plan. The capture's
   claims are re-verified against current code before anything is built on them,
   and its frame is sized — the value in one sentence, the harm measured, what landed
   since capture, the neighbouring states walked, and every candidate shape (doing less,
@@ -37,7 +47,8 @@ a virtue: where the coherent change already fits one context, it ships whole.
   promotion. The plan ends in a **review digest** — a cold-readable Shape
   paragraph plus every tension point, ranked — so the maintainer reviews the
   contestable decisions, not the whole plan.
-- **`/slices:check <plan>`** — the fresh-context gap check. A sub-agent that did
+- **`/slices:check <plan>`** — for every drafted plan, before it is implemented.
+  The fresh-context gap check. A sub-agent that did
   not write the plan, handed **only its path** (withholding the drafting context
   is load-bearing), tries to break it: reads the frame first and calls a frame narrower than the
   problem `MIS-CARVED` before spending precision on it, re-verifies load-bearing claims at
@@ -53,15 +64,9 @@ a virtue: where the coherent change already fits one context, it ships whole.
   until it survives; every check
   leaves a ledger line in the plan, stamped with the plugin version that wrote it.
 
-Two policies ship as stated rules rather than machinery, deliberately:
-
-- **The two-lane rule.** Full drafting and checking for changes to shipped
-  behavior whose shape is not yet clear; low-risk work (docs, reversible chores) may
-  skip the front of the pipeline — but whatever verification guards landing is
-  **never** skipped.
-- **Process telemetry** belongs to the [`threads`](../threads-plugin/README.md)
-  plugin (marker commits, retro capture, cross-session review). The kits compose;
-  neither duplicates the other.
+**Process telemetry** belongs to the [`threads`](../threads-plugin/README.md) plugin
+(marker commits, retro capture, cross-session review). The kits compose; neither
+duplicates the other.
 
 ## Config
 

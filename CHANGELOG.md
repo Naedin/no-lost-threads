@@ -9,6 +9,19 @@ first per plugin. Versions track each plugin's `version` in its
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## threads [0.30.1] — 2026-11-07
+
+### Fixed
+
+- **A workaround probe that could not tell is run again.** `workarounds.py due` re-runs a `broken` probe on every read, at the same version too, so one session's inconclusive run no longer pins a workaround as broken until the tool updates. The probe's stderr is kept, every line, and shown as the reason.
+- **The transcript probe says when the session is the cause.** `extract-record.py --probe` names a session with no human-marked turn (run by `claude -p`, or started by another session) and says to run it from a session a person drives, unless another surprise shows the format itself changed.
+
+## slices [0.17.0] — 2026-11-07
+
+### Changed
+
+- **The kit is sized to the change, not a pipeline every change runs.** A change takes the posture and rigor its situation warrants (talk it through, investigate, prototype, do it, or draft and check a plan), and most changes need none of the commands. The two-lane rule is gone: what it allowed as an exception is now the stated default. A drafted plan is still not implement-ready until it survives `/slices:check`, and whatever verification guards landing is never skipped.
+
 ## slices [0.16.0] — 2026-11-06
 
 ### Changed

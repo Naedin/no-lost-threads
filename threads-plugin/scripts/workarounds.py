@@ -53,7 +53,9 @@ Each workaround is in one state, measured against its tool's version as last rea
   due        the version moved past `observed` and past the last answer, or the version has
              not been read. A version below an answer is that answer, so a read that flips
              between a desktop app and a CLI re-opens nothing
-  broken     the probe at that version could not tell, or the version is unreadable
+  broken     the probe at that version could not tell, or the version is unreadable. A
+             probe that could not tell gave no answer, so `due` runs it again on every read,
+             at the same version too; its stderr is kept as the reason
 
 Answers are per machine, so they are kept outside the tree, in
 `<git common dir>/threads/workarounds-state.json`, shared by every worktree.
@@ -64,8 +66,9 @@ Modes:
   versions  shell printing `<tool>\\t<first line of its version command>` per tool
   due       read `versions`' lines on stdin and record them; print shell running the probe of
             every due workaround (`--all`: every probed one; `--id`: those named), each
-            printing `<id>\\t<exit>`. A due re-test is listed in `status`, never run.
-  record    read `<id>\\t<exit>` lines on stdin, or one `ID EXIT` pair as arguments — a
+            printing `<id>\\t<exit>\\t<its stderr on one line>`. A due re-test is listed in `status`, never run.
+  record    read `<id>\\t<exit>[\\t<reason>]` lines on stdin, a reason kept only beside an
+            exit that is neither 0 nor 1, or one `ID EXIT` pair as arguments — a
             re-test's answer is recorded this way, 0 still reproduces, 1 no longer — at the
             tool's version as last read
   changelogs  shell fetching each tool's changelog and handing it to `changelog`
@@ -221,7 +224,8 @@ def classify(w, now, results):
         return "live", f"reproduced at {now} on {r['date']}"
     if r["exit"] == 1:
         return "retirable", f"stopped reproducing at {now} on {r['date']} (observed at {w['observed']})"
-    return "broken", f"probe at {now} on {r['date']}: exit {r['exit']}"
+    why = f" ({r['reason']})" if r.get("reason") else ""
+    return "broken", f"probe at {now} on {r['date']}: exit {r['exit']}{why}"
 
 
 def pairs(lines, what):
@@ -340,13 +344,17 @@ def main():
             if not w.get("probe"):
                 continue
             now = versions.get(w["tool"], {}).get("version")
-            chosen = w["id"] in a.id if a.id else (a.all or classify(w, now, results)[0] == "due")
+            chosen = w["id"] in a.id if a.id else (a.all or classify(w, now, results)[0] in ("due", "broken"))
             if chosen and now:
-                print(f"( cd {q(root)} && ( {w['probe']} ) >/dev/null 2>&1 </dev/null; printf '%s\\t%s\\n' {q(w['id'])} \"$?\" )")
+                # stdout is dropped; stderr is captured, every line onto one, so a probe that
+                # cannot tell says why and one surprise never hides another
+                print(f"( cd {q(root)} && e=\"$( {{ ( {w['probe']} ) >/dev/null </dev/null; }} 2>&1 )\"; c=$?; "
+                      f"printf '%s\\t%s\\t%s\\n' {q(w['id'])} \"$c\" \"$(printf '%s\\n' \"$e\" | awk 'NR>1{{printf \"; \"}}{{printf \"%s\", $0}}')\" )")
         return
 
     if a.mode == "record":
-        for wid, code in got:
+        for wid, value in got:
+            code, _, reason = value.partition("\t")
             if wid not in by_id:
                 refuse(f"record: no such workaround {wid}")
             if not re.fullmatch(r"\d+", code.strip()):
@@ -355,6 +363,8 @@ def main():
             if not now:
                 refuse(f"record: {wid}: the version of {by_id[wid]['tool']} has not been read; run `due` first")
             results[wid] = {"version": now, "exit": int(code), "date": today}
+            if int(code) not in (0, 1) and reason.strip():
+                results[wid]["reason"] = " ".join(reason.split())[:400]
         save(spath, state)
         print(f"workarounds: recorded {len(got)}", file=sys.stderr)
         return

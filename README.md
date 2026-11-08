@@ -6,8 +6,8 @@ Workflow tooling for AI-assisted coding. This repository is a Claude Code
 repo's scale warrants; each hardens in place without migrations. Three plugins so
 far: **`threads`** (process learning — `/threads:retro` reviews a single session
 as process telemetry, `/threads:process-review` reads what accumulates across
-sessions), **`slices`** (the day-one slice pipeline — capture, draft,
-gap-check), and **`guards`** (repo guardrails — plain scripts with stable ids
+sessions), **`slices`** (change work sized to its situation — capture, draft,
+and gap-check for the changes where writing it down pays), and **`guards`** (repo guardrails — plain scripts with stable ids
 behind a pre-commit gate, each check's rung set by config).
 
 ## `/threads:retro` — a process-retrospective slash command
@@ -66,14 +66,17 @@ thread is the natural next move.
 
 See [`threads-plugin/README.md`](threads-plugin/README.md) for the full loop.
 
-## `slices` — the day-one pipeline kit
+## `slices` — change work sized to its situation
 
-Three explicit-only commands carrying the smallest slice-pipeline habits that pay
-immediately: **`/slices:capture`** files a one-concern, low-trust stub the moment
+A change takes the posture and rigor its situation warrants (talk it through,
+investigate, prototype, do it, or draft and check a plan), and neither planning nor
+executing is the default. Most changes need none of the three explicit-only commands;
+they carry the smallest habits that pay when writing a change down does:
+**`/slices:capture`** files a one-concern, low-trust stub the moment
 work is discovered; **`/slices:draft`** promotes a stub into a plan that
 re-verifies the capture's claims and ends in a review digest (shape + every
 tension point, ranked); **`/slices:check`** hands the plan to a fresh-context
-adversary told only its path — no plan is implement-ready until it survives. The
+adversary told only its path — no drafted plan is implement-ready until it survives. The
 artifacts are the contract, so later hardening (lint, ledgers, gates) only
 appends to them. Full spec: [`slices-plugin/README.md`](slices-plugin/README.md).
 
